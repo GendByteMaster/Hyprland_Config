@@ -91,6 +91,26 @@ t.test("uninstall without active state is harmless", function()
   command.remove_tree(root)
 end)
 
+t.test("uninstall tolerates a missing system monitor from legacy install state", function()
+  local root = temp_dir("legacy-no-monitor")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  local calls = {}
+  fake_repo(repo)
+  install({ home = home, repo_root = repo, timestamp = "backup" })
+
+  local monitor = paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")
+  assert(command.remove(monitor))
+
+  local result = uninstaller.uninstall({ home = home, omarchy_runtime = fake_runtime(calls) })
+  t.truthy(result.changed)
+  t.eq(#calls, 0)
+  t.eq(command.exists(paths.join(home, ".local", "state", "hyprland_config", "active.state")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud")), false)
+
+  command.remove_tree(root)
+end)
+
 t.test("uninstall aborts before deleting an unrelated replacement", function()
   local root = temp_dir("uninstall-conflict")
   local home = paths.join(root, "home")
