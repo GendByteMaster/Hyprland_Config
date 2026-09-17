@@ -4,14 +4,19 @@ local PLUGIN_ID = "gendbyte.mouse-hud"
 local MODES = { mouse = true, numpad = true }
 local BUTTONS = { LMB = true, RMB = true, MMB = true }
 
+local function shell_quote(value)
+  return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+end
+
 function M.new(hl, o)
   local client = {}
+  local quote = type(o.shell_quote) == "function" and o.shell_quote or shell_quote
 
   function client.show(mode, button)
     if not MODES[mode] or not BUTTONS[button] then
       return false
     end
-    if type(hl.exec_cmd) ~= "function" or type(o.shell_quote) ~= "function" then
+    if type(hl.exec_cmd) ~= "function" then
       return false
     end
 
@@ -20,7 +25,7 @@ function M.new(hl, o)
       "omarchy-shell shell summon "
         .. PLUGIN_ID
         .. " "
-        .. o.shell_quote(payload)
+        .. quote(payload)
     )
     return true
   end
