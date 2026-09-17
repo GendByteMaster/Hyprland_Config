@@ -55,6 +55,7 @@ function M.uninstall(options)
   local target_system_monitor = paths.join(home, ".config", "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
   local backup_bindings = state.backup_dir ~= "" and paths.join(state.backup_dir, "hypr", "bindings.lua") or nil
   local backup_workstation = state.backup_dir ~= "" and paths.join(state.backup_dir, "hypr", "workstation") or nil
+  local monitor_present = command.exists_or_symlink(target_system_monitor)
 
   if not target_is(target_bindings, source_bindings) then
     error("managed bindings.lua was modified; refusing to remove it")
@@ -65,7 +66,7 @@ function M.uninstall(options)
   if not target_is(target_hud, source_hud) then
     error("managed Mouse Mode HUD plugin was modified; refusing to remove it")
   end
-  if not target_is(target_system_monitor, source_system_monitor) then
+  if monitor_present and not target_is(target_system_monitor, source_system_monitor) then
     error("managed System Monitor plugin was modified; refusing to remove it")
   end
   if state.preserved_bindings then
@@ -80,17 +81,24 @@ function M.uninstall(options)
     error("preserved workstation backup is missing")
   end
 
-  if not omarchy_runtime.available() then
-    error("Omarchy CLI is required to disable the System Monitor plugin")
-  end
-  if not omarchy_runtime.disable_plugin(SYSTEM_MONITOR_PLUGIN_ID) then
-    error("failed to disable System Monitor plugin")
+  -- v0.1 install state predates the System Monitor plugin. If that path is
+  -- absent there is nothing to disable or remove; existing paths still have
+  -- to match the repository-owned symlink before we touch them.
+  if monitor_present then
+    if not omarchy_runtime.available() then
+      error("Omarchy CLI is required to disable the System Monitor plugin")
+    end
+    if not omarchy_runtime.disable_plugin(SYSTEM_MONITOR_PLUGIN_ID) then
+      error("failed to disable System Monitor plugin")
+    end
   end
 
   assert(command.remove(target_bindings), "failed to remove managed bindings.lua")
   assert(command.remove(target_workstation), "failed to remove managed workstation directory")
   assert(command.remove(target_hud), "failed to remove Mouse Mode HUD plugin")
-  assert(command.remove(target_system_monitor), "failed to remove System Monitor plugin")
+  if monitor_present then
+    assert(command.remove(target_system_monitor), "failed to remove System Monitor plugin")
+  end
 
   if state.preserved_bindings then
     assert(command.move(backup_bindings, target_bindings), "failed to restore previous bindings.lua")
