@@ -1,9 +1,27 @@
 local t = require("tests.testlib")
 local mouse = require("hypr.workstation.mouse")
 
+local function fake_store(initial)
+  local store = { value = initial }
+
+  function store.load()
+    return store.value
+  end
+
+  function store.save(value)
+    store.value = value
+  end
+
+  function store.clear()
+    store.value = nil
+  end
+
+  return store
+end
+
 local function fake_api()
   local calls = {
-    binds = {}, rebinds = {}, dispatches = {}, timers = {}, events = {}, notifications = {}
+    binds = {}, rebinds = {}, dispatches = {}, timers = {}, events = {}, notifications = {}, configs = {}
   }
   local current_definition = "reset"
   local current_submap = ""
@@ -18,6 +36,7 @@ local function fake_api()
   function hl.dsp.cursor.move(args) return { kind = "cursor_move", x = args.x, y = args.y } end
   function hl.dsp.send_key_state(args) return { kind = "send_key_state", key = args.key, state = args.state, mods = args.mods } end
   function hl.dsp.exec_cmd() error("Mouse Mode must not execute external commands") end
+  function hl.config(options) table.insert(calls.configs, options) end
   function hl.bind(keys, dispatcher, options)
     table.insert(calls.binds, { submap = current_definition, keys = keys, dispatcher = dispatcher, options = options or {} })
   end
@@ -59,14 +78,17 @@ local function fake_api()
   return hl, o, calls, find_bind
 end
 
-t.test("register reserves Super M and defines mouse submap keys", function()
+t.test("register reserves Num Lock and starts with Num Lock enabled", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o)
+  local store = fake_store(nil)
+  mouse.register(hl, o, { numlock_store = store })
 
   t.eq(#calls.rebinds, 1)
-  t.eq(calls.rebinds[1].keys, "SUPER + M")
-  t.eq(calls.rebinds[1].description, "Mouse mode")
+  t.eq(calls.rebinds[1].keys, "Num_Lock")
+  t.eq(calls.rebinds[1].description, "Mouse mode / Num Lock")
   t.truthy(calls.rebinds[1].options.submap_universal)
+  t.truthy(calls.rebinds[1].options.non_consuming)
+  t.eq(calls.configs[1].input.numlock_by_default, true)
   t.truthy(find("KP_8", false))
   t.truthy(find("KP_Up", false))
   t.truthy(find("KP_2", false))
@@ -76,12 +98,35 @@ t.test("register reserves Super M and defines mouse submap keys", function()
   t.truthy(find("KP_Insert", false))
   t.truthy(find("KP_Decimal", false))
   t.truthy(find("KP_Delete", false))
-  t.truthy(find("escape", false))
+  t.eq(find("escape", false), nil)
+end)
+
+t.test("Num Lock off enables Mouse Mode and Num Lock on disables it", function()
+  local hl, o, calls = fake_api()
+  local store = fake_store(true)
+  mouse.register(hl, o, { numlock_store = store })
+  local numlock = calls.rebinds[1].dispatcher
+
+  numlock()
+  t.eq(store.value, false)
+  t.eq(calls.dispatches[#calls.dispatches].name, "mouse")
+
+  numlock()
+  t.eq(store.value, true)
+  t.eq(calls.dispatches[#calls.dispatches].name, "reset")
+end)
+
+t.test("reload restores Mouse Mode when session Num Lock state is off", function()
+  local hl, o, calls = fake_api()
+  local store = fake_store(false)
+  mouse.register(hl, o, { numlock_store = store })
+
+  t.eq(calls.dispatches[#calls.dispatches].name, "mouse")
 end)
 
 t.test("movement uses cursor dispatcher with acceleration and release reset", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o)
+  mouse.register(hl, o, { numlock_store = fake_store(true) })
   local up = find("KP_8", false)
   local up_release = find("KP_8", true)
 
@@ -98,7 +143,7 @@ end)
 
 t.test("diagonal movement is normalized", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o)
+  mouse.register(hl, o, { numlock_store = fake_store(true) })
   find("KP_9", false).dispatcher()
   local action = calls.dispatches[#calls.dispatches]
   t.eq(action.x, 102)
@@ -107,7 +152,7 @@ end)
 
 t.test("click mappings send pointer key states", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o)
+  mouse.register(hl, o, { numlock_store = fake_store(true) })
 
   find("KP_5", false).dispatcher()
   t.eq(calls.dispatches[#calls.dispatches - 1].key, "mouse:272")
@@ -123,7 +168,7 @@ end)
 
 t.test("double click schedules the second click", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o)
+  mouse.register(hl, o, { numlock_store = fake_store(true) })
   find("KP_Add", false).dispatcher()
   t.eq(#calls.timers, 1)
   t.eq(calls.timers[1].options.type, "oneshot")
@@ -135,7 +180,7 @@ end)
 
 t.test("held left button is released on explicit release and cleanup", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o)
+  mouse.register(hl, o, { numlock_store = fake_store(true) })
   find("KP_0", false).dispatcher()
   find("KP_0", false).dispatcher()
   t.eq(calls.dispatches[#calls.dispatches].state, "down")
@@ -150,17 +195,11 @@ t.test("held left button is released on explicit release and cleanup", function(
   t.eq(calls.dispatches[#calls.dispatches].state, "up")
 end)
 
-t.test("Super M toggles submap and Esc exits it", function()
-  local hl, o, calls, find = fake_api()
-  mouse.register(hl, o)
-  local toggle = calls.rebinds[1].dispatcher
+t.test("Hyprland shutdown clears the session Num Lock state", function()
+  local hl, o, calls = fake_api()
+  local store = fake_store(false)
+  mouse.register(hl, o, { numlock_store = store })
 
-  toggle()
-  t.eq(calls.dispatches[#calls.dispatches].name, "mouse")
-  toggle()
-  t.eq(calls.dispatches[#calls.dispatches].name, "reset")
-
-  toggle()
-  find("escape", false).dispatcher()
-  t.eq(calls.dispatches[#calls.dispatches].name, "reset")
+  calls.events["hyprland.shutdown"]()
+  t.eq(store.value, nil)
 end)
