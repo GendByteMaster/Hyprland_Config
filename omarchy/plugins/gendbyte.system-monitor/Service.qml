@@ -17,6 +17,8 @@ Item {
 
   readonly property string collectorPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/gendbyte.system-monitor/telemetry-collector.lua"
 
+  Component.onCompleted: collector.running = true
+
   function parseMetric(value) {
     var text = String(value === undefined ? "" : value).trim()
     if (text === "-" || text === "") return null
@@ -53,12 +55,10 @@ Item {
 
   Process {
     id: collector
-    command: ["lua5.1", root.collectorPath]
-    running: true
+    command: ["setpriv", "--pdeathsig", "TERM", "lua5.1", root.collectorPath]
     stdout: SplitParser {
       onRead: function(line) { root.acceptSample(line) }
     }
-    onStarted: root.collectorHealthy = true
     onExited: function(exitCode) {
       root.collectorHealthy = false
       restartTimer.restart()
@@ -69,6 +69,8 @@ Item {
     id: restartTimer
     interval: 5000
     repeat: false
-    onTriggered: if (!collector.running) collector.running = true
+    onTriggered: {
+      if (!collector.running) collector.running = true
+    }
   }
 }
