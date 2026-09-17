@@ -103,17 +103,11 @@ function M.register(hl, o, options)
 
   local function enter()
     cleanup()
-    if hl.get_current_submap() ~= "mouse" then
-      dispatch(hl.dsp.submap("mouse"))
-    end
     show_hud("mouse")
   end
 
   local function exit()
     cleanup()
-    if hl.get_current_submap() == "mouse" then
-      dispatch(hl.dsp.submap("reset"))
-    end
     show_hud("numpad")
   end
 
@@ -125,6 +119,17 @@ function M.register(hl, o, options)
       exit()
     else
       enter()
+    end
+  end
+
+  local function mouse_only(action)
+    return function(...)
+      if numlock_on then
+        return { ok = false }
+      end
+
+      action(...)
+      return { ok = true }
     end
   end
 
@@ -191,46 +196,47 @@ function M.register(hl, o, options)
     non_consuming = true,
   })
 
-  hl.define_submap("mouse", function()
-    for _, direction in ipairs(DIRECTIONS) do
-      local current = direction
-      bind_aliases(hl, current.keys, function()
-        move(current)
-      end, { repeating = true })
+  -- Mouse Mode deliberately stays in the global submap. Each NumPad bind is
+  -- auto-consuming only while Num Lock is off; with Num Lock on it returns
+  -- { ok = false }, so the original key event reaches the focused app. This
+  -- keeps Omarchy's global shortcuts (Super+1..10, Super+arrows, etc.) alive.
+  for _, direction in ipairs(DIRECTIONS) do
+    local current = direction
+    bind_aliases(hl, current.keys, mouse_only(function()
+      move(current)
+    end), { repeating = true, auto_consuming = true })
 
-      bind_aliases(hl, current.keys, function()
-        reset_direction(current)
-      end, { release = true })
-    end
+    bind_aliases(hl, current.keys, mouse_only(function()
+      reset_direction(current)
+    end), { release = true, auto_consuming = true })
+  end
 
-    hl.bind("KP_Divide", function()
-      select_button("LMB")
-    end)
-    hl.bind("KP_Multiply", function()
-      select_button("RMB")
-    end)
-    hl.bind("KP_Subtract", function()
-      select_button("MMB")
-    end)
+  hl.bind("KP_Divide", mouse_only(function()
+    select_button("LMB")
+  end), { auto_consuming = true })
+  hl.bind("KP_Multiply", mouse_only(function()
+    select_button("RMB")
+  end), { auto_consuming = true })
+  hl.bind("KP_Subtract", mouse_only(function()
+    select_button("MMB")
+  end), { auto_consuming = true })
 
-    bind_aliases(hl, { "KP_5", "KP_Begin" }, function()
-      click(selected.key)
-    end)
-    hl.bind("KP_Add", double_click_selected)
-    bind_aliases(hl, { "KP_0", "KP_Insert" }, hold_selected)
-    bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, release_held)
-  end)
+  bind_aliases(hl, { "KP_5", "KP_Begin" }, mouse_only(function()
+    click(selected.key)
+  end), { auto_consuming = true })
+  hl.bind("KP_Add", mouse_only(double_click_selected), { auto_consuming = true })
+  bind_aliases(hl, { "KP_0", "KP_Insert" }, mouse_only(hold_selected), { auto_consuming = true })
+  bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, mouse_only(release_held), { auto_consuming = true })
 
   hl.on("config.reloaded", function()
-    if not numlock_on and hl.get_current_submap() ~= "mouse" then
-      enter()
+    cleanup()
+    if not numlock_on then
+      show_hud("mouse")
     end
   end)
 
-  hl.on("keybinds.submap", function(name)
-    if name ~= "mouse" then
-      cleanup()
-    end
+  hl.on("keybinds.submap", function()
+    cleanup()
   end)
 
   -- Hyprland 0.56 does not expose config.unload. Keep reload compatibility
