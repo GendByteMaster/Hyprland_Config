@@ -40,6 +40,22 @@ t.test("sound assets decode bundled base64 into local Ogg files", function()
   command.remove_tree(root)
 end)
 
+t.test("vendored UI SFX mechanical cues decode to the published asset sizes", function()
+  local root = temp_dir("sound-assets-vendored")
+  local home = paths.join(root, "home")
+  local result = sound_assets.install({ home = home, repo_root = "." })
+
+  t.truthy(result.ok)
+  local on = read(paths.join(home, ".local", "share", "hyprland_config", "sounds", "toggle-on.ogg"))
+  local off = read(paths.join(home, ".local", "share", "hyprland_config", "sounds", "toggle-off.ogg"))
+  t.eq(on:sub(1, 4), "OggS")
+  t.eq(off:sub(1, 4), "OggS")
+  t.eq(#on, 2674)
+  t.eq(#off, 2532)
+
+  command.remove_tree(root)
+end)
+
 t.test("sound asset installation is best effort when bundled files are unavailable", function()
   local root = temp_dir("sound-assets-missing")
   local result = sound_assets.install({
