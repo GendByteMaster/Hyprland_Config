@@ -80,17 +80,75 @@ function M.register(hl, o, options)
     hl.dispatch(action)
   end
 
-  local function send_button(key, key_state)
+  local function send_button(key, key_state, target_window)
     dispatch(hl.dsp.send_key_state({
       mods = "",
       key = key,
       state = key_state,
+      window = target_window,
     }))
   end
 
+  local function window_contains_cursor(window, cursor)
+    if not window or not cursor then
+      return false
+    end
+    if window.mapped == false or window.visible == false or window.accepts_input == false then
+      return false
+    end
+
+    local at = window.at
+    local size = window.size
+    if not at or not size then
+      return false
+    end
+    if type(at.x) ~= "number" or type(at.y) ~= "number" or type(size.x) ~= "number" or type(size.y) ~= "number" then
+      return false
+    end
+    if size.x <= 0 or size.y <= 0 then
+      return false
+    end
+
+    return cursor.x >= at.x and cursor.x < at.x + size.x
+      and cursor.y >= at.y and cursor.y < at.y + size.y
+  end
+
+  local function window_at_cursor()
+    if type(hl.get_windows) ~= "function" then
+      return nil
+    end
+
+    local cursor = hl.get_cursor_pos()
+    local windows = hl.get_windows({ mapped = true }) or {}
+    local candidate = nil
+
+    for _, window in ipairs(windows) do
+      if window_contains_cursor(window, cursor) then
+        if window.active then
+          return window
+        end
+
+        if not candidate or (window.floating and not candidate.floating) then
+          candidate = window
+        end
+      end
+    end
+
+    return candidate
+  end
+
+  local function focus_cursor_target()
+    local target = window_at_cursor()
+    if target and not target.active then
+      dispatch(hl.dsp.focus({ window = target }))
+    end
+    return target
+  end
+
   local function click(key)
-    send_button(key, "down")
-    send_button(key, "up")
+    local target = focus_cursor_target()
+    send_button(key, "down", target)
+    send_button(key, "up", target)
   end
 
   local function release_held()
