@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "gendbyte.system-monitor",
+  "name": "System Monitor",
+  "version": "0.2.0",
+  "author": "GendByteMaster",
+  "description": "CPU, RAM and temperature summary with Activity launcher",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "System Monitor",
+    "description": "CPU, RAM and CPU temperature",
+    "category": "System",
+    "aliases": ["cpu", "ram", "temperature", "activity", "btop"],
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
