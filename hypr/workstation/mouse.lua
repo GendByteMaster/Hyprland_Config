@@ -233,10 +233,8 @@ function M.register(hl, o, options)
     end
   end)
 
-  pcall(function()
-    hl.on("config.unload", cleanup)
-  end)
-
+  -- Hyprland 0.56 does not expose config.unload. Keep reload compatibility
+  -- by relying on config.reloaded and hyprland.shutdown, both supported there.
   hl.on("hyprland.shutdown", function()
     cleanup()
     numlock_store.clear()
