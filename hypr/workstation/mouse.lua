@@ -1,4 +1,5 @@
 local mouse_state = require("hypr.workstation.mouse_state")
+local numlock_store_module = require("hypr.workstation.numlock_store")
 
 local M = {}
 
@@ -24,10 +25,21 @@ local function bind_aliases(hl, keys, dispatcher, options)
   end
 end
 
-function M.register(hl, o)
+function M.register(hl, o, options)
+  options = options or {}
+
   local state = mouse_state.new()
+  local numlock_store = options.numlock_store or numlock_store_module.session()
+  local saved_numlock = numlock_store.load()
+  local numlock_on = saved_numlock == nil and true or saved_numlock
   local left_held = false
   local live_timers = {}
+
+  hl.config({
+    input = {
+      numlock_by_default = true,
+    },
+  })
 
   local function dispatch(action)
     hl.dispatch(action)
@@ -70,18 +82,25 @@ function M.register(hl, o)
 
   local function enter()
     cleanup()
-    dispatch(hl.dsp.submap("mouse"))
-    notify("Mouse Mode", "info")
+    if hl.get_current_submap() ~= "mouse" then
+      dispatch(hl.dsp.submap("mouse"))
+    end
+    notify("Mouse Mode — Num Lock OFF", "info")
   end
 
   local function exit()
     cleanup()
-    dispatch(hl.dsp.submap("reset"))
-    notify("Mouse Mode off", "ok")
+    if hl.get_current_submap() == "mouse" then
+      dispatch(hl.dsp.submap("reset"))
+    end
+    notify("Mouse Mode off — Num Lock ON", "ok")
   end
 
-  local function toggle()
-    if hl.get_current_submap() == "mouse" then
+  local function on_numlock()
+    numlock_on = not numlock_on
+    numlock_store.save(numlock_on)
+
+    if numlock_on then
       exit()
     else
       enter()
@@ -131,7 +150,10 @@ function M.register(hl, o)
     end
   end
 
-  o.rebind("SUPER + M", "Mouse mode", toggle, { submap_universal = true })
+  o.rebind("Num_Lock", "Mouse mode / Num Lock", on_numlock, {
+    submap_universal = true,
+    non_consuming = true,
+  })
 
   hl.define_submap("mouse", function()
     for _, direction in ipairs(DIRECTIONS) do
@@ -157,7 +179,12 @@ function M.register(hl, o)
     end)
     bind_aliases(hl, { "KP_0", "KP_Insert" }, hold_left)
     bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, release_left)
-    hl.bind("escape", exit)
+  end)
+
+  hl.on("config.reloaded", function()
+    if not numlock_on and hl.get_current_submap() ~= "mouse" then
+      enter()
+    end
   end)
 
   hl.on("keybinds.submap", function(name)
@@ -165,7 +192,12 @@ function M.register(hl, o)
       cleanup()
     end
   end)
+
   hl.on("config.unload", cleanup)
+  hl.on("hyprland.shutdown", function()
+    cleanup()
+    numlock_store.clear()
+  end)
 end
 
 return M
