@@ -16,6 +16,7 @@ Omarchy
       └─ ~/.config/hypr/bindings.lua
           ├─ preserved personal bindings
           └─ hypr.workstation.mouse
+              ├─ Num Lock state bridge
               ├─ Hyprland submap
               ├─ cursor movement
               ├─ acceleration
@@ -28,9 +29,18 @@ Omarchy already ships Lua 5.1 for standalone tooling. Hyprland supplies the Lua 
 
 ## Mouse Mode
 
-Press `Super + M` to enter Mouse Mode. Press `Esc` or `Super + M` again to leave it.
+Num Lock is the mode switch:
 
-| Key | Action |
+```text
+Num Lock OFF -> Mouse Mode ON
+Num Lock ON  -> Mouse Mode OFF / normal NumPad
+```
+
+The project sets `numlock_by_default = true`, so a fresh Hyprland session starts with normal NumPad behavior. Pressing Num Lock turns Num Lock off and enters the `mouse` submap; pressing it again turns Num Lock on and returns to the normal submap.
+
+`Num_Lock` is registered as a `submap_universal` and `non_consuming` bind so it continues to work while Mouse Mode is active and the real Num Lock state still changes. `Super + M` is not used by v0.1.
+
+| Key while Num Lock is OFF | Action |
 | --- | --- |
 | NumPad 8 | Move up |
 | NumPad 2 | Move down |
@@ -46,9 +56,9 @@ Press `Super + M` to enter Mouse Mode. Press `Esc` or `Super + M` again to leave
 | NumPad - | Middle click |
 | NumPad 0 | Hold left button |
 | NumPad . | Release left button |
-| Esc | Exit Mouse Mode |
+| Num Lock | Return to normal NumPad |
 
-Both NumLock-on keypad symbols and their NumLock-off navigation aliases are registered where applicable.
+Both numeric keypad symbols and their NumLock-off navigation aliases are registered where applicable.
 
 Movement accelerates while a direction is held:
 
@@ -60,6 +70,16 @@ repeats 11+   -> 24 px
 ```
 
 Diagonal movement is normalized so it is not faster than horizontal/vertical movement.
+
+### Reload synchronization
+
+The Mouse Mode state is kept in a tiny data file under `XDG_RUNTIME_DIR`, scoped by the current `HYPRLAND_INSTANCE_SIGNATURE`.
+
+This means:
+
+- `hyprctl reload` preserves `Num Lock OFF -> Mouse Mode ON`;
+- a new Hyprland instance starts clean with Num Lock ON;
+- no shell command or external daemon is used from the Mouse Mode callbacks.
 
 ## Install
 
@@ -82,7 +102,7 @@ Existing files are preserved under:
 ~/.local/state/hyprland_config/backups/<timestamp>/
 ```
 
-The managed `bindings.lua` loads a preserved previous user bindings file first, then registers the workstation overrides. `Super + M` is intentionally claimed with `o.rebind` for Mouse Mode.
+The managed `bindings.lua` loads a preserved previous user bindings file first, then registers the workstation overrides. `Num_Lock` is intentionally claimed with `o.rebind` for Mouse Mode.
 
 After installation reload Hyprland:
 
@@ -126,6 +146,7 @@ hypr/
   workstation/
     mouse.lua
     mouse_state.lua
+    numlock_store.lua
 
 lua/workstation/
   command.lua
@@ -139,6 +160,7 @@ tests/
   run.lua
   testlib.lua
   mouse_state_test.lua
+  numlock_store_test.lua
   mouse_test.lua
   installer_test.lua
   uninstaller_test.lua
@@ -151,10 +173,10 @@ verify.lua
 
 ## Roadmap
 
-- **v0.1** — Omarchy integration + Mouse Mode
+- **v0.1** — Omarchy integration + Num Lock Mouse Mode
 - **v0.2** — system monitoring/dashboard
 - **v0.3** — Ghostty/Warp-like workflow layer
 - **v0.4** — Project Launcher/workspace orchestration
 - **v0.5** — unified Command Center and optional custom shell UI
 
-The later layers will keep the same rule: use Lua for project-owned logic where it is technically appropriate, while keeping Hyprland, Omarchy, Ghostty, Git, Docker, systemd and other system components as external foundations rather than reimplementing them.
+The later layers keep the same rule: use Lua for project-owned logic where it is technically appropriate, while keeping Hyprland, Omarchy, Ghostty, Git, Docker, systemd and other system components as external foundations rather than reimplementing them.
