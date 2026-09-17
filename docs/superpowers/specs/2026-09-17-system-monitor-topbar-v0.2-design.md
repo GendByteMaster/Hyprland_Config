@@ -4,10 +4,10 @@
 
 Add lightweight workstation telemetry to the Omarchy top bar without building a second system-monitoring application.
 
-v0.2 keeps `btop`/Omarchy Activity as the detailed monitor and adds a small always-visible summary in the bar:
+v0.2 keeps `btop`/Omarchy Activity as the detailed monitor and adds an always-visible summary such as:
 
 ```text
-CPU 12% · RAM 38% · 54°C
+CPU 18% 3.4GHz · RAM 20% 6.2/31.3GB · GPU 24% · ↓1.2MB/s ↑340KB/s · 54°C
 ```
 
 Left-clicking the widget launches or focuses the existing Omarchy `btop` Activity window.
@@ -17,38 +17,48 @@ Left-clicking the widget launches or focuses the existing Omarchy `btop` Activit
 v0.2 is a native third-party Omarchy shell plugin with two kinds:
 
 - `service` — owns telemetry collection and normalized state;
-- `bar-widget` — renders the compact topbar summary and opens Activity.
+- `bar-widget` — renders the topbar summary and opens Activity.
 
-We will not replace `omarchy.bar`, clone the full bar, create a second dashboard, or bind `Super + H`.
+We do not replace `omarchy.bar`, clone the full bar, create a second monitoring dashboard, or bind `Super + H`.
 
-This follows Omarchy's supported plugin boundary: custom plugins live under `~/.config/omarchy/plugins/`, `bar-widget` components can be placed in the active bar, and the built-in bar remains the owner of layout, theme, drag/reorder behavior, and multi-monitor rendering.
+Custom files remain under the user's configuration boundary. `/usr/share/omarchy` is never modified.
 
 ## User experience
 
 ### Horizontal top bar
 
-Default presentation:
+The widget renders available metrics in this order:
 
 ```text
-CPU 12% · RAM 38% · 54°C
+CPU <usage>% [<GHz>GHz] · RAM <usage>% [<used>/<total>GB] · [GPU <usage>%] · [↓<RX>/s ↑<TX>/s] · [<temp>°C]
+```
+
+Example:
+
+```text
+CPU 18% 3.4GHz · RAM 20% 6.2/31.3GB · GPU 24% · ↓1.2MB/s ↑340KB/s · 54°C
 ```
 
 Rules:
 
-- CPU and RAM are always shown when valid samples exist.
-- Temperature is shown only when a usable CPU/package sensor is available.
-- Before the first valid CPU delta sample, CPU renders as `CPU --%` rather than reporting a false zero.
-- If one metric becomes stale or unavailable, the remaining valid metrics continue to render.
-- Values use integer display precision in the bar; detailed precision belongs in `btop`.
+- CPU and RAM utilization remain the primary metrics.
+- CPU frequency is shown when a valid current frequency can be read.
+- RAM used/total is shown in GiB, displayed with the compact `GB` label.
+- GPU utilization is optional and omitted when no supported source is available.
+- Network RX/TX is calculated from byte-counter deltas and omitted until a valid second sample exists.
+- CPU/package temperature is optional and omitted when no valid sensor is available.
+- Missing optional metrics never render as healthy zeroes.
+- Before the first valid CPU delta, CPU renders as `CPU --%`.
 - Styling uses Omarchy bar/theme properties rather than hard-coded colors.
-- The widget defaults to the `right` bar section and remains movable through normal Omarchy bar controls.
+- The widget defaults to the `right` bar section and remains movable through normal Omarchy controls.
+- Vertical bar mode stays compact and does not attempt to render the full horizontal summary.
 
 ### Interaction
 
-- **Left click:** run `omarchy-launch-or-focus-tui btop`, which uses Omarchy's normal `org.omarchy.btop` app id and focuses an existing Activity window when one already exists.
-- **Hover:** show a concise tooltip such as `Open Activity (btop)` plus the last refresh age when useful.
+- **Left click:** run `omarchy-launch-or-focus-tui btop`.
+- **Hover:** show the current summary and indicate when telemetry is unavailable.
+- Existing Omarchy Activity shortcuts remain untouched.
 - No custom right-click menu is required for v0.2.
-- Existing `Super + Ctrl + T` Activity behavior remains untouched.
 
 The widget is a launcher/summary, not an alternative process manager.
 
@@ -59,103 +69,126 @@ Omarchy / Quickshell
 └─ omarchy.bar
    └─ gendbyte.system-monitor (bar-widget)
       └─ hosted gendbyte.system-monitor service
-         └─ telemetry collector process
-            ├─ /proc/stat       -> CPU utilization
-            ├─ /proc/meminfo    -> memory utilization
-            └─ /sys/...         -> CPU/package temperature
+         └─ one long-lived Lua collector
+            ├─ /proc/stat                         -> CPU utilization
+            ├─ /sys/devices/system/cpu/...       -> CPU frequency
+            │   └─ /proc/cpuinfo fallback
+            ├─ /proc/meminfo                      -> RAM usage + GiB
+            ├─ /proc/net/dev                      -> RX/TX counters
+            ├─ /sys/class/drm/...gpu_busy_percent -> GPU utilization
+            │   └─ nvidia-smi fallback when installed
+            └─ /sys/class/hwmon + thermal         -> CPU temperature
 
 left click
    └─ omarchy-launch-or-focus-tui btop
       └─ existing Omarchy Activity window
 ```
 
-Proposed repository layout:
+Repository ownership:
 
 ```text
 omarchy/plugins/gendbyte.system-monitor/
 ├── manifest.json
 ├── Service.qml
+├── ServiceHost.js
 ├── BarWidget.qml
-└── ServiceHost.js
+└── telemetry-collector.lua
 
 lua/workstation/
-└── telemetry.lua
+├── telemetry.lua
+└── telemetry_collector.lua
+
+telemetry-collector.lua
 
 tests/
-└── telemetry_test.lua
+├── telemetry_test.lua
+├── telemetry_collector_test.lua
+└── system_monitor_plugin_test.lua
 ```
 
-### `telemetry.lua`
+## Telemetry model
 
-The Lua module owns parsing and metric calculations so the data logic is deterministic and testable outside a live Quickshell session.
+### Pure parsing/calculation layer
 
-Responsibilities:
+`lua/workstation/telemetry.lua` owns deterministic parsing and calculations:
 
-- parse aggregate CPU counters from `/proc/stat`;
-- calculate CPU utilization from two consecutive counter snapshots;
-- parse `MemTotal` and `MemAvailable` from `/proc/meminfo` and calculate used-memory percentage;
-- discover a CPU/package temperature source under `/sys/class/hwmon/` first, with `/sys/class/thermal/` as a fallback;
-- reject malformed, impossible, or missing values rather than coercing them to zero;
-- emit a small machine-readable sample for the shell service.
+- aggregate CPU counters and CPU delta utilization;
+- average CPU frequency from `scaling_cur_freq` values;
+- `/proc/cpuinfo` MHz fallback parsing;
+- `MemTotal`/`MemAvailable`, memory percentage, used/total GiB;
+- `/proc/net/dev` aggregation excluding `lo`;
+- network byte rates from two samples and elapsed time;
+- GPU percentage validation;
+- temperature conversion/source selection;
+- versioned sample serialization.
 
-No `lm_sensors`, Python, Rust, privileged helper, `/dev/uinput`, `sudo`, or `pkexec` dependency is introduced.
+Malformed or impossible values are rejected instead of coerced to zero.
 
-### Telemetry process
+### Stateful collector core
 
-CPU percentage requires state across samples, so v0.2 uses one long-lived lightweight Lua collector process instead of spawning a new process for every refresh.
+`lua/workstation/telemetry_collector.lua` keeps only the state required between samples:
 
-The collector:
+- previous CPU counters;
+- previous network byte counters;
+- selected temperature source metadata.
 
-- is started and owned by the Omarchy plugin service;
-- exits with the service/shell lifecycle and is not installed as a systemd daemon;
-- samples at a conservative default interval of 2 seconds;
-- emits one compact line per sample;
-- never runs in Hyprland input callbacks;
-- treats individual metric failures as partial data, not fatal process errors.
-
-The output protocol is deliberately simple and versioned so `Service.qml` does not need to understand `/proc` or `/sys` formats.
-
-### `Service.qml`
-
-The service owns the collector process and exposes normalized properties to the widget:
+It produces one normalized sample with these fields:
 
 ```text
-cpuPercent
-memoryPercent
-temperatureC
-hasCpu
-hasMemory
-hasTemperature
-lastSampleAt
-collectorHealthy
+cpu
+cpu_ghz
+memory
+memory_used_gib
+memory_total_gib
+gpu
+network_rx_bps
+network_tx_bps
+temperature
 ```
 
-It is the only QML component that talks to the collector. Restart/backoff logic belongs here.
+### Linux runtime collector
 
-If the collector exits unexpectedly, the service may restart it with bounded backoff. The bar must remain usable while telemetry is unavailable.
+The root `telemetry-collector.lua` owns OS source discovery and I/O.
 
-### `BarWidget.qml`
+It:
 
-The bar widget is presentation-only:
+- samples every 2 seconds;
+- reads CPU/RAM/network data from `/proc`;
+- discovers CPU frequency files under cpufreq sysfs and falls back to `/proc/cpuinfo`;
+- discovers DRM `gpu_busy_percent` first and falls back to `nvidia-smi` only when that command already exists;
+- discovers CPU temperature under hwmon first, then thermal zones;
+- flushes one versioned line to stdout per sample;
+- is non-privileged and not installed as a systemd service.
 
-- reads the hosted service state;
-- formats the compact label;
-- follows the active Omarchy bar theme/font/spacing;
-- adapts to unavailable metrics;
-- launches/focuses `btop` on left click;
-- performs no `/proc` parsing and no polling itself.
+The collector is launched with a parent-death signal so it does not remain orphaned when the Omarchy shell exits.
 
-This separation prevents one bar instance per monitor from starting duplicate collectors: the service is the singleton data owner while each rendered bar widget is only a view.
+## Protocol
+
+The protocol remains key-based and versioned as `v1`:
+
+```text
+v1\tcpu=12.3\tcpu_ghz=3.4\tmem=56.8\tmem_used_gib=6.2\tmem_total_gib=31.3\tgpu=24.0\tnet_rx_bps=1258291.2\tnet_tx_bps=348160.0\ttemp=54.1
+```
+
+Unavailable fields use `-`.
+
+`Service.qml` parses by key rather than field position, keeping the protocol tolerant of optional metrics.
 
 ## Metric semantics
 
-### CPU
+### CPU utilization
 
 Source: aggregate `cpu` line in `/proc/stat`.
 
-CPU utilization is calculated from the delta between two consecutive total/idle counter snapshots. The first sample establishes a baseline and is not presented as a real percentage.
+Utilization is calculated from the delta between consecutive total/idle snapshots. The first sample establishes a baseline.
 
-Values are clamped only after a valid calculation to the display range `0..100` to tolerate small counter/race anomalies; malformed counter sets are rejected.
+### CPU frequency
+
+Primary source: available `scaling_cur_freq` files under `/sys/devices/system/cpu/.../cpufreq/`.
+
+The displayed value is the average of valid current per-CPU frequencies converted from kHz to GHz.
+
+Fallback: average valid `cpu MHz` values from `/proc/cpuinfo`.
 
 ### Memory
 
@@ -164,117 +197,145 @@ Source: `/proc/meminfo`.
 ```text
 used = MemTotal - MemAvailable
 usagePercent = used / MemTotal * 100
+usedGiB = usedKiB / 1024 / 1024
+totalGiB = totalKiB / 1024 / 1024
 ```
 
-`MemAvailable` is preferred over `MemFree` because it better represents memory that can be reclaimed for applications.
+`MemAvailable` is preferred over `MemFree`.
+
+### Network
+
+Source: `/proc/net/dev`.
+
+All non-loopback interfaces are aggregated. RX/TX rates are derived from counter deltas over the collector interval. Counter rollback or invalid elapsed time makes the sample unavailable rather than negative.
+
+### GPU
+
+Primary source: DRM sysfs `device/gpu_busy_percent` when exposed by the active Linux driver.
+
+Fallback: `nvidia-smi --query-gpu=utilization.gpu` when `nvidia-smi` is already installed.
+
+GPU support is best-effort. No new GPU vendor package is installed by this project.
 
 ### Temperature
 
-Primary source: `/sys/class/hwmon/hwmon*/temp*_input`, preferring labels that identify CPU package/control temperature when available.
+Primary source: `/sys/class/hwmon/hwmon*/temp*_input`, preferring CPU/package labels.
 
-Fallback: `/sys/class/thermal/thermal_zone*/temp` when no suitable hwmon source exists.
+Fallback: `/sys/class/thermal/thermal_zone*/temp`.
 
-Temperature is optional. Systems without an exposed CPU sensor simply omit the temperature token from the bar. Sensor absence is not an error state.
+Temperature is optional.
 
-## Failure and stale-data model
+## Service and stale-data model
 
-The widget must never display missing data as a healthy `0`.
+`Service.qml` is the single collector owner and exposes normalized properties including:
 
-- collector starting: placeholders for metrics that need a baseline;
-- one metric invalid: omit or placeholder only that metric;
-- temperature unavailable: omit temperature;
-- collector disconnected: keep the last valid sample briefly and mark it stale internally;
-- prolonged collector failure: render a compact unavailable state rather than blocking or repeatedly spawning processes;
-- `btop` launch failure: telemetry continues; the click action fails independently.
+```text
+cpuPercent
+cpuGhz
+memoryPercent
+memoryUsedGib
+memoryTotalGib
+gpuPercent
+networkRxBps
+networkTxBps
+temperatureC
+hasCpu
+hasCpuFrequency
+hasMemory
+hasMemorySize
+hasGpu
+hasNetwork
+hasTemperature
+lastSampleAt
+collectorHealthy
+```
 
-No telemetry failure may affect Mouse Mode, Hyprland bindings, the Omarchy shell bar, or install/uninstall correctness.
+The service restarts the collector after unexpected exit and uses a 7-second stale watchdog. If samples stop arriving, all `has*` availability flags are cleared so old values are not presented as live telemetry.
+
+One missing metric does not invalidate the others.
+
+## `BarWidget.qml`
+
+The bar widget is presentation-only:
+
+- reads the hosted singleton service;
+- formats CPU usage/frequency, RAM percentage/size, optional GPU, optional network rates, and optional temperature;
+- formats network rates as B/s, KB/s, or MB/s;
+- follows Omarchy bar theme/font/spacing;
+- uses compact vertical mode;
+- launches/focuses `btop` on left click;
+- performs no `/proc` or `/sys` parsing and starts no collector.
+
+Multiple rendered bar instances therefore share one data collector.
 
 ## Installation ownership
 
-v0.2 extends the existing installer only for repository-owned files.
-
-It manages a symlink for:
+The installer manages the repository-owned plugin link:
 
 ```text
 ~/.config/omarchy/plugins/gendbyte.system-monitor
 ```
 
-The plugin is then enabled/placed through the supported Omarchy plugin/bar interface rather than by copying or modifying first-party shell files.
+Plugin placement/enabling uses the Omarchy plugin interface rather than replacing the user's `shell.json` or cloning the first-party bar.
 
-The installer must preserve the user's existing canonical `~/.config/omarchy/shell.json`; it must not replace the whole bar layout just to add this widget.
-
-Uninstall removes only this project's managed plugin link/state and must not reset unrelated bar customization.
+Uninstall disables the plugin before removing its managed link and refuses to remove paths that are no longer owned by this installation.
 
 ## Testing strategy
 
-### Pure Lua tests
+Pure Lua tests cover:
 
-`tests/telemetry_test.lua` covers:
+- CPU counters, delta math, current frequency and fallback;
+- RAM percentage and GiB calculations;
+- network aggregation/rate calculation;
+- GPU percentage parsing and invalid values;
+- temperature conversion/source selection;
+- extended `v1` serialization;
+- stateful collector behavior and fallbacks.
 
-- `/proc/stat` parsing;
-- CPU delta math including first-sample behavior and counter edge cases;
-- `/proc/meminfo` parsing and memory percentage math;
-- temperature unit conversion and source selection;
-- malformed/missing input handling;
-- sample serialization protocol.
+Plugin/static tests cover:
 
-Tests use fixtures/strings and temporary directories; CI does not depend on the runner's real sensor layout.
+- manifest/service/bar entry points;
+- extended service properties and protocol keys;
+- stale-data invalidation;
+- topbar labels and Activity launcher;
+- plugin-local collector handoff.
 
-### Integration/static verification
+Installer/uninstaller/verifier tests protect ownership and Omarchy plugin lifecycle.
 
-Verification checks:
-
-- plugin manifest schema and required entry points;
-- Lua 5.1 syntax/tests;
-- QML/plugin files exist in the installed target;
-- no project file modifies `/usr/share/omarchy`;
-- installer/uninstaller ownership remains safe.
-
-Live visual behavior and click-to-Activity are validated on Omarchy because generic CI does not provide its Quickshell/Hyprland desktop session.
+Live visual behavior still requires an actual Omarchy/Quickshell session because generic CI has no Hyprland desktop.
 
 ## Non-goals for v0.2
 
 - no replacement for `btop`;
 - no process list or process-management UI;
-- no full-screen or popup monitoring dashboard;
-- no GPU telemetry in the first v0.2 slice;
-- no disk/network graphs in the topbar;
-- no alerts/notifications based on thresholds;
-- no background systemd service;
+- no popup/full-screen monitoring dashboard;
+- no disk graphs or network history graphs;
+- no GPU graphs or vendor-specific control UI;
+- no threshold alerts/notifications;
+- no background systemd daemon;
 - no `Super + H` binding;
-- no replacement or clone of `omarchy.bar`.
-
-Disk/network/GPU summaries can be considered later only if real use shows the compact bar needs them. `btop` remains the detailed source of truth.
-
-## Compatibility boundary
-
-The design intentionally uses documented Omarchy extension points rather than internal bar replacement:
-
-- Omarchy shell plugins support `service` and `bar-widget` kinds;
-- third-party plugins belong in `~/.config/omarchy/plugins/`;
-- the built-in bar owns three movable sections and widget configuration;
-- Omarchy already ships `btop` as Activity and binds it to `Super + Ctrl + T`;
-- Omarchy provides `omarchy-launch-or-focus-tui`, which can focus an existing TUI window or launch it with the normal TUI launcher.
-
-If a future Omarchy release changes private QML internals, the plugin should adapt at its small service-host boundary without requiring changes to telemetry parsing or the rest of Hyprland_Config.
+- no replacement or clone of `omarchy.bar`;
+- no installation of `lm_sensors`, NVIDIA utilities, or other heavy telemetry dependencies.
 
 ## Definition of done
 
 v0.2 is complete when:
 
-1. CPU and RAM are continuously visible in the Omarchy topbar, with temperature when available.
-2. The widget does not duplicate the detailed `btop` interface.
-3. Left click opens or focuses Omarchy Activity (`btop`).
-4. Telemetry collection is non-privileged, lightweight, and isolated from Hyprland input callbacks.
-5. Missing sensors and collector failures degrade gracefully without false zero readings.
-6. The installer safely adds/removes the plugin without replacing the user's bar configuration.
-7. Pure telemetry logic is covered by Lua tests and existing v0.1 tests remain green.
-8. The plugin validates against the supported Omarchy plugin model and works in a live Omarchy session.
+1. CPU usage and current GHz are visible when available.
+2. RAM usage percentage and used/total GiB are visible.
+3. GPU utilization appears when a supported source exists and disappears gracefully otherwise.
+4. Network RX/TX rates appear after a valid delta sample and exclude loopback traffic.
+5. CPU temperature appears when a valid sensor exists.
+6. Stale telemetry is invalidated rather than displayed indefinitely.
+7. Left click opens or focuses Omarchy Activity (`btop`).
+8. Collection stays non-privileged, lightweight, and outside Hyprland input callbacks.
+9. Installer/uninstaller preserve Omarchy bar ownership and unrelated user configuration.
+10. Lua tests, plugin tests, installer tests, and syntax checks remain green.
+11. The plugin validates and is visually checked in a live Omarchy session.
 
 ## Upstream references
 
 - Omarchy `manual/32-shell-plugins.md` — plugin kinds, third-party plugin location, validation and lifecycle.
 - Omarchy `manual/05-the-top-bar.md` — bar layout, sections and widget management.
-- Omarchy `manual/21-tuis.md` and `default/hypr/bindings/utilities.lua` — Activity/btop behavior and `Super + Ctrl + T`.
-- Omarchy `bin/omarchy-launch-or-focus-tui` — supported launch-or-focus wrapper for TUI applications.
-- `basecamp/omarchy-basecamp-plugin` — current service + bar-widget third-party plugin precedent.
+- Omarchy `manual/21-tuis.md` and `default/hypr/bindings/utilities.lua` — Activity/btop behavior.
+- Omarchy `bin/omarchy-launch-or-focus-tui` — launch-or-focus wrapper for TUI applications.
