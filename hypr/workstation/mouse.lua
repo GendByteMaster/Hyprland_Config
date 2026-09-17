@@ -97,6 +97,14 @@ function M.register(hl, o, options)
       return false
     end
 
+    -- Hyprland keeps mapped windows from hidden workspaces in the global
+    -- window list. Their geometry can overlap the current workspace, so they
+    -- must never win cursor hit-testing or a click would switch workspaces.
+    local workspace = window.workspace
+    if workspace and workspace.visible == false then
+      return false
+    end
+
     local at = window.at
     local size = window.size
     if not at or not size then
