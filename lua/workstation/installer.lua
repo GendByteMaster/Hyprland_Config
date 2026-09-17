@@ -46,6 +46,14 @@ local function default_omarchy_runtime()
     rescan_plugins = function()
       return command.run("omarchy-shell shell rescanPlugins")
     end,
+    wait_for_plugin = function(id)
+      local filter = "any(.[]; .id == $id)"
+      local poll = "attempt=0; while [ \"$attempt\" -lt 40 ]; do "
+        .. "if omarchy plugin list --json | jq -e --arg id " .. command.quote(id) .. " "
+        .. command.quote(filter) .. " >/dev/null 2>&1; then exit 0; fi; "
+        .. "attempt=$((attempt + 1)); sleep 0.05; done; exit 1"
+      return command.run(poll)
+    end,
     enable_plugin = function(id, section)
       return command.run(
         "omarchy plugin enable " .. command.quote(id)
@@ -63,6 +71,13 @@ local function rescan_plugins(runtime)
     return true
   end
   return runtime.rescan_plugins()
+end
+
+local function wait_for_plugin(runtime, id)
+  if type(runtime.wait_for_plugin) ~= "function" then
+    return true
+  end
+  return runtime.wait_for_plugin(id)
 end
 
 function M.install(options)
@@ -135,6 +150,10 @@ function M.install(options)
         assert_ok(command.symlink(source_system_monitor, target_system_monitor), "failed to link System Monitor plugin")
         linked_monitor = true
         assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
+        assert_ok(
+          wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
+          "System Monitor plugin was not discovered after rescan"
+        )
         assert_ok(
           omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
           "failed to enable System Monitor plugin"
@@ -217,6 +236,10 @@ function M.install(options)
     })
 
     assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
+    assert_ok(
+      wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
+      "System Monitor plugin was not discovered after rescan"
+    )
     assert_ok(
       omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
       "failed to enable System Monitor plugin"
