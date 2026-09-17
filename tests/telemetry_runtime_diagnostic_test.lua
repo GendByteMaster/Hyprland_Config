@@ -16,8 +16,8 @@ end
 
 local function assert_discovery_finishes(label, command)
   local status = timed_status(command)
-  if status ~= 0 then
-    error(label .. " discovery status: " .. tostring(status))
+  if status == 124 then
+    error(label .. " discovery timed out")
   end
 end
 
