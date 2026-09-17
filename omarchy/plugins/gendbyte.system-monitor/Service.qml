@@ -26,6 +26,13 @@ Item {
     return isFinite(number) ? number : null
   }
 
+  function invalidateTelemetry() {
+    hasCpu = false
+    hasMemory = false
+    hasTemperature = false
+    collectorHealthy = false
+  }
+
   function acceptSample(line) {
     var parts = String(line || "").trim().split("\t")
     if (parts.length < 4 || parts[0] !== "v1") return
@@ -51,6 +58,7 @@ Item {
 
     lastSampleAt = new Date()
     collectorHealthy = true
+    staleTimer.restart()
   }
 
   Process {
@@ -60,9 +68,17 @@ Item {
       onRead: function(line) { root.acceptSample(line) }
     }
     onExited: function(exitCode) {
-      root.collectorHealthy = false
+      staleTimer.stop()
+      root.invalidateTelemetry()
       restartTimer.restart()
     }
+  }
+
+  Timer {
+    id: staleTimer
+    interval: 7000
+    repeat: false
+    onTriggered: root.invalidateTelemetry()
   }
 
   Timer {
