@@ -4,6 +4,8 @@ local install_state = require("workstation.install_state")
 
 local M = {}
 
+local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
+
 local function assert_ok(value, message)
   if not value then
     error(message, 2)
@@ -41,18 +43,23 @@ function M.install(options)
 
   local source_bindings = paths.join(repo_root, "hypr", "bindings.lua")
   local source_workstation = paths.join(repo_root, "hypr", "workstation")
+  local source_hud = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
   assert_ok(command.exists(source_bindings), "managed bindings.lua is missing")
   assert_ok(command.exists(source_workstation), "managed workstation directory is missing")
+  assert_ok(command.exists(source_hud), "Mouse Mode HUD plugin is missing")
 
   local config_dir = paths.join(home, ".config", "hypr")
   local target_bindings = paths.join(config_dir, "bindings.lua")
   local target_workstation = paths.join(config_dir, "workstation")
+  local omarchy_plugins_dir = paths.join(home, ".config", "omarchy", "plugins")
+  local target_hud = paths.join(omarchy_plugins_dir, HUD_PLUGIN_ID)
   local state_dir = paths.join(home, ".local", "state", "hyprland_config")
   local backups_root = paths.join(state_dir, "backups")
   local state_path = paths.join(state_dir, "active.state")
   local preserved_bindings_link = paths.join(state_dir, "preserved_bindings.lua")
 
   assert_ok(command.mkdir_p(config_dir), "failed to create Hyprland config directory")
+  assert_ok(command.mkdir_p(omarchy_plugins_dir), "failed to create Omarchy plugins directory")
   assert_ok(command.mkdir_p(backups_root), "failed to create state directory")
 
   local active, state_error = install_state.read(state_path)
@@ -65,13 +72,25 @@ function M.install(options)
       error("another Hyprland_Config repository is already active")
     end
     if not target_is(target_bindings, source_bindings) or not target_is(target_workstation, source_workstation) then
-      error("active installation state exists but managed targets were modified")
+      error("active installation state exists but managed Hyprland targets were modified")
     end
-    return { changed = false, state_path = state_path, backup_dir = active.backup_dir }
+
+    if target_is(target_hud, source_hud) then
+      return { changed = false, state_path = state_path, backup_dir = active.backup_dir }
+    end
+    if command.exists_or_symlink(target_hud) then
+      error("Mouse Mode HUD plugin path is occupied by another file")
+    end
+
+    assert_ok(command.symlink(source_hud, target_hud), "failed to link Mouse Mode HUD plugin")
+    return { changed = true, state_path = state_path, backup_dir = active.backup_dir }
   end
 
   if target_is(target_bindings, source_bindings) or target_is(target_workstation, source_workstation) then
-    error("managed links exist without active installation state")
+    error("managed Hyprland links exist without active installation state")
+  end
+  if command.exists_or_symlink(target_hud) then
+    error("Mouse Mode HUD plugin path already exists")
   end
   if command.exists_or_symlink(preserved_bindings_link) then
     error("preserved bindings marker exists without active installation state")
@@ -92,6 +111,7 @@ function M.install(options)
   local moved_workstation = false
   local linked_bindings = false
   local linked_workstation = false
+  local linked_hud = false
   local preserved_linked = false
 
   local ok, err = pcall(function()
@@ -108,6 +128,8 @@ function M.install(options)
     linked_bindings = true
     assert_ok(command.symlink(source_workstation, target_workstation), "failed to link managed workstation directory")
     linked_workstation = true
+    assert_ok(command.symlink(source_hud, target_hud), "failed to link Mouse Mode HUD plugin")
+    linked_hud = true
 
     if moved_bindings then
       assert_ok(command.symlink(backup_bindings, preserved_bindings_link), "failed to expose preserved bindings")
@@ -126,6 +148,7 @@ function M.install(options)
   if not ok then
     command.remove(state_path)
     if preserved_linked then command.remove(preserved_bindings_link) end
+    if linked_hud then command.remove(target_hud) end
     if linked_workstation then command.remove(target_workstation) end
     if linked_bindings then command.remove(target_bindings) end
     if moved_workstation then command.move(backup_workstation, target_workstation) end
