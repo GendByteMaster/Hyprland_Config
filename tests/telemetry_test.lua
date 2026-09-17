@@ -43,3 +43,38 @@ t.test("telemetry rejects incomplete or impossible memory input", function()
   t.eq(telemetry.memory_percent({ total_kib = 0, available_kib = 0 }), nil)
   t.eq(telemetry.memory_percent({ total_kib = 100, available_kib = 200 }), nil)
 end)
+
+t.test("telemetry converts millidegree temperature", function()
+  near(telemetry.temperature_c("54000\n"), 54.0)
+  near(telemetry.temperature_c("54\n"), 54.0)
+end)
+
+t.test("telemetry rejects impossible temperature", function()
+  t.eq(telemetry.temperature_c("not-a-number"), nil)
+  t.eq(telemetry.temperature_c("-50000"), nil)
+  t.eq(telemetry.temperature_c("250000"), nil)
+end)
+
+t.test("telemetry prefers package and cpu temperature labels", function()
+  local chosen = assert(telemetry.choose_temperature({
+    { path = "/sys/class/hwmon/hwmon0/temp1_input", label = "acpitz", raw = "41000" },
+    { path = "/sys/class/hwmon/hwmon1/temp2_input", label = "Package id 0", raw = "54000" },
+    { path = "/sys/class/hwmon/hwmon1/temp3_input", label = "Core 0", raw = "51000" },
+  }))
+  t.eq(chosen.path, "/sys/class/hwmon/hwmon1/temp2_input")
+  near(chosen.value, 54.0)
+end)
+
+t.test("telemetry encodes a versioned sample", function()
+  t.eq(
+    telemetry.encode_sample({ cpu = 12.34, memory = 56.78, temperature = 54.1 }),
+    "v1\tcpu=12.3\tmem=56.8\ttemp=54.1"
+  )
+end)
+
+t.test("telemetry protocol preserves unavailable metrics", function()
+  t.eq(
+    telemetry.encode_sample({ cpu = nil, memory = 50, temperature = nil }),
+    "v1\tcpu=-\tmem=50.0\ttemp=-"
+  )
+end)
