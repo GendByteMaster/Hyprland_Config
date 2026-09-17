@@ -82,7 +82,7 @@ t.test("system monitor topbar shows extended summary and launches Activity", fun
   t.truthy(widget:find('"GB"', 1, true))
   t.truthy(widget:find('"GPU "', 1, true))
   t.truthy(widget:find('"↓"', 1, true))
-  t.truthy(widget:find('"↑"', 1, true))
+  t.truthy(widget:find("↑", 1, true))
   t.truthy(widget:find("formatRate", 1, true))
   t.truthy(widget:find('"°C"', 1, true))
   t.truthy(widget:find("vertical", 1, true))
