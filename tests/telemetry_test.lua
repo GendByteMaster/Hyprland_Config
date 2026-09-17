@@ -24,6 +24,21 @@ t.test("telemetry rejects cpu usage without a positive total delta", function()
   t.eq(telemetry.cpu_percent({ total = 200, idle = 100 }, { total = 150, idle = 90 }), nil)
 end)
 
+t.test("telemetry averages cpufreq kHz as GHz", function()
+  near(telemetry.cpu_frequency_ghz({ "3400000\n", "3600000\n" }), 3.5)
+  near(telemetry.cpu_frequency_ghz({ "2200000", "bad", "4200000" }), 3.2)
+  t.eq(telemetry.cpu_frequency_ghz({ "bad" }), nil)
+end)
+
+t.test("telemetry falls back to cpuinfo MHz for GHz", function()
+  near(telemetry.cpuinfo_frequency_ghz([[processor : 0
+cpu MHz : 3200.000
+processor : 1
+cpu MHz : 3600.000
+]]), 3.4)
+  t.eq(telemetry.cpuinfo_frequency_ghz("processor : 0\n"), nil)
+end)
+
 t.test("telemetry parses MemTotal and MemAvailable", function()
   local memory = assert(telemetry.parse_meminfo([[MemTotal:       16000000 kB
 MemFree:         1000000 kB
@@ -38,10 +53,17 @@ t.test("telemetry computes memory usage from MemAvailable", function()
   near(telemetry.memory_percent({ total_kib = 16000000, available_kib = 4000000 }), 75.0)
 end)
 
+t.test("telemetry exposes used and total memory in GiB", function()
+  local used, total = telemetry.memory_gib({ total_kib = 16000000, available_kib = 4000000 })
+  near(used, 11.4440918, 0.0001)
+  near(total, 15.2587891, 0.0001)
+end)
+
 t.test("telemetry rejects incomplete or impossible memory input", function()
   t.eq(telemetry.parse_meminfo("MemTotal: 1000 kB\n"), nil)
   t.eq(telemetry.memory_percent({ total_kib = 0, available_kib = 0 }), nil)
   t.eq(telemetry.memory_percent({ total_kib = 100, available_kib = 200 }), nil)
+  t.eq(telemetry.memory_gib({ total_kib = 100, available_kib = 200 }), nil)
 end)
 
 t.test("telemetry converts millidegree temperature", function()
