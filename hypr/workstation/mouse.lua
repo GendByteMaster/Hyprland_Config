@@ -1,12 +1,15 @@
 local mouse_state = require("hypr.workstation.mouse_state")
 local numlock_store_module = require("hypr.workstation.numlock_store")
+local hud_module = require("hypr.workstation.hud")
 
 local M = {}
 
 local SQRT_HALF = 0.7071067811865476
-local LEFT_BUTTON = "mouse:272"
-local RIGHT_BUTTON = "mouse:273"
-local MIDDLE_BUTTON = "mouse:274"
+local BUTTONS = {
+  LMB = { label = "LMB", key = "mouse:272" },
+  RMB = { label = "RMB", key = "mouse:273" },
+  MMB = { label = "MMB", key = "mouse:274" },
+}
 
 local DIRECTIONS = {
   { id = "up", keys = { "KP_8", "KP_Up" }, dx = 0, dy = -1 },
@@ -30,9 +33,11 @@ function M.register(hl, o, options)
 
   local state = mouse_state.new()
   local numlock_store = options.numlock_store or numlock_store_module.session()
+  local hud = options.hud or hud_module.new(hl, o)
   local saved_numlock = numlock_store.load()
   local numlock_on = saved_numlock == nil and true or saved_numlock
-  local left_held = false
+  local selected = BUTTONS.LMB
+  local held_key = nil
   local live_timers = {}
 
   hl.config({
@@ -58,26 +63,20 @@ function M.register(hl, o, options)
     send_button(key, "up")
   end
 
-  local function release_left()
-    if left_held then
-      send_button(LEFT_BUTTON, "up")
-      left_held = false
+  local function release_held()
+    if held_key then
+      send_button(held_key, "up")
+      held_key = nil
     end
   end
 
   local function cleanup()
-    release_left()
+    release_held()
     mouse_state.reset(state)
   end
 
-  local function notify(text, icon)
-    if hl.notification and hl.notification.create then
-      hl.notification.create({
-        text = text,
-        timeout = 1000,
-        icon = icon or "info",
-      })
-    end
+  local function show_hud(mode)
+    hud.show(mode, selected.label)
   end
 
   local function enter()
@@ -85,7 +84,7 @@ function M.register(hl, o, options)
     if hl.get_current_submap() ~= "mouse" then
       dispatch(hl.dsp.submap("mouse"))
     end
-    notify("Mouse Mode — Num Lock OFF", "info")
+    show_hud("mouse")
   end
 
   local function exit()
@@ -93,7 +92,7 @@ function M.register(hl, o, options)
     if hl.get_current_submap() == "mouse" then
       dispatch(hl.dsp.submap("reset"))
     end
-    notify("Mouse Mode off — Num Lock ON", "ok")
+    show_hud("numpad")
   end
 
   local function on_numlock()
@@ -105,6 +104,17 @@ function M.register(hl, o, options)
     else
       enter()
     end
+  end
+
+  local function select_button(label)
+    local next_button = BUTTONS[label]
+    if not next_button then
+      return
+    end
+
+    release_held()
+    selected = next_button
+    show_hud("mouse")
   end
 
   local function move(direction)
@@ -123,12 +133,13 @@ function M.register(hl, o, options)
     mouse_state.release(state, direction.id)
   end
 
-  local function double_click()
-    click(LEFT_BUTTON)
+  local function double_click_selected()
+    local key = selected.key
+    click(key)
 
     local timer
     timer = hl.timer(function()
-      click(LEFT_BUTTON)
+      click(key)
       for index, candidate in ipairs(live_timers) do
         if candidate == timer then
           table.remove(live_timers, index)
@@ -143,11 +154,14 @@ function M.register(hl, o, options)
     table.insert(live_timers, timer)
   end
 
-  local function hold_left()
-    if not left_held then
-      send_button(LEFT_BUTTON, "down")
-      left_held = true
+  local function hold_selected()
+    if held_key == selected.key then
+      return
     end
+
+    release_held()
+    send_button(selected.key, "down")
+    held_key = selected.key
   end
 
   o.rebind("Num_Lock", "Mouse mode / Num Lock", on_numlock, {
@@ -167,18 +181,22 @@ function M.register(hl, o, options)
       end, { release = true })
     end
 
-    bind_aliases(hl, { "KP_5", "KP_Begin" }, function()
-      click(LEFT_BUTTON)
+    hl.bind("KP_Divide", function()
+      select_button("LMB")
     end)
-    hl.bind("KP_Add", double_click)
     hl.bind("KP_Multiply", function()
-      click(RIGHT_BUTTON)
+      select_button("RMB")
     end)
     hl.bind("KP_Subtract", function()
-      click(MIDDLE_BUTTON)
+      select_button("MMB")
     end)
-    bind_aliases(hl, { "KP_0", "KP_Insert" }, hold_left)
-    bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, release_left)
+
+    bind_aliases(hl, { "KP_5", "KP_Begin" }, function()
+      click(selected.key)
+    end)
+    hl.bind("KP_Add", double_click_selected)
+    bind_aliases(hl, { "KP_0", "KP_Insert" }, hold_selected)
+    bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, release_held)
   end)
 
   hl.on("config.reloaded", function()
