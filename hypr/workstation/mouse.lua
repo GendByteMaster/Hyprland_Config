@@ -66,6 +66,12 @@ function M.register(hl, o, options)
     input = {
       numlock_by_default = true,
     },
+    cursor = {
+      -- Omarchy hides the cursor after keyboard input by default. Mouse Mode
+      -- itself is keyboard-driven, so that policy makes the pointer disappear
+      -- while NumPad movement is active. Keep it renderable for this layer.
+      hide_on_key_press = false,
+    },
   })
 
   local function dispatch(action)
