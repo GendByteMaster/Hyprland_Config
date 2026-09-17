@@ -17,7 +17,7 @@ Omarchy
           ├─ preserved personal bindings
           └─ hypr.workstation.mouse
               ├─ Num Lock state bridge
-              ├─ Hyprland submap
+              ├─ global conditional NumPad binds
               ├─ cursor movement
               ├─ acceleration
               └─ mouse buttons
@@ -36,9 +36,11 @@ Num Lock OFF -> Mouse Mode ON
 Num Lock ON  -> Mouse Mode OFF / normal NumPad
 ```
 
-The project sets `numlock_by_default = true`, so a fresh Hyprland session starts with normal NumPad behavior. Pressing Num Lock turns Num Lock off and enters the `mouse` submap; pressing it again turns Num Lock on and returns to the normal submap.
+The project sets `numlock_by_default = true`, so a fresh Hyprland session starts with normal NumPad behavior. Mouse Mode does **not** enter a Hyprland submap. Instead, the NumPad bindings stay in the global keymap and use Hyprland's `auto_consuming` behavior: while Num Lock is off they consume the NumPad event and perform the mouse action; while Num Lock is on they return `{ ok = false }` so the original key event passes through normally.
 
-`Num_Lock` is registered as a `submap_universal` and `non_consuming` bind so it continues to work while Mouse Mode is active and the real Num Lock state still changes. `Super + M` is not used by v0.1.
+Keeping Mouse Mode out of a submap is intentional: Omarchy's regular global shortcuts such as `Super + 1..10`, `Super + Tab`, and `Super + Arrow` remain available while Mouse Mode is active.
+
+`Num_Lock` is registered as a `submap_universal` and `non_consuming` bind so it continues to work if another Hyprland submap is active and the real Num Lock state still changes. `Super + M` is not used by v0.1.
 
 | Key while Num Lock is OFF | Action |
 | --- | --- |
@@ -79,6 +81,7 @@ This means:
 
 - `hyprctl reload` preserves `Num Lock OFF -> Mouse Mode ON`;
 - a new Hyprland instance starts clean with Num Lock ON;
+- reload and submap changes release any held virtual mouse button;
 - no shell command or external daemon is used from the Mouse Mode callbacks.
 
 ## Install
@@ -109,6 +112,14 @@ After installation reload Hyprland:
 ```bash
 hyprctl reload
 ```
+
+For an already installed checkout, the repository also provides:
+
+```bash
+lua5.1 reinstall.lua
+```
+
+It uninstalls and reinstalls the managed links, verifies them, reloads Hyprland, and checks `hyprctl configerrors` before reporting success.
 
 ## Verify
 
@@ -167,6 +178,7 @@ tests/
   verifier_test.lua
 
 install.lua
+reinstall.lua
 uninstall.lua
 verify.lua
 ```
