@@ -121,6 +121,8 @@ t.test("reload restores Mouse Mode when session Num Lock state is off", function
   local store = fake_store(false)
   mouse.register(hl, o, { numlock_store = store })
 
+  t.eq(#calls.dispatches, 0)
+  calls.events["config.reloaded"]()
   t.eq(calls.dispatches[#calls.dispatches].name, "mouse")
 end)
 
