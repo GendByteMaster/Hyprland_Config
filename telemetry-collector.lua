@@ -2,23 +2,21 @@ local function shell_quote(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
-local function process_success(a, _, c)
-  if type(a) == "number" then
-    return a == 0
-  end
-  if type(a) == "boolean" then
-    return a and (c == nil or c == 0)
-  end
-  return false
-end
+local CAPTURE_STATUS_MARKER = "__HYPRLAND_CONFIG_EXIT_STATUS__"
 
 local function capture(command)
-  local pipe = io.popen(command .. " 2>/dev/null")
+  local wrapped = command
+    .. " 2>/dev/null; status=$?; printf '\\n"
+    .. CAPTURE_STATUS_MARKER
+    .. "%d\\n' \"$status\""
+  local pipe = io.popen(wrapped)
   if not pipe then return nil end
   local output = pipe:read("*a") or ""
-  local a, b, c = pipe:close()
-  if not process_success(a, b, c) then return nil end
-  return (output:gsub("[\r\n]+$", ""))
+  pipe:close()
+
+  local body, status = output:match("^(.*)\\n" .. CAPTURE_STATUS_MARKER .. "(%d+)\\n?$")
+  if not status or tonumber(status) ~= 0 then return nil end
+  return (body:gsub("[\r\n]+$", ""))
 end
 
 local repo_root = rawget(_G, "HYPRLAND_CONFIG_ROOT")
