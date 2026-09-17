@@ -20,12 +20,13 @@ Omarchy
               ├─ global conditional NumPad binds
               ├─ cursor movement
               ├─ acceleration
-              └─ mouse buttons
+              ├─ mouse buttons
+              └─ optional PipeWire sound feedback
 ```
 
 Project-owned behavior is Lua-first. v0.1 introduces no Bash, Python, Rust, `ydotool`, `/dev/uinput`, privileged daemon, `sudo`, or `pkexec` requirement.
 
-Omarchy already ships Lua 5.1 for standalone tooling. Hyprland supplies the Lua API used by Mouse Mode.
+Omarchy already ships Lua 5.1 for standalone tooling. Hyprland supplies the Lua API used by Mouse Mode. Optional audio feedback uses the existing PipeWire `pw-play` utility when available.
 
 ## Mouse Mode
 
@@ -74,6 +75,24 @@ repeats 11+   -> 24 px
 
 Diagonal movement is normalized so it is not faster than horizontal/vertical movement.
 
+### Num Lock sound feedback
+
+Num Lock changes have two distinct short cues from the open-source [UI SFX](https://uisfx.com/) `mechanical` pack:
+
+```text
+Num Lock OFF -> Mouse Mode ON  -> mechanical / toggle-on
+Num Lock ON  -> normal NumPad   -> mechanical / toggle-off
+```
+
+The generated UI SFX audio assets are CC0-1.0. They are vendored as Base64 text under `assets/sounds/` and decoded during install/reinstall to:
+
+```text
+~/.local/share/hyprland_config/sounds/toggle-on.ogg
+~/.local/share/hyprland_config/sounds/toggle-off.ogg
+```
+
+Playback is asynchronous and best-effort through `pw-play`. Missing audio files, a missing PipeWire playback utility, or playback failure never prevents Num Lock or Mouse Mode from changing. HUD feedback remains the visible source of state.
+
 ### Reload synchronization
 
 The Mouse Mode state is kept in a tiny data file under `XDG_RUNTIME_DIR`, scoped by the current `HYPRLAND_INSTANCE_SIGNATURE`.
@@ -83,7 +102,8 @@ This means:
 - `hyprctl reload` preserves `Num Lock OFF -> Mouse Mode ON`;
 - a new Hyprland instance starts clean with Num Lock ON;
 - reload and submap changes release any held virtual mouse button;
-- no shell command or external daemon is used from the Mouse Mode callbacks.
+- cursor movement and button actions do not require an external input daemon or privileged process;
+- optional Num Lock audio launches a short local `pw-play` process and never participates in mouse-state correctness.
 
 ## Install
 
@@ -93,14 +113,17 @@ Clone the repository, check out the feature/release branch you want to test, the
 lua5.1 install.lua
 ```
 
-The installer manages only:
+The installer manages these Hyprland/Omarchy symlink targets:
 
 ```text
 ~/.config/hypr/bindings.lua
 ~/.config/hypr/workstation
+~/.config/omarchy/plugins/gendbyte.mouse-hud
 ```
 
-Existing files are preserved under:
+It also materializes the two local UI SFX files under `~/.local/share/hyprland_config/sounds/`.
+
+Existing Hyprland files are preserved under:
 
 ```text
 ~/.local/state/hyprland_config/backups/<timestamp>/
@@ -120,7 +143,7 @@ For an already installed checkout, the repository also provides:
 lua5.1 reinstall.lua
 ```
 
-It uninstalls and reinstalls the managed links, verifies them, reloads Hyprland, and checks `hyprctl configerrors` before reporting success.
+It uninstalls and reinstalls the managed links, refreshes the local sound assets, verifies the installation, reloads Hyprland, and checks `hyprctl configerrors` before reporting success.
 
 ## Verify
 
@@ -153,18 +176,26 @@ hyprctl reload
 ## Repository layout
 
 ```text
+assets/
+  sounds/
+    uisfx-mechanical-toggle-on.ogg.b64
+    uisfx-mechanical-toggle-off.ogg.b64
+    LICENSE-UI-SFX
+
 hypr/
   bindings.lua
   workstation/
     mouse.lua
     mouse_state.lua
     numlock_store.lua
+    sound.lua
 
 lua/workstation/
   command.lua
   paths.lua
   install_state.lua
   installer.lua
+  sound_assets.lua
   uninstaller.lua
   verifier.lua
 
@@ -174,6 +205,9 @@ tests/
   mouse_state_test.lua
   numlock_store_test.lua
   mouse_test.lua
+  numlock_sound_test.lua
+  sound_test.lua
+  sound_assets_test.lua
   installer_test.lua
   uninstaller_test.lua
   verifier_test.lua
