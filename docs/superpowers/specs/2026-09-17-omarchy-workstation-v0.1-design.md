@@ -2,89 +2,52 @@
 
 ## Goal
 
-Build the first maintainable layer of a personal workstation on top of the Hyprland configuration shipped by Omarchy, without forking Omarchy or editing files under `/usr/share/omarchy`.
+Build the first maintainable layer of a personal workstation on top of the Hyprland configuration shipped by Omarchy, without forking Omarchy or editing `/usr/share/omarchy`.
 
-The first vertical slice covers only:
+v0.1 is intentionally narrow:
 
 - repository-as-source-of-truth for personal Hyprland overrides;
-- safe installation through per-file symlinks into `~/.config/hypr`;
-- personal keybinding module compatible with Omarchy's Lua config API;
-- NumFlow-like Mouse Mode launched from Hyprland;
-- verification and uninstall/restore behavior.
+- Lua-first implementation for all project-owned behavior;
+- NumFlow-like Mouse Mode implemented inside Hyprland's Lua runtime;
+- safe Lua installer, verifier, and uninstaller;
+- preservation and restoration of an existing user `bindings.lua`.
 
-System monitoring, Warp-like terminal workflows, Project Launcher, Command Center, notifications, and a custom shell/dashboard are explicitly deferred to later subprojects.
+Monitoring, the Warp-like terminal layer, Project Launcher, Command Center, and custom dashboard are separate later subprojects.
 
-## Context
+## Architecture principle: Lua-first
 
-Current Omarchy loads its defaults first and then loads these user modules:
+All logic owned by this repository is written in Lua unless a later feature has a concrete technical reason not to be. Existing system components remain external: Hyprland, Omarchy, Ghostty, Git, Docker, systemd, and coreutils are orchestrated rather than reimplemented.
 
-- `hypr.monitors`
-- `hypr.input`
-- `hypr.bindings`
-- `hypr.looknfeel`
-- `hypr.autostart`
+Omarchy already installs `lua51`, so standalone project tools target Lua 5.1 and are invoked with `lua5.1`. Hyprland runs its own Lua configuration runtime and supplies the `hl` API.
 
-That makes `~/.config/hypr` the correct extension boundary. Personal changes must stay outside `/usr/share/omarchy` so Omarchy updates can replace upstream defaults without overwriting this repository.
+No Bash/Python/Rust runtime is introduced by v0.1.
 
-Omarchy's `bindings.lua` supports adding or replacing bindings through `o.bind` and `o.rebind`, and existing bindings can be disabled with `hl.unbind`.
+## Omarchy integration boundary
 
-## Scope decomposition
+Omarchy loads its defaults first and then user modules including `hypr.bindings`. Its bootstrap adds `~/.config/?.lua` to `package.path`, so a module such as `require("hypr.workstation.mouse")` resolves from `~/.config/hypr/workstation/mouse.lua`.
 
-The workstation project is larger than one implementation unit, so development is split into independently testable subprojects:
-
-1. **v0.1 — Omarchy integration + Mouse Mode**
-2. **v0.2 — System monitoring and dashboard**
-3. **v0.3 — Ghostty/Warp-like terminal workflow layer**
-4. **v0.4 — Project Launcher and workspace orchestration**
-5. **v0.5 — Unified Command Center and optional custom shell UI**
-
-This document specifies only v0.1.
-
-## Approaches considered
-
-### A. Edit Omarchy defaults directly
-
-Modify files under `/usr/share/omarchy/default/hypr`.
-
-**Advantages:** minimal indirection.
-
-**Disadvantages:** package updates can overwrite changes; upstream and personal configuration become mixed; rollback is difficult.
-
-**Decision:** rejected.
-
-### B. Replace the entire `~/.config/hypr` directory with the repository
-
-Make the repository own every Hyprland file, including Omarchy's bootstrap-facing user files.
-
-**Advantages:** simple mental model; everything is version controlled.
-
-**Disadvantages:** unnecessarily takes ownership of files Omarchy may evolve; makes migration across Omarchy versions more brittle; harder to preserve local machine-specific monitor/input settings.
-
-**Decision:** rejected for v0.1.
-
-### C. Manage only selected user override files through symlinks
-
-Keep Omarchy as the base and symlink only repository-owned modules/scripts into the expected user paths.
-
-**Advantages:** smallest ownership surface; compatible with Omarchy updates; easy rollback; repository remains portable; machine-local files can remain local.
-
-**Disadvantages:** installer must detect pre-existing files and preserve them safely.
-
-**Decision:** selected.
+Project files never modify `/usr/share/omarchy`.
 
 ## Repository layout
 
 ```text
 Hyprland_Config/
 ├── hypr/
-│   └── bindings.lua
-├── mouse-mode/
-│   ├── mouse-mode.sh
-│   └── README.md
-├── scripts/
-│   ├── install.sh
-│   ├── uninstall.sh
-│   └── verify.sh
+│   ├── bindings.lua
+│   └── workstation/
+│       ├── mouse.lua
+│       └── mouse_state.lua
+├── lua/
+│   └── workstation/
+│       ├── command.lua
+│       ├── paths.lua
+│       └── install_state.lua
+├── tests/
+│   ├── run.lua
+│   └── mouse_state_test.lua
+├── install.lua
+├── uninstall.lua
+├── verify.lua
 ├── docs/
 │   └── superpowers/
 │       ├── specs/
@@ -92,55 +55,60 @@ Hyprland_Config/
 └── README.md
 ```
 
-Only `hypr/bindings.lua` is managed in v0.1. `input.lua`, `monitors.lua`, `looknfeel.lua`, and `autostart.lua` remain untouched until a later feature actually needs them.
+`mouse_state.lua` contains compositor-independent acceleration state so it can be unit tested with plain Lua 5.1. `mouse.lua` is the Hyprland adapter.
 
 ## Installation model
 
-The repository is the source of truth.
-
-`install.sh` creates:
+The repository is the source of truth. `lua5.1 install.lua` manages only these user paths:
 
 ```text
-~/.config/hypr/bindings.lua -> <repo>/hypr/bindings.lua
-~/.local/bin/hypr-mouse-mode -> <repo>/mouse-mode/mouse-mode.sh
+~/.config/hypr/bindings.lua
+~/.config/hypr/workstation
 ```
 
-Before replacing an existing non-symlink file, the installer moves it to a timestamped backup directory under:
+They point to:
 
 ```text
-~/.local/state/hyprland-config/backups/<timestamp>/
+<repo>/hypr/bindings.lua
+<repo>/hypr/workstation
 ```
 
-The installer must be idempotent: running it again when the correct symlinks already exist must succeed without creating duplicate backups.
+If `~/.config/hypr/bindings.lua` already exists and is not this project's managed link, the installer moves it into a timestamped backup under:
 
-It must not modify `/usr/share/omarchy`.
+```text
+~/.local/state/hyprland-config/backups/<timestamp>/hypr/bindings.lua
+```
+
+The project wrapper then loads that preserved file before registering workstation bindings, so existing personal bindings continue to work while v0.1 is installed.
+
+A small data-only state file under `~/.local/state/hyprland-config/` records the active repository root and backup path. The installer is idempotent: rerunning it when the correct links already exist must not create another backup.
+
+Installation requires no `sudo`, `pkexec`, input-group membership, `/dev/uinput`, or daemon.
 
 ## Keybinding design
 
-`hypr/bindings.lua` adds only workstation-specific bindings and does not disable Omarchy's complete default binding set.
+`hypr/bindings.lua` performs two operations in order:
 
-Initial binding:
+1. load the preserved pre-install user bindings when an active backup is recorded;
+2. register the workstation Mouse Mode.
 
-```text
-SUPER + M -> toggle Mouse Mode
-```
+`SUPER + M` is reserved for Mouse Mode with `o.rebind` so a pre-existing user binding cannot leave duplicate actions on the same shortcut.
 
-The binding launches `hypr-mouse-mode` through `o.bind`.
+Other workstation shortcuts are outside v0.1.
 
-`Super + H`, terminal bindings, Project Launcher bindings, and Command Center bindings remain unassigned by this subproject unless Omarchy already owns them.
+## Mouse Mode
 
-## Mouse Mode behavior
-
-Mouse Mode is a modal helper inspired by NumFlow. It must not require changes to Hyprland itself.
+Mouse Mode is implemented entirely using Hyprland's Lua API. It uses a Hyprland submap named `mouse`, cursor dispatchers, key-state dispatchers, timers, and notifications.
 
 Activation:
 
 ```text
-Super + M -> enter/toggle Mouse Mode
+Super + M -> enter Mouse Mode
 Esc       -> exit Mouse Mode
+Super + M -> exit Mouse Mode while already active
 ```
 
-Mappings while active:
+Mappings:
 
 ```text
 NumPad 8 -> up
@@ -160,83 +128,88 @@ NumPad 0 -> hold left button
 NumPad . -> release left button
 ```
 
-Movement must support acceleration rather than a fixed large step:
+Both numeric keypad symbols (`KP_8`, etc.) and their NumLock-off navigation equivalents (`KP_Up`, etc.) are registered where applicable.
 
-- short taps: precise movement;
-- continued hold: progressively faster movement;
-- releasing a direction resets acceleration for the next movement.
+### Movement
 
-The implementation must keep the mode bounded: when Mouse Mode is not active, NumPad behavior must remain normal.
+Movement binds use Hyprland's `repeating` flag. Each direction maintains a repeat count. The movement step grows in bounded stages:
 
-## Implementation boundary
+```text
+presses 1-2   -> 3 px
+presses 3-5   -> 6 px
+presses 6-10  -> 12 px
+presses 11+   -> 24 px
+```
 
-v0.1 may use existing Wayland/Hyprland-compatible command-line tools for pointer injection instead of implementing a kernel/input backend.
+Releasing that direction resets its counter. Diagonal movement is normalized so it is not approximately 1.41x faster than horizontal/vertical movement.
 
-The Mouse Mode process owns only:
+The handler reads the current cursor position with `hl.get_cursor_pos()` and dispatches an absolute move with `hl.dsp.cursor.move({ x = ..., y = ... })`.
 
-- mode lifecycle;
-- NumPad key interpretation;
-- acceleration state;
-- pointer/button actions;
-- clean exit.
+### Pointer buttons
 
-It does not own window management, global application launching, monitoring, or terminal behavior.
+Mouse buttons use `hl.dsp.send_key_state`:
 
-## Failure handling
+```text
+left   -> mouse:272
+right  -> mouse:273
+middle -> mouse:274
+```
 
-The installer must stop with a clear error when:
+A click sends `down` then `up`. Double-click sends one click immediately and schedules the second through a short Hyprland one-shot timer. Hold sends `down` only once; release sends `up`.
 
-- Omarchy/Hyprland user config directory cannot be created;
-- a required dependency for Mouse Mode is missing;
-- a target path exists but cannot be backed up or replaced;
-- the repository path cannot be resolved.
+Leaving Mouse Mode, reloading the config, or unloading it must release a held left button before state is discarded.
 
-Mouse Mode must exit cleanly on `Esc`, process termination, or dependency failure and must not leave a mouse button logically held down.
+## Runtime safety
+
+Hyprland bind callbacks must not block. Mouse Mode callbacks therefore perform no shell commands, filesystem reads, sleeps, network access, or process waits. All pointer operations use the in-process Hyprland API.
+
+Standalone install/uninstall/verify tools may call normal coreutils such as `mkdir`, `mv`, `ln`, and `readlink`; these run outside the compositor event loop.
 
 ## Verification
 
-`verify.sh` performs non-destructive checks:
+`lua5.1 verify.lua` performs non-destructive checks:
 
-1. repository-managed files exist;
-2. expected symlinks point to this repository;
-3. `bindings.lua` is syntactically valid Lua;
-4. Mouse Mode script is executable/syntax-valid;
-5. required runtime commands are available;
-6. no repository-owned path points into `/usr/share/omarchy`.
+1. `lua5.1` and `luac5.1` are available;
+2. repository-managed Lua files exist;
+3. all standalone/project Lua files parse with `luac5.1 -p`;
+4. expected symlinks resolve to this repository;
+5. installation state is internally consistent;
+6. no managed destination or source is under `/usr/share/omarchy`.
 
-Manual acceptance checks:
+`lua5.1 tests/run.lua` runs pure Lua tests for acceleration/reset behavior and any standalone path/state helpers added by v0.1.
 
-1. restart/reload the Omarchy shell/Hyprland configuration;
-2. confirm existing Omarchy shortcuts still work;
-3. press `Super + M` and confirm Mouse Mode activates;
-4. verify all movement directions and click actions;
-5. exit with `Esc` and confirm NumPad behaves normally again;
-6. rerun `install.sh` and confirm idempotence;
-7. run `uninstall.sh` and confirm previous files can be restored from backup.
+Manual acceptance on Omarchy:
 
-## Security and safety constraints
+1. run `lua5.1 install.lua`;
+2. reload Hyprland configuration;
+3. confirm existing Omarchy and preserved personal shortcuts still work;
+4. press `Super + M` and confirm the `mouse` submap activates;
+5. test movement, acceleration, clicks, hold/release, and NumLock on/off variants;
+6. exit with `Esc` and confirm normal NumPad behavior returns;
+7. rerun the installer and confirm idempotence;
+8. run `lua5.1 uninstall.lua` and confirm the previous `bindings.lua` is restored.
 
-- No `sudo` is required for normal installation.
+## Security and failure handling
+
+- No normal operation requires root privileges.
 - No files under `/usr/share/omarchy` are modified.
-- Existing user configuration is backed up before replacement.
-- Scripts use strict shell error handling.
-- Mouse Mode releases any held pointer button during shutdown.
-- Installation and uninstall operations are limited to explicit paths owned by this project.
+- Existing user bindings are preserved before replacement.
+- Installer aborts rather than overwriting an unexpected backup/state conflict.
+- Uninstaller removes only links owned by the active installation state.
+- Mouse Mode releases any held pointer button on exit/config unload.
+- Hyprland callbacks contain no blocking I/O.
 
 ## Non-goals for v0.1
 
-The following are intentionally excluded:
-
 - replacing Omarchy Shell;
-- custom Quickshell dashboard;
-- CPU/RAM/network monitoring UI;
-- Ghostty configuration beyond any dependency needed by Mouse Mode;
-- Warp-style command blocks or AI terminal assistant;
-- project detection or workspace orchestration;
-- clipboard manager;
-- notification daemon;
-- system service management UI.
+- dashboard or system monitoring UI;
+- Ghostty/Warp-like workflows;
+- project/workspace launcher;
+- clipboard or notification daemon replacement;
+- kernel/input drivers;
+- ydotool/uinput integration;
+- custom terminal emulator.
 
 ## Success criteria
 
-v0.1 is complete when a fresh Omarchy user can clone this repository, run one installer without `sudo`, keep Omarchy's defaults intact, toggle a NumFlow-like Mouse Mode with `Super + M`, verify the installation, and uninstall/restore the previous local configuration without editing Omarchy's packaged files.
+v0.1 is complete when a fresh current Omarchy installation can clone the repository, run `lua5.1 install.lua` without privilege escalation, preserve its existing user bindings, operate a NumFlow-like Mouse Mode entirely through Hyprland Lua, pass project tests and verification, and cleanly restore the previous configuration through `lua5.1 uninstall.lua`.
