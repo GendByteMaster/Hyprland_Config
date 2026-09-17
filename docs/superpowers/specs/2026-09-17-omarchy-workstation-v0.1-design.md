@@ -9,10 +9,11 @@ v0.1 is intentionally narrow:
 - repository-as-source-of-truth for personal Hyprland overrides;
 - Lua-first implementation for all project-owned behavior;
 - NumFlow-like Mouse Mode implemented inside Hyprland's Lua runtime;
+- **Num Lock OFF = Mouse Mode ON** and **Num Lock ON = Mouse Mode OFF**;
 - safe Lua installer, verifier, and uninstaller;
 - preservation and restoration of an existing user `bindings.lua`.
 
-Monitoring, the Warp-like terminal layer, Project Launcher, Command Center, and custom dashboard are separate later subprojects.
+Monitoring, the Warp-like terminal layer, Project Launcher, Command Center, and custom dashboard remain separate later subprojects.
 
 ## Architecture principle: Lua-first
 
@@ -24,7 +25,7 @@ No Bash/Python/Rust runtime is introduced by v0.1.
 
 ## Omarchy integration boundary
 
-Omarchy loads its defaults first and then user modules including `hypr.bindings`. Its bootstrap adds `~/.config/?.lua` to `package.path`, so a module such as `require("hypr.workstation.mouse")` resolves from `~/.config/hypr/workstation/mouse.lua`.
+Omarchy loads its defaults first and then user modules including `hypr.bindings`. Its bootstrap adds `~/.config/?.lua` to `package.path`, so `require("hypr.workstation.mouse")` resolves from `~/.config/hypr/workstation/mouse.lua`.
 
 Project files never modify `/usr/share/omarchy`.
 
@@ -36,30 +37,32 @@ Hyprland_Config/
 │   ├── bindings.lua
 │   └── workstation/
 │       ├── mouse.lua
-│       └── mouse_state.lua
+│       ├── mouse_state.lua
+│       └── numlock_store.lua
 ├── lua/
 │   └── workstation/
 │       ├── command.lua
 │       ├── paths.lua
-│       └── install_state.lua
+│       ├── install_state.lua
+│       ├── installer.lua
+│       ├── uninstaller.lua
+│       └── verifier.lua
 ├── tests/
 │   ├── run.lua
-│   └── mouse_state_test.lua
+│   ├── mouse_state_test.lua
+│   ├── numlock_store_test.lua
+│   └── mouse_test.lua
 ├── install.lua
 ├── uninstall.lua
 ├── verify.lua
-├── docs/
-│   └── superpowers/
-│       ├── specs/
-│       └── plans/
 └── README.md
 ```
 
-`mouse_state.lua` contains compositor-independent acceleration state so it can be unit tested with plain Lua 5.1. `mouse.lua` is the Hyprland adapter.
+`mouse_state.lua` contains compositor-independent acceleration state. `numlock_store.lua` contains session-scoped Num Lock mode persistence. `mouse.lua` is the Hyprland adapter.
 
 ## Installation model
 
-The repository is the source of truth. `lua5.1 install.lua` manages only these user paths:
+The repository is the source of truth. `lua5.1 install.lua` manages only:
 
 ```text
 ~/.config/hypr/bindings.lua
@@ -79,36 +82,51 @@ If `~/.config/hypr/bindings.lua` already exists and is not this project's manage
 ~/.local/state/hyprland-config/backups/<timestamp>/hypr/bindings.lua
 ```
 
-The project wrapper then loads that preserved file before registering workstation bindings, so existing personal bindings continue to work while v0.1 is installed.
+The project wrapper loads that preserved file before registering workstation bindings, so existing personal bindings continue to work while v0.1 is installed.
 
-A small data-only state file under `~/.local/state/hyprland-config/` records the active repository root and backup path. The installer is idempotent: rerunning it when the correct links already exist must not create another backup.
+A data-only state file under `~/.local/state/hyprland-config/` records the active repository root and backup path. The installer is idempotent and does not require `sudo`, `pkexec`, input-group membership, `/dev/uinput`, or a daemon.
 
-Installation requires no `sudo`, `pkexec`, input-group membership, `/dev/uinput`, or daemon.
+## Num Lock ownership model
 
-## Keybinding design
+Num Lock is the mode-state source:
 
-`hypr/bindings.lua` performs two operations in order:
+```text
+Num Lock OFF -> Mouse Mode ON
+Num Lock ON  -> Mouse Mode OFF / normal NumPad
+```
 
-1. load the preserved pre-install user bindings when an active backup is recorded;
-2. register the workstation Mouse Mode.
+`mouse.lua` sets:
 
-`SUPER + M` is reserved for Mouse Mode with `o.rebind` so a pre-existing user binding cannot leave duplicate actions on the same shortcut.
+```text
+input.numlock_by_default = true
+```
 
-Other workstation shortcuts are outside v0.1.
+so a fresh Hyprland instance starts in the safe/default state: Num Lock ON and Mouse Mode OFF.
+
+`Num_Lock` is registered with `o.rebind` and these flags:
+
+- `submap_universal = true` so Num Lock can always leave Mouse Mode;
+- `non_consuming = true` so the real Num Lock key event still propagates and the keyboard lock state changes normally.
+
+`Super + M` is not owned by v0.1.
+
+### Reload synchronization
+
+The current logical Num Lock state is written as data to:
+
+```text
+$XDG_RUNTIME_DIR/hyprland-config-numlock-<HYPRLAND_INSTANCE_SIGNATURE>.state
+```
+
+The file contains only `on` or `off` and is scoped to the current Hyprland instance.
+
+On config reload, the new Lua state reads the same instance-scoped value. The `mouse` submap is restored from the `config.reloaded` event rather than during config initialization, avoiding dispatcher calls while Hyprland is still loading the config.
+
+On Hyprland shutdown the session-state file is removed. A new Hyprland instance therefore starts from `numlock_by_default = true` rather than inheriting stale state.
 
 ## Mouse Mode
 
-Mouse Mode is implemented entirely using Hyprland's Lua API. It uses a Hyprland submap named `mouse`, cursor dispatchers, key-state dispatchers, timers, and notifications.
-
-Activation:
-
-```text
-Super + M -> enter Mouse Mode
-Esc       -> exit Mouse Mode
-Super + M -> exit Mouse Mode while already active
-```
-
-Mappings:
+When Num Lock is OFF, the Hyprland submap `mouse` owns the NumPad mappings:
 
 ```text
 NumPad 8 -> up
@@ -126,7 +144,10 @@ NumPad * -> right click
 NumPad - -> middle click
 NumPad 0 -> hold left button
 NumPad . -> release left button
+Num Lock -> leave Mouse Mode by turning Num Lock ON
 ```
+
+There is no independent `Esc` exit in v0.1 because that would allow Mouse Mode OFF while Num Lock remained OFF and break the state invariant.
 
 Both numeric keypad symbols (`KP_8`, etc.) and their NumLock-off navigation equivalents (`KP_Up`, etc.) are registered where applicable.
 
@@ -157,13 +178,15 @@ middle -> mouse:274
 
 A click sends `down` then `up`. Double-click sends one click immediately and schedules the second through a short Hyprland one-shot timer. Hold sends `down` only once; release sends `up`.
 
-Leaving Mouse Mode, reloading the config, or unloading it must release a held left button before state is discarded.
+Leaving Mouse Mode, reloading the config, or unloading it must release a held left button before movement state is discarded.
 
 ## Runtime safety
 
-Hyprland bind callbacks must not block. Mouse Mode callbacks therefore perform no shell commands, filesystem reads, sleeps, network access, or process waits. All pointer operations use the in-process Hyprland API.
+Normal Mouse Mode callbacks perform no shell commands, process waits, network access, or privileged input injection. Pointer operations use the in-process Hyprland API.
 
-Standalone install/uninstall/verify tools may call normal coreutils such as `mkdir`, `mv`, `ln`, and `readlink`; these run outside the compositor event loop.
+The only runtime filesystem operation is the tiny session state file written when Num Lock changes and read when the Lua configuration is reconstructed. It is data-only and located under `XDG_RUNTIME_DIR`.
+
+Standalone install/uninstall/verify tools may call ordinary coreutils outside the compositor event loop.
 
 ## Verification
 
@@ -171,33 +194,34 @@ Standalone install/uninstall/verify tools may call normal coreutils such as `mkd
 
 1. `lua5.1` and `luac5.1` are available;
 2. repository-managed Lua files exist;
-3. all standalone/project Lua files parse with `luac5.1 -p`;
+3. project Lua files parse with `luac5.1 -p`;
 4. expected symlinks resolve to this repository;
 5. installation state is internally consistent;
 6. no managed destination or source is under `/usr/share/omarchy`.
 
-`lua5.1 tests/run.lua` runs pure Lua tests for acceleration/reset behavior and any standalone path/state helpers added by v0.1.
+`lua5.1 tests/run.lua` covers acceleration, Num Lock session-state persistence, Hyprland adapter behavior, installer, uninstaller, and verifier logic.
 
 Manual acceptance on Omarchy:
 
 1. run `lua5.1 install.lua`;
-2. reload Hyprland configuration;
-3. confirm existing Omarchy and preserved personal shortcuts still work;
-4. press `Super + M` and confirm the `mouse` submap activates;
-5. test movement, acceleration, clicks, hold/release, and NumLock on/off variants;
-6. exit with `Esc` and confirm normal NumPad behavior returns;
-7. rerun the installer and confirm idempotence;
-8. run `lua5.1 uninstall.lua` and confirm the previous `bindings.lua` is restored.
+2. run `hyprctl reload`;
+3. confirm Num Lock starts ON and normal NumPad behavior works;
+4. press Num Lock so it becomes OFF and confirm Mouse Mode activates;
+5. test movement, acceleration, clicks, hold/release, and NumLock-off aliases;
+6. press Num Lock again so it becomes ON and confirm normal NumPad behavior returns;
+7. while Num Lock is OFF, run `hyprctl reload` and confirm Mouse Mode is restored after reload;
+8. rerun the installer and confirm idempotence;
+9. run `lua5.1 uninstall.lua` and confirm the previous `bindings.lua` is restored.
 
 ## Security and failure handling
 
 - No normal operation requires root privileges.
 - No files under `/usr/share/omarchy` are modified.
 - Existing user bindings are preserved before replacement.
-- Installer aborts rather than overwriting an unexpected backup/state conflict.
+- Installer aborts rather than overwriting unexpected backup/state conflicts.
 - Uninstaller removes only links owned by the active installation state.
 - Mouse Mode releases any held pointer button on exit/config unload.
-- Hyprland callbacks contain no blocking I/O.
+- No `ydotool`, `/dev/uinput`, input group, or privileged daemon is used.
 
 ## Non-goals for v0.1
 
@@ -207,9 +231,8 @@ Manual acceptance on Omarchy:
 - project/workspace launcher;
 - clipboard or notification daemon replacement;
 - kernel/input drivers;
-- ydotool/uinput integration;
 - custom terminal emulator.
 
 ## Success criteria
 
-v0.1 is complete when a fresh current Omarchy installation can clone the repository, run `lua5.1 install.lua` without privilege escalation, preserve its existing user bindings, operate a NumFlow-like Mouse Mode entirely through Hyprland Lua, pass project tests and verification, and cleanly restore the previous configuration through `lua5.1 uninstall.lua`.
+v0.1 is complete when a fresh current Omarchy installation can clone the repository, run `lua5.1 install.lua` without privilege escalation, preserve its existing user bindings, use Num Lock OFF as a NumFlow-like Mouse Mode and Num Lock ON as normal NumPad mode, survive `hyprctl reload` without losing that relationship, pass project tests and verification, and cleanly restore the previous configuration through `lua5.1 uninstall.lua`.
