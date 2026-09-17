@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "gendbyte.mouse-hud",
+  "name": "Mouse Mode HUD",
+  "version": "0.1.0",
+  "author": "GendByteMaster",
+  "description": "Transient NumFlow-style HUD for Hyprland keyboard mouse mode",
+  "kinds": [
+    "panel"
+  ],
+  "entryPoints": {
+    "panel": "Panel.qml"
+  },
+  "keepLoaded": true
+}
