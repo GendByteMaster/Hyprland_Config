@@ -12,9 +12,12 @@ local function capture(command)
   return (output:gsub("[\r\n]+$", ""))
 end
 
-local script_path = (arg and arg[0]) or "telemetry-collector.lua"
-local resolved_script = capture("readlink -f -- " .. shell_quote(script_path)) or script_path
-local repo_root = resolved_script:match("^(.*)/[^/]+$") or "."
+local repo_root = rawget(_G, "HYPRLAND_CONFIG_ROOT")
+if type(repo_root) ~= "string" or repo_root == "" then
+  local script_path = (arg and arg[0]) or "telemetry-collector.lua"
+  local resolved_script = capture("readlink -f -- " .. shell_quote(script_path)) or script_path
+  repo_root = resolved_script:match("^(.*)/[^/]+$") or "."
+end
 
 package.path = table.concat({
   repo_root .. "/?.lua",
