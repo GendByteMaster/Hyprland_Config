@@ -34,7 +34,7 @@ local function fake_api(options)
   options = options or {}
 
   local calls = {
-    binds = {}, rebinds = {}, unbinds = {}, dispatches = {}, timers = {}, events = {}, configs = {}
+    binds = {}, rebinds = {}, unbinds = {}, dispatches = {}, timers = {}, events = {}, configs = {}, submaps = {}
   }
   local current_definition = "reset"
   local current_submap = ""
@@ -56,6 +56,7 @@ local function fake_api(options)
     table.insert(calls.unbinds, keys)
   end
   function hl.define_submap(name, fn)
+    table.insert(calls.submaps, name)
     local previous = current_definition
     current_definition = name
     fn()
@@ -91,7 +92,7 @@ local function fake_api(options)
 
   local function find_bind(key, release)
     for _, bind in ipairs(calls.binds) do
-      if bind.submap == "mouse" and bind.keys == key and not not bind.options.release == not not release then
+      if bind.submap == "reset" and bind.keys == key and not not bind.options.release == not not release then
         return bind
       end
     end
@@ -100,7 +101,7 @@ local function fake_api(options)
   return hl, o, calls, find_bind
 end
 
-t.test("register reserves Num Lock and defines NumFlow button selectors", function()
+t.test("register reserves Num Lock and defines global NumFlow button selectors", function()
   local hl, o, calls, find = fake_api()
   local hud = fake_hud()
   mouse.register(hl, o, { numlock_store = fake_store(nil), hud = hud })
@@ -111,6 +112,7 @@ t.test("register reserves Num Lock and defines NumFlow button selectors", functi
   t.truthy(calls.rebinds[1].options.submap_universal)
   t.truthy(calls.rebinds[1].options.non_consuming)
   t.eq(calls.configs[1].input.numlock_by_default, true)
+  t.eq(#calls.submaps, 0)
   t.truthy(find("KP_8", false))
   t.truthy(find("KP_Up", false))
   t.truthy(find("KP_5", false))
@@ -121,6 +123,7 @@ t.test("register reserves Num Lock and defines NumFlow button selectors", functi
   t.truthy(find("KP_0", false))
   t.truthy(find("KP_Decimal", false))
   t.eq(find("escape", false), nil)
+  t.truthy(find("KP_8", false).options.auto_consuming)
 end)
 
 t.test("register supports Omarchy helpers without rebind", function()
@@ -147,7 +150,7 @@ t.test("register supports Omarchy helpers without rebind", function()
   t.eq(numlock_bind.options.description, "Mouse mode / Num Lock")
 end)
 
-t.test("Num Lock off enables Mouse Mode HUD and Num Lock on shows NumPad HUD", function()
+t.test("Num Lock off enables Mouse Mode HUD without entering a submap", function()
   local hl, o, calls = fake_api()
   local store = fake_store(true)
   local hud = fake_hud()
@@ -156,35 +159,51 @@ t.test("Num Lock off enables Mouse Mode HUD and Num Lock on shows NumPad HUD", f
 
   numlock()
   t.eq(store.value, false)
-  t.eq(calls.dispatches[#calls.dispatches].name, "mouse")
+  t.eq(#calls.dispatches, 0)
   t.eq(hud.events[#hud.events].mode, "mouse")
   t.eq(hud.events[#hud.events].button, "LMB")
 
   numlock()
   t.eq(store.value, true)
-  t.eq(calls.dispatches[#calls.dispatches].name, "reset")
+  t.eq(#calls.dispatches, 0)
   t.eq(hud.events[#hud.events].mode, "numpad")
 end)
 
-t.test("reload restores Mouse Mode when session Num Lock state is off", function()
+t.test("NumPad events pass through while Num Lock is on", function()
+  local hl, o, calls, find = fake_api()
+  mouse.register(hl, o, { numlock_store = fake_store(true), hud = fake_hud() })
+
+  local up = find("KP_8", false)
+  local up_release = find("KP_8", true)
+  local press_result = up.dispatcher()
+  local release_result = up_release.dispatcher()
+
+  t.eq(press_result.ok, false)
+  t.eq(release_result.ok, false)
+  t.truthy(up.options.auto_consuming)
+  t.truthy(up_release.options.auto_consuming)
+  t.eq(#calls.dispatches, 0)
+end)
+
+t.test("reload restores Mouse Mode HUD when session Num Lock state is off", function()
   local hl, o, calls = fake_api()
   local hud = fake_hud()
   mouse.register(hl, o, { numlock_store = fake_store(false), hud = hud })
 
   t.eq(#calls.dispatches, 0)
   calls.events["config.reloaded"]()
-  t.eq(calls.dispatches[#calls.dispatches].name, "mouse")
+  t.eq(#calls.dispatches, 0)
   t.eq(hud.events[#hud.events].mode, "mouse")
 end)
 
 t.test("movement uses cursor dispatcher with acceleration and does not touch HUD", function()
   local hl, o, calls, find = fake_api()
   local hud = fake_hud()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = hud })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = hud })
   local up = find("KP_8", false)
   local up_release = find("KP_8", true)
 
-  up.dispatcher()
+  t.eq(up.dispatcher().ok, true)
   t.eq(calls.dispatches[#calls.dispatches].x, 100)
   t.eq(calls.dispatches[#calls.dispatches].y, 97)
   up.dispatcher()
@@ -198,7 +217,7 @@ end)
 
 t.test("diagonal movement is normalized", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = fake_hud() })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
   find("KP_9", false).dispatcher()
   local action = calls.dispatches[#calls.dispatches]
   t.eq(action.x, 102)
@@ -208,7 +227,7 @@ end)
 t.test("slash star minus select LMB RMB MMB and update HUD", function()
   local hl, o, calls, find = fake_api()
   local hud = fake_hud()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = hud })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = hud })
 
   find("KP_Multiply", false).dispatcher()
   t.eq(hud.events[#hud.events].button, "RMB")
@@ -225,7 +244,7 @@ end)
 
 t.test("NumPad 5 clicks the selected button", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = fake_hud() })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
 
   find("KP_Multiply", false).dispatcher()
   find("KP_5", false).dispatcher()
@@ -236,7 +255,7 @@ end)
 
 t.test("double click uses the selected button", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = fake_hud() })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
   find("KP_Subtract", false).dispatcher()
   find("KP_Add", false).dispatcher()
   t.eq(calls.dispatches[#calls.dispatches - 1].key, "mouse:274")
@@ -250,7 +269,7 @@ end)
 
 t.test("hold and release track the actual selected button", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = fake_hud() })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
 
   find("KP_Multiply", false).dispatcher()
   find("KP_0", false).dispatcher()
@@ -267,7 +286,7 @@ end)
 
 t.test("changing button mode releases an active hold before switching", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = fake_hud() })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
 
   find("KP_0", false).dispatcher()
   find("KP_Multiply", false).dispatcher()
@@ -275,13 +294,22 @@ t.test("changing button mode releases an active hold before switching", function
   t.eq(calls.dispatches[#calls.dispatches].state, "up")
 end)
 
-t.test("config unload releases a held selected button", function()
+t.test("config reload releases a held selected button", function()
   local hl, o, calls, find = fake_api()
-  mouse.register(hl, o, { numlock_store = fake_store(true), hud = fake_hud() })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
   find("KP_Subtract", false).dispatcher()
   find("KP_0", false).dispatcher()
-  calls.events["config.unload"]()
+  calls.events["config.reloaded"]()
   t.eq(calls.dispatches[#calls.dispatches].key, "mouse:274")
+  t.eq(calls.dispatches[#calls.dispatches].state, "up")
+end)
+
+t.test("other submaps release a held selected button without owning Mouse Mode", function()
+  local hl, o, calls, find = fake_api()
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
+  find("KP_0", false).dispatcher()
+  calls.events["keybinds.submap"]("resize")
+  t.eq(calls.dispatches[#calls.dispatches].key, "mouse:272")
   t.eq(calls.dispatches[#calls.dispatches].state, "up")
 end)
 
