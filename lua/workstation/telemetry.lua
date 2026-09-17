@@ -167,7 +167,13 @@ function M.encode_sample(sample)
   return table.concat({
     "v1",
     "cpu=" .. encode_metric(sample.cpu),
+    "cpu_ghz=" .. encode_metric(sample.cpu_ghz),
     "mem=" .. encode_metric(sample.memory),
+    "mem_used_gib=" .. encode_metric(sample.memory_used_gib),
+    "mem_total_gib=" .. encode_metric(sample.memory_total_gib),
+    "gpu=" .. encode_metric(sample.gpu),
+    "net_rx_bps=" .. encode_metric(sample.network_rx_bps),
+    "net_tx_bps=" .. encode_metric(sample.network_tx_bps),
     "temp=" .. encode_metric(sample.temperature),
   }, "\t")
 end
