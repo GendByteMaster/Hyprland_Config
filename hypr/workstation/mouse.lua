@@ -233,7 +233,10 @@ function M.register(hl, o, options)
     end
   end)
 
-  hl.on("config.unload", cleanup)
+  pcall(function()
+    hl.on("config.unload", cleanup)
+  end)
+
   hl.on("hyprland.shutdown", function()
     cleanup()
     numlock_store.clear()
