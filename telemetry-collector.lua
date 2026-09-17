@@ -36,7 +36,7 @@ local function read_file(path)
   return content
 end
 
-local function find_paths(command)
+local function discover_paths(command)
   local paths = {}
   local pipe = io.popen(command .. " 2>/dev/null")
   if not pipe then return paths end
@@ -48,9 +48,13 @@ local function find_paths(command)
   return paths
 end
 
+local function readable_glob(pattern)
+  return "for path in " .. pattern .. "; do [ -r \"$path\" ] && printf '%s\\n' \"$path\"; done"
+end
+
 local function hwmon_candidates()
   local candidates = {}
-  local paths = find_paths("find -L /sys/class/hwmon -maxdepth 2 -type f -name 'temp*_input' -print")
+  local paths = discover_paths(readable_glob("/sys/class/hwmon/hwmon*/temp*_input"))
   for _, path in ipairs(paths) do
     local label_path = path:gsub("_input$", "_label")
     local label = read_file(label_path)
@@ -62,7 +66,7 @@ end
 
 local function thermal_candidates()
   local candidates = {}
-  local paths = find_paths("find -L /sys/class/thermal -maxdepth 2 -type f -name temp -print")
+  local paths = discover_paths(readable_glob("/sys/class/thermal/thermal_zone*/temp"))
   for _, path in ipairs(paths) do
     local zone_dir = path:match("^(.*)/temp$")
     local label = zone_dir and read_file(zone_dir .. "/type") or nil
@@ -78,7 +82,9 @@ local function temperature_candidates()
   return thermal_candidates()
 end
 
-local cpu_frequency_paths = find_paths("find -L /sys/devices/system/cpu -path '*/cpufreq/scaling_cur_freq' -type f -print")
+local cpu_frequency_paths = discover_paths(
+  readable_glob("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq")
+)
 local function cpu_frequencies()
   local values = {}
   for _, path in ipairs(cpu_frequency_paths) do
@@ -88,7 +94,9 @@ local function cpu_frequencies()
   return values
 end
 
-local gpu_busy_paths = find_paths("find -L /sys/class/drm -path '*/device/gpu_busy_percent' -type f -print")
+local gpu_busy_paths = discover_paths(
+  readable_glob("/sys/class/drm/card[0-9]*/device/gpu_busy_percent")
+)
 local has_nvidia_smi = capture("command -v nvidia-smi") ~= nil
 local function gpu_utilization()
   for _, path in ipairs(gpu_busy_paths) do
