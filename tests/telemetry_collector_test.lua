@@ -149,12 +149,13 @@ t.test("collector executable wires extended linux sources and fallbacks", functi
   t.truthy(runtime:find("sleep 2", 1, true))
 end)
 
-t.test("collector follows sysfs class links when discovering sensors", function()
+t.test("collector uses bounded sysfs glob discovery", function()
   local runtime = read_file("telemetry-collector.lua")
-  t.truthy(runtime:find("find -L /sys/class/hwmon", 1, true))
-  t.truthy(runtime:find("find -L /sys/class/thermal", 1, true))
-  t.truthy(runtime:find("find -L /sys/class/drm", 1, true))
-  t.truthy(runtime:find("find -L /sys/devices/system/cpu", 1, true))
+  t.eq(runtime:find("find -L /sys/", 1, true), nil)
+  t.truthy(runtime:find("/sys/class/hwmon/hwmon*/temp*_input", 1, true))
+  t.truthy(runtime:find("/sys/class/thermal/thermal_zone*/temp", 1, true))
+  t.truthy(runtime:find("/sys/class/drm/card[0-9]*/device/gpu_busy_percent", 1, true))
+  t.truthy(runtime:find("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq", 1, true))
 end)
 
 t.test("collector executable emits live memory then cpu samples on Linux", function()
