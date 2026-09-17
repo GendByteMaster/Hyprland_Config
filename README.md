@@ -52,16 +52,16 @@ Keeping Mouse Mode out of a submap is intentional: Omarchy's regular global shor
 | NumPad 9 | Move up-right |
 | NumPad 1 | Move down-left |
 | NumPad 3 | Move down-right |
-| NumPad 5 | Left click |
-| NumPad / | Left click |
-| NumPad * | Right click |
-| NumPad - | Middle click |
-| NumPad + | Double left click |
-| NumPad 0 | Hold left button |
-| NumPad . | Release left button |
+| NumPad / | Select Left Button mode (LMB) |
+| NumPad * | Select Right Button mode (RMB) |
+| NumPad - | Select Middle Button mode (MMB) |
+| NumPad 5 | Click selected button |
+| NumPad + | Double-click selected button |
+| NumPad 0 | Hold selected button |
+| NumPad . | Release held button |
 | Num Lock | Return to normal NumPad |
 
-The button keys use fixed NumFlow semantics; `/`, `*`, and `-` execute mouse clicks directly rather than selecting a button mode for NumPad 5. Both numeric keypad symbols and their NumLock-off navigation aliases are registered where applicable.
+The mouse-button controls use a Windows Mouse Keys-style selection model: `/`, `*`, and `-` change the active button mode without clicking immediately. The HUD shows the currently selected `LMB`, `RMB`, or `MMB` mode. `5`, `+`, `0`, and `.` then operate on that selected button. Both numeric keypad symbols and their NumLock-off navigation aliases are registered where applicable.
 
 Movement accelerates while a direction is held:
 
