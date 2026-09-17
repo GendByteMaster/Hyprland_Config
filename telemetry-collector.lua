@@ -50,7 +50,7 @@ end
 
 local function hwmon_candidates()
   local candidates = {}
-  local paths = find_paths("find /sys/class/hwmon -maxdepth 2 -type f -name 'temp*_input' -print")
+  local paths = find_paths("find -L /sys/class/hwmon -maxdepth 2 -type f -name 'temp*_input' -print")
   for _, path in ipairs(paths) do
     local label_path = path:gsub("_input$", "_label")
     local label = read_file(label_path)
@@ -62,7 +62,7 @@ end
 
 local function thermal_candidates()
   local candidates = {}
-  local paths = find_paths("find /sys/class/thermal -maxdepth 2 -type f -name temp -print")
+  local paths = find_paths("find -L /sys/class/thermal -maxdepth 2 -type f -name temp -print")
   for _, path in ipairs(paths) do
     local zone_dir = path:match("^(.*)/temp$")
     local label = zone_dir and read_file(zone_dir .. "/type") or nil
@@ -78,7 +78,7 @@ local function temperature_candidates()
   return thermal_candidates()
 end
 
-local cpu_frequency_paths = find_paths("find /sys/devices/system/cpu -path '*/cpufreq/scaling_cur_freq' -type f -print")
+local cpu_frequency_paths = find_paths("find -L /sys/devices/system/cpu -path '*/cpufreq/scaling_cur_freq' -type f -print")
 local function cpu_frequencies()
   local values = {}
   for _, path in ipairs(cpu_frequency_paths) do
@@ -88,7 +88,7 @@ local function cpu_frequencies()
   return values
 end
 
-local gpu_busy_paths = find_paths("find /sys/class/drm -path '*/device/gpu_busy_percent' -type f -print")
+local gpu_busy_paths = find_paths("find -L /sys/class/drm -path '*/device/gpu_busy_percent' -type f -print")
 local has_nvidia_smi = capture("command -v nvidia-smi") ~= nil
 local function gpu_utilization()
   for _, path in ipairs(gpu_busy_paths) do
