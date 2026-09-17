@@ -5,6 +5,7 @@ local install_state = require("workstation.install_state")
 local M = {}
 
 local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
+local SYSTEM_MONITOR_PLUGIN_ID = "gendbyte.system-monitor"
 
 local function target_is(target, source)
   if not command.is_symlink(target) then
@@ -22,6 +23,9 @@ local function default_runtime()
     syntax_check = function(repo_root)
       local quoted_root = command.quote(repo_root)
       return command.run("find " .. quoted_root .. " -name '*.lua' -type f -print0 | xargs -0 -r -n1 luac5.1 -p")
+    end,
+    plugin_validate = function(plugin_path)
+      return command.run("omarchy plugin validate " .. command.quote(plugin_path))
     end,
   }
 end
@@ -49,15 +53,26 @@ function M.verify(options)
   add("repository safety", repo_root:sub(1, #"/usr/share/omarchy") ~= "/usr/share/omarchy", repo_root)
   add("lua5.1", runtime.command_exists("lua5.1"), "lua5.1 must be installed")
   add("luac5.1", runtime.command_exists("luac5.1"), "luac5.1 must be installed")
+  local has_omarchy = runtime.command_exists("omarchy")
+  add("Omarchy CLI", has_omarchy, "omarchy must be installed for plugin validation")
 
   local hud_source = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
   local hud_manifest = paths.join(hud_source, "manifest.json")
   local hud_panel = paths.join(hud_source, "Panel.qml")
+  local monitor_source = paths.join(repo_root, "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
+  local monitor_manifest = paths.join(monitor_source, "manifest.json")
+  local monitor_service = paths.join(monitor_source, "Service.qml")
+  local monitor_widget = paths.join(monitor_source, "BarWidget.qml")
+  local monitor_host = paths.join(monitor_source, "ServiceHost.js")
+  local monitor_launcher = paths.join(monitor_source, "telemetry-collector.lua")
   local required = {
     paths.join(repo_root, "hypr", "bindings.lua"),
     paths.join(repo_root, "hypr", "workstation", "mouse.lua"),
     paths.join(repo_root, "hypr", "workstation", "mouse_state.lua"),
     paths.join(repo_root, "hypr", "workstation", "hud.lua"),
+    paths.join(repo_root, "lua", "workstation", "telemetry.lua"),
+    paths.join(repo_root, "lua", "workstation", "telemetry_collector.lua"),
+    paths.join(repo_root, "telemetry-collector.lua"),
     paths.join(repo_root, "install.lua"),
     paths.join(repo_root, "uninstall.lua"),
     paths.join(repo_root, "verify.lua"),
@@ -68,6 +83,16 @@ function M.verify(options)
   end
   add("HUD manifest", command.exists(hud_manifest), hud_manifest)
   add("HUD panel", command.exists(hud_panel), hud_panel)
+  add("system monitor manifest", command.exists(monitor_manifest), monitor_manifest)
+  add("system monitor service", command.exists(monitor_service), monitor_service)
+  add("system monitor bar widget", command.exists(monitor_widget), monitor_widget)
+  add("system monitor service host", command.exists(monitor_host), monitor_host)
+  add("system monitor collector launcher", command.exists(monitor_launcher), monitor_launcher)
+  add(
+    "Omarchy plugin validation",
+    has_omarchy and command.exists(monitor_manifest) and runtime.plugin_validate(monitor_source),
+    monitor_source
+  )
 
   local state_dir = paths.join(home, ".local", "state", "hyprland_config")
   local state_path = paths.join(state_dir, "active.state")
@@ -83,9 +108,11 @@ function M.verify(options)
     local target_bindings = paths.join(home, ".config", "hypr", "bindings.lua")
     local target_workstation = paths.join(home, ".config", "hypr", "workstation")
     local target_hud = paths.join(home, ".config", "omarchy", "plugins", HUD_PLUGIN_ID)
+    local target_monitor = paths.join(home, ".config", "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
     add("bindings link", target_is(target_bindings, source_bindings), target_bindings)
     add("workstation link", target_is(target_workstation, source_workstation), target_workstation)
     add("HUD plugin link", target_is(target_hud, hud_source), target_hud)
+    add("system monitor plugin link", target_is(target_monitor, monitor_source), target_monitor)
 
     if state.preserved_bindings then
       local backup_bindings = paths.join(state.backup_dir, "hypr", "bindings.lua")
@@ -97,6 +124,7 @@ function M.verify(options)
     add("bindings link", false, "cannot validate without install state")
     add("workstation link", false, "cannot validate without install state")
     add("HUD plugin link", false, "cannot validate without install state")
+    add("system monitor plugin link", false, "cannot validate without install state")
   end
 
   add("Lua syntax", runtime.syntax_check(repo_root), "luac5.1 -p")
