@@ -135,12 +135,13 @@ function M.register(hl, o)
 
   hl.define_submap("mouse", function()
     for _, direction in ipairs(DIRECTIONS) do
-      bind_aliases(hl, direction.keys, function()
-        move(direction)
+      local current = direction
+      bind_aliases(hl, current.keys, function()
+        move(current)
       end, { repeating = true })
 
-      bind_aliases(hl, direction.keys, function()
-        reset_direction(direction)
+      bind_aliases(hl, current.keys, function()
+        reset_direction(current)
       end, { release = true })
     end
 
@@ -157,7 +158,6 @@ function M.register(hl, o)
     bind_aliases(hl, { "KP_0", "KP_Insert" }, hold_left)
     bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, release_left)
     hl.bind("escape", exit)
-    hl.bind("SUPER + M", exit, { submap_universal = true })
   end)
 
   hl.on("keybinds.submap", function(name)
