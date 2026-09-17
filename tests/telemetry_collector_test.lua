@@ -26,6 +26,10 @@ local function read_file(path)
   return content
 end
 
+local function protocol_value(line, key)
+  return line and line:match("\t" .. key .. "=([^\t\r\n]+)") or nil
+end
+
 t.test("collector uses the first cpu read only as a baseline", function()
   local io_api = fake_io({
     ["/proc/stat"] = "cpu 100 0 0 100 0 0 0 0\n",
@@ -151,4 +155,16 @@ t.test("collector follows sysfs class links when discovering sensors", function(
   t.truthy(runtime:find("find -L /sys/class/thermal", 1, true))
   t.truthy(runtime:find("find -L /sys/class/drm", 1, true))
   t.truthy(runtime:find("find -L /sys/devices/system/cpu", 1, true))
+end)
+
+t.test("collector executable emits live memory then cpu samples on Linux", function()
+  local pipe = assert(io.popen("timeout 5s lua5.1 telemetry-collector.lua 2>/dev/null"))
+  local first = pipe:read("*l")
+  local second = pipe:read("*l")
+  pipe:close()
+
+  t.truthy(first ~= nil and first:match("^v1\t") ~= nil)
+  t.truthy(second ~= nil and second:match("^v1\t") ~= nil)
+  t.truthy(protocol_value(first, "mem") ~= nil and protocol_value(first, "mem") ~= "-")
+  t.truthy(protocol_value(second, "cpu") ~= nil and protocol_value(second, "cpu") ~= "-")
 end)
