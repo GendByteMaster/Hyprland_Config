@@ -144,3 +144,11 @@ t.test("collector executable wires extended linux sources and fallbacks", functi
   t.truthy(runtime:find("io.stdout:flush()", 1, true))
   t.truthy(runtime:find("sleep 2", 1, true))
 end)
+
+t.test("collector follows sysfs class links when discovering sensors", function()
+  local runtime = read_file("telemetry-collector.lua")
+  t.truthy(runtime:find("find -L /sys/class/hwmon", 1, true))
+  t.truthy(runtime:find("find -L /sys/class/thermal", 1, true))
+  t.truthy(runtime:find("find -L /sys/class/drm", 1, true))
+  t.truthy(runtime:find("find -L /sys/devices/system/cpu", 1, true))
+end)
