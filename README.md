@@ -53,14 +53,15 @@ Keeping Mouse Mode out of a submap is intentional: Omarchy's regular global shor
 | NumPad 1 | Move down-left |
 | NumPad 3 | Move down-right |
 | NumPad 5 | Left click |
-| NumPad + | Double left click |
+| NumPad / | Left click |
 | NumPad * | Right click |
 | NumPad - | Middle click |
+| NumPad + | Double left click |
 | NumPad 0 | Hold left button |
 | NumPad . | Release left button |
 | Num Lock | Return to normal NumPad |
 
-Both numeric keypad symbols and their NumLock-off navigation aliases are registered where applicable.
+The button keys use fixed NumFlow semantics; `/`, `*`, and `-` execute mouse clicks directly rather than selecting a button mode for NumPad 5. Both numeric keypad symbols and their NumLock-off navigation aliases are registered where applicable.
 
 Movement accelerates while a direction is held:
 
