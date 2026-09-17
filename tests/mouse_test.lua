@@ -284,6 +284,31 @@ t.test("NumPad 5 focuses and clicks the window under the cursor", function()
   t.eq(calls.dispatches[#calls.dispatches].state, "up")
 end)
 
+t.test("NumPad 5 ignores windows on hidden workspaces", function()
+  local hidden_workspace = { visible = false }
+  local current_workspace = { visible = true }
+  local hidden = {
+    at = { x = 100, y = 0 }, size = { x = 100, y = 100 }, mapped = true,
+    visible = true, accepts_input = true, active = false, workspace = hidden_workspace,
+  }
+  local current = {
+    at = { x = 100, y = 0 }, size = { x = 100, y = 100 }, mapped = true,
+    visible = true, accepts_input = true, active = false, workspace = current_workspace,
+  }
+  local hl, o, calls, find = fake_api({
+    cursor = { x = 150, y = 50 },
+    windows = { hidden, current },
+  })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
+
+  find("KP_5", false).dispatcher()
+
+  t.eq(calls.dispatches[#calls.dispatches - 2].kind, "focus")
+  t.eq(calls.dispatches[#calls.dispatches - 2].window, current)
+  t.eq(calls.dispatches[#calls.dispatches - 1].window, current)
+  t.eq(calls.dispatches[#calls.dispatches].window, current)
+end)
+
 t.test("double click uses the selected button", function()
   local hl, o, calls, find = fake_api()
   mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
