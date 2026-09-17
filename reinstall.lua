@@ -54,7 +54,7 @@ end
 local verification = verifier.verify({ home = home, repo_root = repo_root })
 for _, check in ipairs(verification.checks) do
   local marker = check.ok and "OK" or "FAIL"
-  print(string.format("[%s] %s%s", check.ok and "OK" or "FAIL", check.name, check.detail and (" - " .. tostring(check.detail)) or ""))
+  print(string.format("[%s] %s%s", marker, check.name, check.detail and (" - " .. tostring(check.detail)) or ""))
 end
 
 if not verification.ok then
@@ -66,11 +66,25 @@ print("Hyprland_Config verification passed.")
 
 if command.command_exists("hyprctl") then
   local reload_result = command.capture("hyprctl reload")
-  if reload_result ~= nil then
-    print("Hyprland configuration reloaded.")
-  else
-    print("Hyprland reload failed; run 'hyprctl reload' manually.")
+  if reload_result == nil then
+    io.stderr:write("Hyprland reload failed.\n")
+    os.exit(1)
   end
+
+  print("Hyprland configuration reloaded.")
+
+  local config_errors = command.capture("hyprctl configerrors")
+  if config_errors == nil then
+    io.stderr:write("Unable to query Hyprland runtime config errors.\n")
+    os.exit(1)
+  end
+
+  if config_errors ~= "" and config_errors ~= "ok" then
+    io.stderr:write("Hyprland runtime config errors remain:\n" .. config_errors .. "\n")
+    os.exit(1)
+  end
+
+  print("Hyprland runtime config check passed.")
 end
 
 print("Reinstall complete.")
