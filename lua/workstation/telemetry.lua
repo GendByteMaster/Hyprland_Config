@@ -91,4 +91,69 @@ function M.memory_percent(memory)
   return ((total - available) / total) * 100
 end
 
+function M.temperature_c(raw)
+  local value = finite_number(raw)
+  if not value then
+    return nil
+  end
+
+  if math.abs(value) >= 1000 then
+    value = value / 1000
+  end
+  if value < 0 or value > 150 then
+    return nil
+  end
+  return value
+end
+
+local function temperature_priority(label)
+  local normalized = string.lower(label or "")
+  if normalized:find("package", 1, true) then return 1 end
+  if normalized:find("tdie", 1, true) then return 1 end
+  if normalized:find("tctl", 1, true) then return 1 end
+  if normalized:find("cpu", 1, true) then return 2 end
+  if normalized:find("core", 1, true) then return 3 end
+  return 10
+end
+
+function M.choose_temperature(candidates)
+  if type(candidates) ~= "table" then
+    return nil
+  end
+
+  local best, best_priority
+  for _, candidate in ipairs(candidates) do
+    local value = M.temperature_c(candidate.raw)
+    if value then
+      local priority = temperature_priority(candidate.label)
+      if not best or priority < best_priority then
+        best = {
+          path = candidate.path,
+          label = candidate.label,
+          value = value,
+        }
+        best_priority = priority
+      end
+    end
+  end
+  return best
+end
+
+local function encode_metric(value)
+  if value == nil then
+    return "-"
+  end
+  return string.format("%.1f", value)
+end
+
+function M.encode_sample(sample)
+  sample = sample or {}
+  return table.concat({
+    "v1",
+    "cpu=" .. encode_metric(sample.cpu),
+    "mem=" .. encode_metric(sample.memory),
+    "temp=" .. encode_metric(sample.temperature),
+  }, "\t")
+end
+
 return M
