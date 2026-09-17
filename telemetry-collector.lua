@@ -4,9 +4,7 @@ end
 
 local function capture(command)
   local pipe = io.popen(command .. " 2>/dev/null")
-  if not pipe then
-    return nil
-  end
+  if not pipe then return nil end
   local output = pipe:read("*a") or ""
   pipe:close()
   return (output:gsub("[\r\n]+$", ""))
@@ -32,9 +30,7 @@ local collector = require("workstation.telemetry_collector")
 
 local function read_file(path)
   local file = io.open(path, "r")
-  if not file then
-    return nil
-  end
+  if not file then return nil end
   local content = file:read("*a")
   file:close()
   return content
@@ -43,13 +39,9 @@ end
 local function find_paths(command)
   local paths = {}
   local pipe = io.popen(command .. " 2>/dev/null")
-  if not pipe then
-    return paths
-  end
+  if not pipe then return paths end
   for path in pipe:lines() do
-    if path ~= "" then
-      paths[#paths + 1] = path
-    end
+    if path ~= "" then paths[#paths + 1] = path end
   end
   pipe:close()
   table.sort(paths)
@@ -62,14 +54,8 @@ local function hwmon_candidates()
   for _, path in ipairs(paths) do
     local label_path = path:gsub("_input$", "_label")
     local label = read_file(label_path)
-    if label then
-      label = label:gsub("[\r\n]+$", "")
-    end
-    candidates[#candidates + 1] = {
-      path = path,
-      label = label,
-      raw = read_file(path),
-    }
+    if label then label = label:gsub("[\r\n]+$", "") end
+    candidates[#candidates + 1] = { path = path, label = label, raw = read_file(path) }
   end
   return candidates
 end
@@ -80,29 +66,47 @@ local function thermal_candidates()
   for _, path in ipairs(paths) do
     local zone_dir = path:match("^(.*)/temp$")
     local label = zone_dir and read_file(zone_dir .. "/type") or nil
-    if label then
-      label = label:gsub("[\r\n]+$", "")
-    end
-    candidates[#candidates + 1] = {
-      path = path,
-      label = label,
-      raw = read_file(path),
-    }
+    if label then label = label:gsub("[\r\n]+$", "") end
+    candidates[#candidates + 1] = { path = path, label = label, raw = read_file(path) }
   end
   return candidates
 end
 
 local function temperature_candidates()
   local hwmon = hwmon_candidates()
-  if telemetry.choose_temperature(hwmon) then
-    return hwmon
-  end
+  if telemetry.choose_temperature(hwmon) then return hwmon end
   return thermal_candidates()
+end
+
+local cpu_frequency_paths = find_paths("find /sys/devices/system/cpu -path '*/cpufreq/scaling_cur_freq' -type f -print")
+local function cpu_frequencies()
+  local values = {}
+  for _, path in ipairs(cpu_frequency_paths) do
+    local raw = read_file(path)
+    if raw then values[#values + 1] = raw end
+  end
+  return values
+end
+
+local gpu_busy_paths = find_paths("find /sys/class/drm -path '*/device/gpu_busy_percent' -type f -print")
+local has_nvidia_smi = capture("command -v nvidia-smi") ~= nil
+local function gpu_utilization()
+  for _, path in ipairs(gpu_busy_paths) do
+    local raw = read_file(path)
+    if telemetry.gpu_percent(raw) ~= nil then return raw end
+  end
+  if has_nvidia_smi then
+    return capture("nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1")
+  end
+  return nil
 end
 
 local io_api = {
   read = read_file,
   temperature_candidates = temperature_candidates,
+  cpu_frequencies = cpu_frequencies,
+  gpu_utilization = gpu_utilization,
+  sample_interval_seconds = 2,
 }
 
 local state = {}
