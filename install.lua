@@ -8,6 +8,7 @@ package.path = script_dir .. "/lua/?.lua;" .. script_dir .. "/lua/?/init.lua;" .
 
 local command = require("workstation.command")
 local installer = require("workstation.installer")
+local sound_assets = require("workstation.sound_assets")
 
 local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
 local home = assert(os.getenv("HOME"), "HOME is not set")
@@ -21,6 +22,14 @@ if result.changed then
   end
 else
   print("Hyprland_Config is already installed and up to date.")
+end
+
+local sound_result = sound_assets.install({ home = home, repo_root = repo_root })
+if sound_result.ok then
+  print("Num Lock UI SFX installed locally: " .. sound_result.directory)
+else
+  print("Num Lock sound feedback is unavailable: " .. tostring(sound_result.error))
+  print("Mouse Mode will continue to work without audio feedback.")
 end
 
 local hud_enabled = false
