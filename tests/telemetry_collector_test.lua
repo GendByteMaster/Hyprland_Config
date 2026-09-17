@@ -12,6 +12,13 @@ local function fake_io(files, candidates)
   }
 end
 
+local function read_file(path)
+  local file = assert(io.open(path, "r"))
+  local content = file:read("*a")
+  file:close()
+  return content
+end
+
 t.test("collector uses the first cpu read only as a baseline", function()
   local io_api = fake_io({
     ["/proc/stat"] = "cpu 100 0 0 100 0 0 0 0\n",
@@ -62,4 +69,15 @@ t.test("collector selects package temperature without making it mandatory", func
   }, {})
   local missing = collector.sample_once({}, without_sensor)
   t.eq(missing.temperature, nil)
+end)
+
+t.test("collector executable wires proc sys protocol flushing and cadence", function()
+  local source = read_file("telemetry-collector.lua")
+  t.truthy(source:find("/proc/stat", 1, true))
+  t.truthy(source:find("/proc/meminfo", 1, true))
+  t.truthy(source:find("/sys/class/hwmon", 1, true))
+  t.truthy(source:find("/sys/class/thermal", 1, true))
+  t.truthy(source:find("encode_sample", 1, true))
+  t.truthy(source:find("io.stdout:flush()", 1, true))
+  t.truthy(source:find("sleep 2", 1, true))
 end)
