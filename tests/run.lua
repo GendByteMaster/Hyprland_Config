@@ -12,5 +12,6 @@ require("tests.installer_test")
 require("tests.uninstaller_test")
 require("tests.verifier_test")
 require("tests.telemetry_test")
+require("tests.telemetry_collector_test")
 
 require("tests.testlib").run()
