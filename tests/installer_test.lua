@@ -28,9 +28,11 @@ end
 local function fake_repo(root)
   write(paths.join(root, "hypr", "bindings.lua"), "-- managed bindings\n")
   write(paths.join(root, "hypr", "workstation", "mouse.lua"), "return {}\n")
+  write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json"), "{}\n")
+  write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "Panel.qml"), "import QtQuick\nItem {}\n")
 end
 
-t.test("fresh install creates managed links and state", function()
+t.test("fresh install creates Hyprland and HUD plugin links", function()
   local root = temp_dir("fresh")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
@@ -40,6 +42,7 @@ t.test("fresh install creates managed links and state", function()
   t.truthy(result.changed)
   t.eq(command.realpath(paths.join(home, ".config", "hypr", "bindings.lua")), command.realpath(paths.join(repo, "hypr", "bindings.lua")))
   t.eq(command.realpath(paths.join(home, ".config", "hypr", "workstation")), command.realpath(paths.join(repo, "hypr", "workstation")))
+  t.eq(command.realpath(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud")), command.realpath(paths.join(repo, "omarchy", "plugins", "gendbyte.mouse-hud")))
 
   local state = assert(install_state.read(paths.join(home, ".local", "state", "hyprland_config", "active.state")))
   t.eq(state.repo_root, command.realpath(repo))
@@ -85,6 +88,37 @@ t.test("second install is idempotent and keeps the first backup", function()
   t.eq(second_state.backup_dir, first_state.backup_dir)
   t.eq(command.exists(paths.join(home, ".local", "state", "hyprland_config", "backups", "second")), false)
 
+  command.remove_tree(root)
+end)
+
+t.test("installer adds missing HUD link to an existing active install", function()
+  local root = temp_dir("hud-migration")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+  installer.install({ home = home, repo_root = repo, timestamp = "first" })
+
+  local hud_target = paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud")
+  assert(command.remove(hud_target))
+  local result = installer.install({ home = home, repo_root = repo, timestamp = "second" })
+
+  t.truthy(result.changed)
+  t.eq(command.realpath(hud_target), command.realpath(paths.join(repo, "omarchy", "plugins", "gendbyte.mouse-hud")))
+  command.remove_tree(root)
+end)
+
+t.test("installer refuses to replace an unrelated HUD plugin", function()
+  local root = temp_dir("hud-conflict")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+  write(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json"), "{\"id\":\"other\"}\n")
+
+  local ok = pcall(function()
+    installer.install({ home = home, repo_root = repo, timestamp = "first" })
+  end)
+  t.eq(ok, false)
+  t.eq(read(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json")), "{\"id\":\"other\"}\n")
   command.remove_tree(root)
 end)
 
