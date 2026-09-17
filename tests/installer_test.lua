@@ -30,19 +30,53 @@ local function fake_repo(root)
   write(paths.join(root, "hypr", "workstation", "mouse.lua"), "return {}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json"), "{}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "Panel.qml"), "import QtQuick\nItem {}\n")
+  write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "manifest.json"), "{}\n")
+  write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "Service.qml"), "import QtQuick\nItem {}\n")
+  write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "BarWidget.qml"), "import QtQuick\nItem {}\n")
+  write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "ServiceHost.js"), "function hostedService() {}\n")
+  write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "telemetry-collector.lua"), "return true\n")
 end
 
-t.test("fresh install creates Hyprland and HUD plugin links", function()
+local function fake_omarchy_runtime(calls, options)
+  calls = calls or {}
+  options = options or {}
+  return {
+    available = function()
+      return options.available ~= false
+    end,
+    enable_plugin = function(id, section)
+      calls[#calls + 1] = { action = "enable", id = id, section = section }
+      return options.enable_ok ~= false
+    end,
+    disable_plugin = function(id)
+      calls[#calls + 1] = { action = "disable", id = id }
+      return true
+    end,
+  }
+end
+
+local function install(options, runtime)
+  options.omarchy_runtime = runtime or fake_omarchy_runtime()
+  return installer.install(options)
+end
+
+t.test("fresh install creates Hyprland HUD and system monitor links", function()
   local root = temp_dir("fresh")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
+  local calls = {}
   fake_repo(repo)
 
-  local result = installer.install({ home = home, repo_root = repo, timestamp = "20260917-120000" })
+  local result = install({ home = home, repo_root = repo, timestamp = "20260917-120000" }, fake_omarchy_runtime(calls))
   t.truthy(result.changed)
   t.eq(command.realpath(paths.join(home, ".config", "hypr", "bindings.lua")), command.realpath(paths.join(repo, "hypr", "bindings.lua")))
   t.eq(command.realpath(paths.join(home, ".config", "hypr", "workstation")), command.realpath(paths.join(repo, "hypr", "workstation")))
   t.eq(command.realpath(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud")), command.realpath(paths.join(repo, "omarchy", "plugins", "gendbyte.mouse-hud")))
+  t.eq(command.realpath(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")), command.realpath(paths.join(repo, "omarchy", "plugins", "gendbyte.system-monitor")))
+  t.eq(#calls, 1)
+  t.eq(calls[1].action, "enable")
+  t.eq(calls[1].id, "gendbyte.system-monitor")
+  t.eq(calls[1].section, "right")
 
   local state = assert(install_state.read(paths.join(home, ".local", "state", "hyprland_config", "active.state")))
   t.eq(state.repo_root, command.realpath(repo))
@@ -61,7 +95,7 @@ t.test("install preserves existing bindings and workstation directory", function
   write(paths.join(home, ".config", "hypr", "bindings.lua"), "-- original bindings\n")
   write(paths.join(home, ".config", "hypr", "workstation", "local.lua"), "return 'local'\n")
 
-  local result = installer.install({ home = home, repo_root = repo, timestamp = "20260917-120100" })
+  local result = install({ home = home, repo_root = repo, timestamp = "20260917-120100" })
   local state = assert(install_state.read(result.state_path))
   t.truthy(state.preserved_bindings)
   t.truthy(state.preserved_workstation)
@@ -72,21 +106,24 @@ t.test("install preserves existing bindings and workstation directory", function
   command.remove_tree(root)
 end)
 
-t.test("second install is idempotent and keeps the first backup", function()
+t.test("second install is idempotent and enables system monitor only once", function()
   local root = temp_dir("idempotent")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
+  local calls = {}
+  local runtime = fake_omarchy_runtime(calls)
   fake_repo(repo)
   write(paths.join(home, ".config", "hypr", "bindings.lua"), "-- original\n")
 
-  local first = installer.install({ home = home, repo_root = repo, timestamp = "first" })
+  local first = install({ home = home, repo_root = repo, timestamp = "first" }, runtime)
   local first_state = assert(install_state.read(first.state_path))
-  local second = installer.install({ home = home, repo_root = repo, timestamp = "second" })
+  local second = install({ home = home, repo_root = repo, timestamp = "second" }, runtime)
   local second_state = assert(install_state.read(second.state_path))
 
   t.eq(second.changed, false)
   t.eq(second_state.backup_dir, first_state.backup_dir)
   t.eq(command.exists(paths.join(home, ".local", "state", "hyprland_config", "backups", "second")), false)
+  t.eq(#calls, 1)
 
   command.remove_tree(root)
 end)
@@ -96,14 +133,36 @@ t.test("installer adds missing HUD link to an existing active install", function
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
   fake_repo(repo)
-  installer.install({ home = home, repo_root = repo, timestamp = "first" })
+  install({ home = home, repo_root = repo, timestamp = "first" })
 
   local hud_target = paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud")
   assert(command.remove(hud_target))
-  local result = installer.install({ home = home, repo_root = repo, timestamp = "second" })
+  local result = install({ home = home, repo_root = repo, timestamp = "second" })
 
   t.truthy(result.changed)
   t.eq(command.realpath(hud_target), command.realpath(paths.join(repo, "omarchy", "plugins", "gendbyte.mouse-hud")))
+  command.remove_tree(root)
+end)
+
+t.test("installer adds and enables a missing system monitor link", function()
+  local root = temp_dir("monitor-migration")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  local calls = {}
+  local runtime = fake_omarchy_runtime(calls)
+  fake_repo(repo)
+  install({ home = home, repo_root = repo, timestamp = "first" }, runtime)
+
+  local target = paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")
+  assert(command.remove(target))
+  calls = {}
+  runtime = fake_omarchy_runtime(calls)
+  local result = install({ home = home, repo_root = repo, timestamp = "second" }, runtime)
+
+  t.truthy(result.changed)
+  t.eq(command.realpath(target), command.realpath(paths.join(repo, "omarchy", "plugins", "gendbyte.system-monitor")))
+  t.eq(#calls, 1)
+  t.eq(calls[1].action, "enable")
   command.remove_tree(root)
 end)
 
@@ -115,10 +174,43 @@ t.test("installer refuses to replace an unrelated HUD plugin", function()
   write(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json"), "{\"id\":\"other\"}\n")
 
   local ok = pcall(function()
-    installer.install({ home = home, repo_root = repo, timestamp = "first" })
+    install({ home = home, repo_root = repo, timestamp = "first" })
   end)
   t.eq(ok, false)
   t.eq(read(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json")), "{\"id\":\"other\"}\n")
+  command.remove_tree(root)
+end)
+
+t.test("installer refuses to replace an unrelated system monitor plugin", function()
+  local root = temp_dir("monitor-conflict")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+  write(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor", "manifest.json"), "{\"id\":\"other\"}\n")
+
+  local ok = pcall(function()
+    install({ home = home, repo_root = repo, timestamp = "first" })
+  end)
+  t.eq(ok, false)
+  t.eq(read(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor", "manifest.json")), "{\"id\":\"other\"}\n")
+  command.remove_tree(root)
+end)
+
+t.test("installer rolls back when Omarchy cannot enable the system monitor", function()
+  local root = temp_dir("monitor-enable-failure")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+  write(paths.join(home, ".config", "omarchy", "shell.json"), "{\"keep\":true}\n")
+
+  local ok = pcall(function()
+    install({ home = home, repo_root = repo, timestamp = "first" }, fake_omarchy_runtime({}, { enable_ok = false }))
+  end)
+  t.eq(ok, false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".config", "hypr", "bindings.lua")), false)
+  t.eq(command.exists(paths.join(home, ".local", "state", "hyprland_config", "active.state")), false)
+  t.eq(read(paths.join(home, ".config", "omarchy", "shell.json")), "{\"keep\":true}\n")
   command.remove_tree(root)
 end)
 
@@ -127,14 +219,14 @@ t.test("installer aborts when active managed target was replaced", function()
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
   fake_repo(repo)
-  installer.install({ home = home, repo_root = repo, timestamp = "first" })
+  install({ home = home, repo_root = repo, timestamp = "first" })
 
   local bindings = paths.join(home, ".config", "hypr", "bindings.lua")
   assert(command.remove(bindings))
   write(bindings, "-- unrelated replacement\n")
 
   local ok = pcall(function()
-    installer.install({ home = home, repo_root = repo, timestamp = "second" })
+    install({ home = home, repo_root = repo, timestamp = "second" })
   end)
   t.eq(ok, false)
   t.eq(read(bindings), "-- unrelated replacement\n")
