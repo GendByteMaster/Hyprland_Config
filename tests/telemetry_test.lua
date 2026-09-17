@@ -66,6 +66,33 @@ t.test("telemetry rejects incomplete or impossible memory input", function()
   t.eq(telemetry.memory_gib({ total_kib = 100, available_kib = 200 }), nil)
 end)
 
+t.test("telemetry aggregates network counters without loopback", function()
+  local snapshot = assert(telemetry.parse_net_dev([[Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo: 1000 1 0 0 0 0 0 0 1000 1 0 0 0 0 0 0
+enp3s0: 100000 10 0 0 0 0 0 0 200000 20 0 0 0 0 0 0
+ wlan0: 50000 5 0 0 0 0 0 0 30000 3 0 0 0 0 0 0
+]]))
+  t.eq(snapshot.rx_bytes, 150000)
+  t.eq(snapshot.tx_bytes, 230000)
+end)
+
+t.test("telemetry computes network byte rates from deltas", function()
+  local rx, tx = telemetry.network_bytes_per_second(
+    { rx_bytes = 1000, tx_bytes = 2000 },
+    { rx_bytes = 5000, tx_bytes = 6000 },
+    2
+  )
+  near(rx, 2000)
+  near(tx, 2000)
+end)
+
+t.test("telemetry rejects invalid network deltas", function()
+  t.eq(telemetry.network_bytes_per_second(nil, { rx_bytes = 100, tx_bytes = 100 }, 2), nil)
+  t.eq(telemetry.network_bytes_per_second({ rx_bytes = 200, tx_bytes = 200 }, { rx_bytes = 100, tx_bytes = 100 }, 2), nil)
+  t.eq(telemetry.network_bytes_per_second({ rx_bytes = 100, tx_bytes = 100 }, { rx_bytes = 200, tx_bytes = 200 }, 0), nil)
+end)
+
 t.test("telemetry converts millidegree temperature", function()
   near(telemetry.temperature_c("54000\n"), 54.0)
   near(telemetry.temperature_c("54\n"), 54.0)
