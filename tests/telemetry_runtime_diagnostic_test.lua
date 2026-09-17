@@ -21,31 +21,31 @@ local function assert_discovery_finishes(label, command)
   end
 end
 
-t.test("cpu frequency sysfs discovery finishes quickly", function()
+t.test("bounded cpu frequency discovery finishes quickly", function()
   assert_discovery_finishes(
     "cpu frequency",
-    "find -L /sys/devices/system/cpu -path '*/cpufreq/scaling_cur_freq' -type f -print"
+    "for path in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq; do [ -r \"$path\" ] && printf '%s\\n' \"$path\"; done"
   )
 end)
 
-t.test("drm gpu sysfs discovery finishes quickly", function()
+t.test("bounded drm gpu discovery finishes quickly", function()
   assert_discovery_finishes(
     "drm gpu",
-    "find -L /sys/class/drm -path '*/device/gpu_busy_percent' -type f -print"
+    "for path in /sys/class/drm/card[0-9]*/device/gpu_busy_percent; do [ -r \"$path\" ] && printf '%s\\n' \"$path\"; done"
   )
 end)
 
-t.test("hwmon sysfs discovery finishes quickly", function()
+t.test("bounded hwmon discovery finishes quickly", function()
   assert_discovery_finishes(
     "hwmon",
-    "find -L /sys/class/hwmon -maxdepth 2 -type f -name 'temp*_input' -print"
+    "for path in /sys/class/hwmon/hwmon*/temp*_input; do [ -r \"$path\" ] && printf '%s\\n' \"$path\"; done"
   )
 end)
 
-t.test("thermal sysfs discovery finishes quickly", function()
+t.test("bounded thermal discovery finishes quickly", function()
   assert_discovery_finishes(
     "thermal",
-    "find -L /sys/class/thermal -maxdepth 2 -type f -name temp -print"
+    "for path in /sys/class/thermal/thermal_zone*/temp; do [ -r \"$path\" ] && printf '%s\\n' \"$path\"; done"
   )
 end)
 
