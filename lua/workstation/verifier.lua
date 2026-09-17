@@ -4,6 +4,8 @@ local install_state = require("workstation.install_state")
 
 local M = {}
 
+local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
+
 local function target_is(target, source)
   if not command.is_symlink(target) then
     return false
@@ -48,10 +50,14 @@ function M.verify(options)
   add("lua5.1", runtime.command_exists("lua5.1"), "lua5.1 must be installed")
   add("luac5.1", runtime.command_exists("luac5.1"), "luac5.1 must be installed")
 
+  local hud_source = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
+  local hud_manifest = paths.join(hud_source, "manifest.json")
+  local hud_panel = paths.join(hud_source, "Panel.qml")
   local required = {
     paths.join(repo_root, "hypr", "bindings.lua"),
     paths.join(repo_root, "hypr", "workstation", "mouse.lua"),
     paths.join(repo_root, "hypr", "workstation", "mouse_state.lua"),
+    paths.join(repo_root, "hypr", "workstation", "hud.lua"),
     paths.join(repo_root, "install.lua"),
     paths.join(repo_root, "uninstall.lua"),
     paths.join(repo_root, "verify.lua"),
@@ -60,6 +66,8 @@ function M.verify(options)
   for _, path in ipairs(required) do
     add("file: " .. path:sub(#repo_root + 2), command.exists(path), path)
   end
+  add("HUD manifest", command.exists(hud_manifest), hud_manifest)
+  add("HUD panel", command.exists(hud_panel), hud_panel)
 
   local state_dir = paths.join(home, ".local", "state", "hyprland_config")
   local state_path = paths.join(state_dir, "active.state")
@@ -74,8 +82,10 @@ function M.verify(options)
     local source_workstation = paths.join(repo_root, "hypr", "workstation")
     local target_bindings = paths.join(home, ".config", "hypr", "bindings.lua")
     local target_workstation = paths.join(home, ".config", "hypr", "workstation")
+    local target_hud = paths.join(home, ".config", "omarchy", "plugins", HUD_PLUGIN_ID)
     add("bindings link", target_is(target_bindings, source_bindings), target_bindings)
     add("workstation link", target_is(target_workstation, source_workstation), target_workstation)
+    add("HUD plugin link", target_is(target_hud, hud_source), target_hud)
 
     if state.preserved_bindings then
       local backup_bindings = paths.join(state.backup_dir, "hypr", "bindings.lua")
@@ -86,6 +96,7 @@ function M.verify(options)
   else
     add("bindings link", false, "cannot validate without install state")
     add("workstation link", false, "cannot validate without install state")
+    add("HUD plugin link", false, "cannot validate without install state")
   end
 
   add("Lua syntax", runtime.syntax_check(repo_root), "luac5.1 -p")
