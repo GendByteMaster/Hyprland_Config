@@ -112,6 +112,7 @@ t.test("register reserves Num Lock and defines global NumFlow button selectors",
   t.truthy(calls.rebinds[1].options.submap_universal)
   t.truthy(calls.rebinds[1].options.non_consuming)
   t.eq(calls.configs[1].input.numlock_by_default, true)
+  t.eq(calls.configs[1].cursor.hide_on_key_press, false)
   t.eq(#calls.submaps, 0)
   t.truthy(find("KP_8", false))
   t.truthy(find("KP_Up", false))
