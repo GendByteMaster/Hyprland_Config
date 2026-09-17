@@ -41,17 +41,29 @@ end
 local function default_omarchy_runtime()
   return {
     available = function()
-      return command.command_exists("omarchy")
+      return command.command_exists("omarchy") and command.command_exists("omarchy-shell")
+    end,
+    rescan_plugins = function()
+      return command.run("omarchy-shell shell rescanPlugins")
     end,
     enable_plugin = function(id, section)
       return command.run(
-        "omarchy plugin enable " .. command.quote(id) .. " --section " .. command.quote(section)
+        "omarchy plugin enable " .. command.quote(id)
+          .. " --section " .. command.quote(section)
+          .. " --yes"
       )
     end,
     disable_plugin = function(id)
-      return command.run("omarchy plugin disable " .. command.quote(id))
+      return command.run("omarchy plugin disable " .. command.quote(id) .. " --yes")
     end,
   }
+end
+
+local function rescan_plugins(runtime)
+  if type(runtime.rescan_plugins) ~= "function" then
+    return true
+  end
+  return runtime.rescan_plugins()
 end
 
 function M.install(options)
@@ -110,7 +122,7 @@ function M.install(options)
       return { changed = false, state_path = state_path, backup_dir = active.backup_dir }
     end
     if not monitor_installed then
-      assert_ok(omarchy_runtime.available(), "Omarchy CLI is required to enable the System Monitor plugin")
+      assert_ok(omarchy_runtime.available(), "Omarchy CLI and shell are required to enable the System Monitor plugin")
     end
 
     local linked_hud = false
@@ -123,6 +135,7 @@ function M.install(options)
       if not monitor_installed then
         assert_ok(command.symlink(source_system_monitor, target_system_monitor), "failed to link System Monitor plugin")
         linked_monitor = true
+        assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
         assert_ok(
           omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
           "failed to enable System Monitor plugin"
@@ -151,7 +164,7 @@ function M.install(options)
   if command.exists_or_symlink(preserved_bindings_link) then
     error("preserved bindings marker exists without active installation state")
   end
-  assert_ok(omarchy_runtime.available(), "Omarchy CLI is required to enable the System Monitor plugin")
+  assert_ok(omarchy_runtime.available(), "Omarchy CLI and shell are required to enable the System Monitor plugin")
 
   local has_bindings = command.exists_or_symlink(target_bindings)
   local has_workstation = command.exists_or_symlink(target_workstation)
@@ -204,6 +217,7 @@ function M.install(options)
       preserved_workstation = moved_workstation,
     })
 
+    assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
     assert_ok(
       omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
       "failed to enable System Monitor plugin"
