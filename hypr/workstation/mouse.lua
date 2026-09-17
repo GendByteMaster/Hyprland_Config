@@ -28,6 +28,28 @@ local function bind_aliases(hl, keys, dispatcher, options)
   end
 end
 
+local function rebind_compat(hl, o, keys, description, dispatcher, options)
+  if type(o.rebind) == "function" then
+    return o.rebind(keys, description, dispatcher, options)
+  end
+
+  if type(hl.unbind) ~= "function" then
+    error("Omarchy compatibility requires hl.unbind when o.rebind is unavailable")
+  end
+
+  hl.unbind(keys)
+
+  if type(o.bind) == "function" then
+    return o.bind(keys, description, dispatcher, options)
+  end
+
+  local opts = options or {}
+  if description then
+    opts.description = description
+  end
+  return hl.bind(keys, dispatcher, opts)
+end
+
 function M.register(hl, o, options)
   options = options or {}
 
@@ -164,7 +186,7 @@ function M.register(hl, o, options)
     held_key = selected.key
   end
 
-  o.rebind("Num_Lock", "Mouse mode / Num Lock", on_numlock, {
+  rebind_compat(hl, o, "Num_Lock", "Mouse mode / Num Lock", on_numlock, {
     submap_universal = true,
     non_consuming = true,
   })
