@@ -101,3 +101,11 @@ t.test("reinstall is non-destructive and does not uninstall a working managed co
   t.eq(script:find("uninstaller.uninstall", 1, true), nil)
   t.truthy(script:find("installer.install", 1, true))
 end)
+
+t.test("default Omarchy plugin commands avoid unsupported yes flags", function()
+  local source = read("lua/workstation/installer.lua")
+  t.eq(source:find("--yes", 1, true), nil)
+  t.truthy(source:find("omarchy plugin enable ", 1, true))
+  t.truthy(source:find("--section", 1, true))
+  t.truthy(source:find("omarchy plugin disable ", 1, true))
+end)
