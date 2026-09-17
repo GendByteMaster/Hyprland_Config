@@ -127,16 +127,26 @@ t.test("telemetry prefers package and cpu temperature labels", function()
   near(chosen.value, 54.0)
 end)
 
-t.test("telemetry encodes a versioned sample", function()
+t.test("telemetry encodes an extended versioned sample", function()
   t.eq(
-    telemetry.encode_sample({ cpu = 12.34, memory = 56.78, temperature = 54.1 }),
-    "v1\tcpu=12.3\tmem=56.8\ttemp=54.1"
+    telemetry.encode_sample({
+      cpu = 12.34,
+      cpu_ghz = 3.4,
+      memory = 56.78,
+      memory_used_gib = 6.2,
+      memory_total_gib = 31.3,
+      gpu = 24,
+      network_rx_bps = 1258291.2,
+      network_tx_bps = 348160,
+      temperature = 54.1,
+    }),
+    "v1\tcpu=12.3\tcpu_ghz=3.4\tmem=56.8\tmem_used_gib=6.2\tmem_total_gib=31.3\tgpu=24.0\tnet_rx_bps=1258291.2\tnet_tx_bps=348160.0\ttemp=54.1"
   )
 end)
 
-t.test("telemetry protocol preserves unavailable metrics", function()
+t.test("telemetry protocol preserves unavailable extended metrics", function()
   t.eq(
     telemetry.encode_sample({ cpu = nil, memory = 50, temperature = nil }),
-    "v1\tcpu=-\tmem=50.0\ttemp=-"
+    "v1\tcpu=-\tcpu_ghz=-\tmem=50.0\tmem_used_gib=-\tmem_total_gib=-\tgpu=-\tnet_rx_bps=-\tnet_tx_bps=-\ttemp=-"
   )
 end)
