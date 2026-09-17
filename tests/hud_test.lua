@@ -20,6 +20,20 @@ t.test("HUD sends canonical Omarchy shell summon command", function()
   t.eq(commands[1], "omarchy-shell shell summon gendbyte.mouse-hud '{\"mode\":\"mouse\",\"button\":\"RMB\"}'")
 end)
 
+t.test("HUD quotes payload when Omarchy shell_quote helper is unavailable", function()
+  local commands = {}
+  local hl = {}
+
+  function hl.exec_cmd(command)
+    table.insert(commands, command)
+  end
+
+  local client = hud.new(hl, {})
+  t.truthy(client.show("mouse", "LMB"))
+  t.eq(#commands, 1)
+  t.eq(commands[1], "omarchy-shell shell summon gendbyte.mouse-hud '{\"mode\":\"mouse\",\"button\":\"LMB\"}'")
+end)
+
 t.test("HUD rejects unsupported mode and button values", function()
   local hl = { exec_cmd = function() error("must not execute") end }
   local o = { shell_quote = function(value) return value end }
