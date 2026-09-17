@@ -1,0 +1,42 @@
+local t = require("tests.testlib")
+
+local function read_file(path)
+  local file = assert(io.open(path, "r"), "missing file: " .. path)
+  local content = file:read("*a")
+  file:close()
+  return content
+end
+
+t.test("system monitor manifest declares service and bar widget", function()
+  local manifest = read_file("omarchy/plugins/gendbyte.system-monitor/manifest.json")
+  t.truthy(manifest:find('"id": "gendbyte.system-monitor"', 1, true))
+  t.truthy(manifest:find('"service"', 1, true))
+  t.truthy(manifest:find('"bar-widget"', 1, true))
+  t.truthy(manifest:find('"service": "Service.qml"', 1, true))
+  t.truthy(manifest:find('"barWidget": "BarWidget.qml"', 1, true))
+  t.truthy(manifest:find('"defaultSection": "right"', 1, true))
+  t.truthy(manifest:find('"allowMultiple": false', 1, true))
+end)
+
+t.test("system monitor service owns one streaming collector", function()
+  local service = read_file("omarchy/plugins/gendbyte.system-monitor/Service.qml")
+  t.truthy(service:find("Process {", 1, true))
+  t.truthy(service:find("SplitParser", 1, true))
+  t.truthy(service:find("acceptSample", 1, true))
+  t.truthy(service:find('"v1"', 1, true))
+  t.truthy(service:find("collectorHealthy", 1, true))
+  t.truthy(service:find("telemetry-collector.lua", 1, true))
+  t.truthy(service:find("restartTimer", 1, true))
+end)
+
+t.test("system monitor bar widget resolves the singleton service", function()
+  local host = read_file("omarchy/plugins/gendbyte.system-monitor/ServiceHost.js")
+  t.truthy(host:find('serviceFor("gendbyte.system-monitor")', 1, true))
+end)
+
+t.test("plugin collector launcher resolves repository root without duplicating telemetry", function()
+  local launcher = read_file("omarchy/plugins/gendbyte.system-monitor/telemetry-collector.lua")
+  t.truthy(launcher:find("HYPRLAND_CONFIG_ROOT", 1, true))
+  t.truthy(launcher:find("dofile", 1, true))
+  t.truthy(launcher:find("../../../", 1, true))
+end)
