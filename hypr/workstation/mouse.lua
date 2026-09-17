@@ -23,9 +23,9 @@ local DIRECTIONS = {
   { id = "down_right", keys = { "KP_3", "KP_Next" }, dx = 1, dy = 1 },
 }
 
-local function bind_aliases(hl, keys, dispatcher, options)
+local function bind_aliases(bind_fn, keys, dispatcher, options)
   for _, key in ipairs(keys) do
-    hl.bind(key, dispatcher, options)
+    bind_fn(key, dispatcher, options)
   end
 end
 
@@ -63,6 +63,7 @@ function M.register(hl, o, options)
   local selected = BUTTONS.LMB
   local held_key = nil
   local live_timers = {}
+  local mouse_bind_handles = {}
 
   hl.config({
     input = {
@@ -75,6 +76,22 @@ function M.register(hl, o, options)
       hide_on_key_press = false,
     },
   })
+
+  local function register_mouse_bind(key, dispatcher, bind_options)
+    local handle = hl.bind(key, dispatcher, bind_options)
+    if handle then
+      table.insert(mouse_bind_handles, handle)
+    end
+    return handle
+  end
+
+  local function set_mouse_bindings_enabled(enabled)
+    for _, handle in ipairs(mouse_bind_handles) do
+      if handle and type(handle.set_enabled) == "function" then
+        handle:set_enabled(enabled)
+      end
+    end
+  end
 
   local function dispatch(action)
     hl.dispatch(action)
@@ -183,12 +200,14 @@ function M.register(hl, o, options)
   end
 
   local function enter()
+    set_mouse_bindings_enabled(true)
     cleanup()
     show_hud("mouse")
   end
 
   local function exit()
     cleanup()
+    set_mouse_bindings_enabled(false)
     show_hud("numpad")
   end
 
@@ -279,39 +298,40 @@ function M.register(hl, o, options)
     non_consuming = true,
   })
 
-  -- Mouse Mode deliberately stays in the global submap. Each NumPad bind is
-  -- auto-consuming only while Num Lock is off; with Num Lock on it returns
-  -- { ok = false }, so the original key event reaches the focused app. This
-  -- keeps Omarchy's global shortcuts (Super+1..10, Super+arrows, etc.) alive.
+  -- Mouse Mode stays in the global submap, but its NumPad binds are enabled
+  -- only while Num Lock is off. With Num Lock on, Hyprland sees no active
+  -- custom NumPad bind and the focused application receives normal NumPad input.
   for _, direction in ipairs(DIRECTIONS) do
     local current = direction
-    bind_aliases(hl, current.keys, mouse_only(function()
+    bind_aliases(register_mouse_bind, current.keys, mouse_only(function()
       move(current)
     end), { repeating = true, auto_consuming = true })
 
-    bind_aliases(hl, current.keys, mouse_only(function()
+    bind_aliases(register_mouse_bind, current.keys, mouse_only(function()
       reset_direction(current)
     end), { release = true, auto_consuming = true })
   end
 
   -- Windows-style selection model: these keys choose which virtual mouse
   -- button 5/+ /0/. operate on. Selecting a mode does not click immediately.
-  hl.bind("KP_Divide", mouse_only(function()
+  register_mouse_bind("KP_Divide", mouse_only(function()
     select_button("LMB")
   end), { auto_consuming = true })
-  hl.bind("KP_Multiply", mouse_only(function()
+  register_mouse_bind("KP_Multiply", mouse_only(function()
     select_button("RMB")
   end), { auto_consuming = true })
-  hl.bind("KP_Subtract", mouse_only(function()
+  register_mouse_bind("KP_Subtract", mouse_only(function()
     select_button("MMB")
   end), { auto_consuming = true })
 
-  bind_aliases(hl, { "KP_5", "KP_Begin" }, mouse_only(function()
+  bind_aliases(register_mouse_bind, { "KP_5", "KP_Begin" }, mouse_only(function()
     click(selected.key)
   end), { auto_consuming = true })
-  hl.bind("KP_Add", mouse_only(double_click_selected), { auto_consuming = true })
-  bind_aliases(hl, { "KP_0", "KP_Insert" }, mouse_only(hold_selected), { auto_consuming = true })
-  bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, mouse_only(release_held), { auto_consuming = true })
+  register_mouse_bind("KP_Add", mouse_only(double_click_selected), { auto_consuming = true })
+  bind_aliases(register_mouse_bind, { "KP_0", "KP_Insert" }, mouse_only(hold_selected), { auto_consuming = true })
+  bind_aliases(register_mouse_bind, { "KP_Decimal", "KP_Delete" }, mouse_only(release_held), { auto_consuming = true })
+
+  set_mouse_bindings_enabled(not numlock_on)
 
   hl.on("config.reloaded", function()
     cleanup()
