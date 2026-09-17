@@ -148,6 +148,58 @@ function M.memory_gib(memory)
   return (total - available) / kib_per_gib, total / kib_per_gib
 end
 
+function M.parse_net_dev(text)
+  if type(text) ~= "string" then
+    return nil
+  end
+
+  local rx_bytes = 0
+  local tx_bytes = 0
+  local found = false
+  for line in text:gmatch("[^\n]+") do
+    local interface, counters = line:match("^%s*([^:%s]+):%s*(.+)$")
+    if interface and interface ~= "lo" then
+      local fields = {}
+      for value in counters:gmatch("(%d+)") do
+        fields[#fields + 1] = tonumber(value)
+      end
+      if #fields >= 9 then
+        rx_bytes = rx_bytes + fields[1]
+        tx_bytes = tx_bytes + fields[9]
+        found = true
+      end
+    end
+  end
+
+  if not found then
+    return nil
+  end
+  return { rx_bytes = rx_bytes, tx_bytes = tx_bytes }
+end
+
+function M.network_bytes_per_second(previous, current, elapsed_seconds)
+  if type(previous) ~= "table" or type(current) ~= "table" then
+    return nil
+  end
+
+  local elapsed = finite_number(elapsed_seconds)
+  local previous_rx = finite_number(previous.rx_bytes)
+  local previous_tx = finite_number(previous.tx_bytes)
+  local current_rx = finite_number(current.rx_bytes)
+  local current_tx = finite_number(current.tx_bytes)
+  if not elapsed or elapsed <= 0 or not previous_rx or not previous_tx or not current_rx or not current_tx then
+    return nil
+  end
+
+  local rx_delta = current_rx - previous_rx
+  local tx_delta = current_tx - previous_tx
+  if rx_delta < 0 or tx_delta < 0 then
+    return nil
+  end
+
+  return rx_delta / elapsed, tx_delta / elapsed
+end
+
 function M.temperature_c(raw)
   local value = finite_number(raw)
   if not value then
