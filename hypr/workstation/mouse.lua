@@ -58,7 +58,6 @@ function M.register(hl, o, options)
   local hud = options.hud or hud_module.new(hl, o)
   local saved_numlock = numlock_store.load()
   local numlock_on = saved_numlock == nil and true or saved_numlock
-  local selected = BUTTONS.LMB
   local held_key = nil
   local live_timers = {}
 
@@ -104,7 +103,7 @@ function M.register(hl, o, options)
   end
 
   local function show_hud(mode)
-    hud.show(mode, selected.label)
+    hud.show(mode, BUTTONS.LMB.label)
   end
 
   local function enter()
@@ -139,17 +138,6 @@ function M.register(hl, o, options)
     end
   end
 
-  local function select_button(label)
-    local next_button = BUTTONS[label]
-    if not next_button then
-      return
-    end
-
-    release_held()
-    selected = next_button
-    show_hud("mouse")
-  end
-
   local function move(direction)
     local step = mouse_state.next_step(state, direction.id)
     local scale = (direction.dx ~= 0 and direction.dy ~= 0) and SQRT_HALF or 1
@@ -166,8 +154,8 @@ function M.register(hl, o, options)
     mouse_state.release(state, direction.id)
   end
 
-  local function double_click_selected()
-    local key = selected.key
+  local function double_click_left()
+    local key = BUTTONS.LMB.key
     click(key)
 
     local timer
@@ -187,14 +175,15 @@ function M.register(hl, o, options)
     table.insert(live_timers, timer)
   end
 
-  local function hold_selected()
-    if held_key == selected.key then
+  local function hold_left()
+    local key = BUTTONS.LMB.key
+    if held_key == key then
       return
     end
 
     release_held()
-    send_button(selected.key, "down")
-    held_key = selected.key
+    send_button(key, "down")
+    held_key = key
   end
 
   rebind_compat(hl, o, "Num_Lock", "Mouse mode / Num Lock", on_numlock, {
@@ -217,21 +206,23 @@ function M.register(hl, o, options)
     end), { release = true, auto_consuming = true })
   end
 
+  -- Keep NumFlow's button semantics direct: these keys click fixed buttons,
+  -- they do not select a mode for NumPad 5.
   hl.bind("KP_Divide", mouse_only(function()
-    select_button("LMB")
+    click(BUTTONS.LMB.key)
   end), { auto_consuming = true })
   hl.bind("KP_Multiply", mouse_only(function()
-    select_button("RMB")
+    click(BUTTONS.RMB.key)
   end), { auto_consuming = true })
   hl.bind("KP_Subtract", mouse_only(function()
-    select_button("MMB")
+    click(BUTTONS.MMB.key)
   end), { auto_consuming = true })
 
   bind_aliases(hl, { "KP_5", "KP_Begin" }, mouse_only(function()
-    click(selected.key)
+    click(BUTTONS.LMB.key)
   end), { auto_consuming = true })
-  hl.bind("KP_Add", mouse_only(double_click_selected), { auto_consuming = true })
-  bind_aliases(hl, { "KP_0", "KP_Insert" }, mouse_only(hold_selected), { auto_consuming = true })
+  hl.bind("KP_Add", mouse_only(double_click_left), { auto_consuming = true })
+  bind_aliases(hl, { "KP_0", "KP_Insert" }, mouse_only(hold_left), { auto_consuming = true })
   bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, mouse_only(release_held), { auto_consuming = true })
 
   hl.on("config.reloaded", function()
