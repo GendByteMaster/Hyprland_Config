@@ -1,6 +1,7 @@
 local mouse_state = require("hypr.workstation.mouse_state")
 local numlock_store_module = require("hypr.workstation.numlock_store")
 local hud_module = require("hypr.workstation.hud")
+local sound_module = require("hypr.workstation.sound")
 
 local M = {}
 
@@ -56,6 +57,7 @@ function M.register(hl, o, options)
   local state = mouse_state.new()
   local numlock_store = options.numlock_store or numlock_store_module.session()
   local hud = options.hud or hud_module.new(hl, o)
+  local sound = options.sound or sound_module.new(hl)
   local saved_numlock = numlock_store.load()
   local numlock_on = saved_numlock == nil and true or saved_numlock
   local selected = BUTTONS.LMB
@@ -107,6 +109,13 @@ function M.register(hl, o, options)
     hud.show(mode, selected.label)
   end
 
+  local function play_mode_sound(enabled)
+    if sound and type(sound.play_mouse_mode) == "function" then
+      -- Audio feedback must never prevent Num Lock or Mouse Mode from changing.
+      pcall(sound.play_mouse_mode, enabled)
+    end
+  end
+
   local function enter()
     cleanup()
     show_hud("mouse")
@@ -123,8 +132,10 @@ function M.register(hl, o, options)
 
     if numlock_on then
       exit()
+      play_mode_sound(false)
     else
       enter()
+      play_mode_sound(true)
     end
   end
 
