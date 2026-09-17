@@ -7,4 +7,5 @@ if preserved then
   dofile(preserved_bindings)
 end
 
+require("hypr.workstation.compat").apply(hl)
 require("hypr.workstation.mouse").register(hl, o)
