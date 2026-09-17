@@ -50,11 +50,10 @@ local function default_omarchy_runtime()
       return command.run(
         "omarchy plugin enable " .. command.quote(id)
           .. " --section " .. command.quote(section)
-          .. " --yes"
       )
     end,
     disable_plugin = function(id)
-      return command.run("omarchy plugin disable " .. command.quote(id) .. " --yes")
+      return command.run("omarchy plugin disable " .. command.quote(id))
     end,
   }
 end
