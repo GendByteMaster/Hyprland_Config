@@ -30,9 +30,11 @@ local function fake_hud()
   return hud
 end
 
-local function fake_api()
+local function fake_api(options)
+  options = options or {}
+
   local calls = {
-    binds = {}, rebinds = {}, dispatches = {}, timers = {}, events = {}, configs = {}
+    binds = {}, rebinds = {}, unbinds = {}, dispatches = {}, timers = {}, events = {}, configs = {}
   }
   local current_definition = "reset"
   local current_submap = ""
@@ -46,9 +48,12 @@ local function fake_api()
   function hl.dsp.cursor.move(args) return { kind = "cursor_move", x = args.x, y = args.y } end
   function hl.dsp.send_key_state(args) return { kind = "send_key_state", key = args.key, state = args.state, mods = args.mods } end
   function hl.dsp.exec_cmd() error("Mouse movement must not execute external commands") end
-  function hl.config(options) table.insert(calls.configs, options) end
-  function hl.bind(keys, dispatcher, options)
-    table.insert(calls.binds, { submap = current_definition, keys = keys, dispatcher = dispatcher, options = options or {} })
+  function hl.config(config) table.insert(calls.configs, config) end
+  function hl.bind(keys, dispatcher, bind_options)
+    table.insert(calls.binds, { submap = current_definition, keys = keys, dispatcher = dispatcher, options = bind_options or {} })
+  end
+  function hl.unbind(keys)
+    table.insert(calls.unbinds, keys)
   end
   function hl.define_submap(name, fn)
     local previous = current_definition
@@ -63,17 +68,25 @@ local function fake_api()
   end
   function hl.get_cursor_pos() return { x = cursor.x, y = cursor.y } end
   function hl.get_current_submap() return current_submap end
-  function hl.timer(fn, options)
-    local timer = { fn = fn, options = options }
+  function hl.timer(fn, timer_options)
+    local timer = { fn = fn, options = timer_options }
     table.insert(calls.timers, timer)
     return timer
   end
   function hl.on(event, fn) calls.events[event] = fn end
 
   local o = {}
-  function o.rebind(keys, description, dispatcher, options)
-    table.insert(calls.rebinds, { keys = keys, description = description, dispatcher = dispatcher, options = options or {} })
-    hl.bind(keys, dispatcher, options)
+  function o.bind(keys, description, dispatcher, bind_options)
+    local opts = bind_options or {}
+    opts.description = description
+    hl.bind(keys, dispatcher, opts)
+  end
+
+  if not options.without_rebind then
+    function o.rebind(keys, description, dispatcher, bind_options)
+      table.insert(calls.rebinds, { keys = keys, description = description, dispatcher = dispatcher, options = bind_options or {} })
+      hl.bind(keys, dispatcher, bind_options)
+    end
   end
 
   local function find_bind(key, release)
@@ -108,6 +121,30 @@ t.test("register reserves Num Lock and defines NumFlow button selectors", functi
   t.truthy(find("KP_0", false))
   t.truthy(find("KP_Decimal", false))
   t.eq(find("escape", false), nil)
+end)
+
+t.test("register supports Omarchy helpers without rebind", function()
+  local hl, o, calls = fake_api({ without_rebind = true })
+  local ok = pcall(function()
+    mouse.register(hl, o, { numlock_store = fake_store(nil), hud = fake_hud() })
+  end)
+
+  t.eq(ok, true)
+  t.eq(#calls.unbinds, 1)
+  t.eq(calls.unbinds[1], "Num_Lock")
+
+  local numlock_bind
+  for _, bind in ipairs(calls.binds) do
+    if bind.submap == "reset" and bind.keys == "Num_Lock" then
+      numlock_bind = bind
+      break
+    end
+  end
+
+  t.truthy(numlock_bind)
+  t.truthy(numlock_bind.options.submap_universal)
+  t.truthy(numlock_bind.options.non_consuming)
+  t.eq(numlock_bind.options.description, "Mouse mode / Num Lock")
 end)
 
 t.test("Num Lock off enables Mouse Mode HUD and Num Lock on shows NumPad HUD", function()
