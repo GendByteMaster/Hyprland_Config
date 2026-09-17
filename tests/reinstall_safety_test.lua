@@ -43,6 +43,10 @@ local function runtime(calls, options)
       calls[#calls + 1] = { action = "rescan" }
       return options.rescan_ok ~= false
     end,
+    wait_for_plugin = function(id)
+      calls[#calls + 1] = { action = "wait", id = id }
+      return options.discover_ok ~= false
+    end,
     enable_plugin = function(id, section)
       calls[#calls + 1] = { action = "enable", id = id, section = section }
       return true
@@ -51,7 +55,7 @@ local function runtime(calls, options)
   }
 end
 
-t.test("installer rescans Omarchy plugins before enabling system monitor", function()
+t.test("installer rescans and waits for Omarchy discovery before enabling system monitor", function()
   local root = temp_dir("rescan-order")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
@@ -65,9 +69,11 @@ t.test("installer rescans Omarchy plugins before enabling system monitor", funct
     omarchy_runtime = runtime(calls),
   })
 
-  t.eq(#calls, 2)
+  t.eq(#calls, 3)
   t.eq(calls[1].action, "rescan")
-  t.eq(calls[2].action, "enable")
+  t.eq(calls[2].action, "wait")
+  t.eq(calls[2].id, "gendbyte.system-monitor")
+  t.eq(calls[3].action, "enable")
   command.remove_tree(root)
 end)
 
@@ -90,6 +96,34 @@ t.test("installer restores previous Hyprland config when plugin rescan fails", f
   end)
 
   t.eq(ok, false)
+  t.eq(read(paths.join(home, ".config", "hypr", "bindings.lua")), "-- original bindings\n")
+  t.eq(read(paths.join(home, ".config", "hypr", "workstation", "local.lua")), "return 'original'\n")
+  t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")), false)
+  command.remove_tree(root)
+end)
+
+t.test("installer restores previous Hyprland config when plugin discovery times out", function()
+  local root = temp_dir("discovery-timeout")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  local calls = {}
+  fake_repo(repo)
+  write(paths.join(home, ".config", "hypr", "bindings.lua"), "-- original bindings\n")
+  write(paths.join(home, ".config", "hypr", "workstation", "local.lua"), "return 'original'\n")
+
+  local ok = pcall(function()
+    installer.install({
+      home = home,
+      repo_root = repo,
+      timestamp = "first",
+      omarchy_runtime = runtime(calls, { discover_ok = false }),
+    })
+  end)
+
+  t.eq(ok, false)
+  t.eq(calls[1].action, "rescan")
+  t.eq(calls[2].action, "wait")
+  t.eq(#calls, 2)
   t.eq(read(paths.join(home, ".config", "hypr", "bindings.lua")), "-- original bindings\n")
   t.eq(read(paths.join(home, ".config", "hypr", "workstation", "local.lua")), "return 'original'\n")
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")), false)
