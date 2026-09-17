@@ -63,6 +63,48 @@ function M.cpu_percent(previous, current)
   return percent
 end
 
+function M.cpu_frequency_ghz(raw_values)
+  if type(raw_values) ~= "table" then
+    return nil
+  end
+
+  local total_khz = 0
+  local count = 0
+  for _, raw in ipairs(raw_values) do
+    local khz = finite_number(raw)
+    if khz and khz > 0 then
+      total_khz = total_khz + khz
+      count = count + 1
+    end
+  end
+
+  if count == 0 then
+    return nil
+  end
+  return (total_khz / count) / 1000000
+end
+
+function M.cpuinfo_frequency_ghz(text)
+  if type(text) ~= "string" then
+    return nil
+  end
+
+  local total_mhz = 0
+  local count = 0
+  for raw in text:gmatch("cpu MHz%s*:%s*([%d%.]+)") do
+    local mhz = finite_number(raw)
+    if mhz and mhz > 0 then
+      total_mhz = total_mhz + mhz
+      count = count + 1
+    end
+  end
+
+  if count == 0 then
+    return nil
+  end
+  return (total_mhz / count) / 1000
+end
+
 function M.parse_meminfo(text)
   if type(text) ~= "string" then
     return nil
@@ -89,6 +131,21 @@ function M.memory_percent(memory)
   end
 
   return ((total - available) / total) * 100
+end
+
+function M.memory_gib(memory)
+  if type(memory) ~= "table" then
+    return nil
+  end
+
+  local total = finite_number(memory.total_kib)
+  local available = finite_number(memory.available_kib)
+  if not total or not available or total <= 0 or available < 0 or available > total then
+    return nil
+  end
+
+  local kib_per_gib = 1024 * 1024
+  return (total - available) / kib_per_gib, total / kib_per_gib
 end
 
 function M.temperature_c(raw)
