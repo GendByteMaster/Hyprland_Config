@@ -9,6 +9,7 @@ Item {
 
   property bool opened: false
   property int selectedIndex: -1
+  property var targetScreen: null
 
   readonly property int focusedWorkspaceId: Hyprland.focusedWorkspace
     ? Number(Hyprland.focusedWorkspace.id)
@@ -53,6 +54,20 @@ Item {
     return "0x" + value
   }
 
+  function focusedScreen() {
+    var screens = Quickshell.screens || []
+    var monitor = Hyprland.focusedMonitor
+
+    if (monitor) {
+      for (var i = 0; i < screens.length; ++i) {
+        if (screens[i] && String(screens[i].name) === String(monitor.name))
+          return screens[i]
+      }
+    }
+
+    return screens.length > 0 ? screens[0] : null
+  }
+
   function selectedWindow() {
     if (selectedIndex < 0 || selectedIndex >= visibleWindows.length)
       return null
@@ -75,6 +90,7 @@ Item {
     Hyprland.refreshMonitors()
     Hyprland.refreshWorkspaces()
     Hyprland.refreshToplevels()
+    targetScreen = focusedScreen()
     selectedIndex = 0
     opened = true
   }
@@ -82,6 +98,7 @@ Item {
   function hideOverview() {
     opened = false
     selectedIndex = -1
+    targetScreen = null
   }
 
   function toggleOverview() {
@@ -111,23 +128,23 @@ Item {
       required property var modelData
       screen: modelData
 
-      readonly property var hyprMonitor: Hyprland.monitorFor(screen)
-      readonly property bool focusedSurface: Hyprland.focusedMonitor !== null
-        && hyprMonitor !== null
-        && Hyprland.focusedMonitor.id === hyprMonitor.id
+      readonly property bool targetSurface: root.targetScreen !== null
+        && screen !== null
+        && String(screen.name) === String(root.targetScreen.name)
       readonly property int columns: Math.max(1,
         Math.ceil(Math.sqrt(Math.max(1, root.visibleWindows.length) * width / Math.max(1, height))))
       readonly property real previewWidth: Math.max(220,
         Math.min(520, (content.width - Math.max(0, columns - 1) * 16) / columns))
       readonly property real previewHeight: previewWidth * 0.62
 
-      visible: root.opened && focusedSurface
+      visible: root.opened && targetSurface
       color: "transparent"
       exclusionMode: ExclusionMode.Ignore
 
       WlrLayershell.namespace: "gendbyte-workspace-overview"
       WlrLayershell.layer: WlrLayer.Overlay
-      WlrLayershell.keyboardFocus: focusedSurface
+      focusable: targetSurface
+      WlrLayershell.keyboardFocus: targetSurface
         ? WlrKeyboardFocus.Exclusive
         : WlrKeyboardFocus.None
 
