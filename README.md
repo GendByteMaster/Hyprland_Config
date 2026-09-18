@@ -128,7 +128,9 @@ The default discovery root is:
 
 Git project roots are discovered with bounded depth; the default maximum depth is 4. Common heavy/generated directories are pruned, symlink Git markers are rejected, and canonical paths are used as stable project IDs.
 
-Additional roots, explicit non-Git projects, hidden paths, application preferences, and action overrides can be configured in:
+Additional roots can also be added directly from the launcher with **+ Folder** / **Choose project folder…**. The selected root is persisted in launcher state and rescanned immediately. When no manual `projects.lua` exists, the first UI-selected root replaces the implicit `~/Repository` fallback so a missing default directory does not keep producing warnings.
+
+Explicit non-Git projects, hidden paths, application preferences, and action overrides can still be configured in:
 
 ```text
 ~/.config/hyprland-workstation/projects.lua
