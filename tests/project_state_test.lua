@@ -27,6 +27,7 @@ test("project state starts empty when no file exists", function()
   testlib.eq(warning, nil)
   testlib.eq(next(state.favorites), nil)
   testlib.eq(#state.recent, 0)
+  testlib.eq(#state.roots, 0)
 end)
 
 test("project state toggles favorite and persists it", function()
@@ -43,6 +44,23 @@ test("project state toggles favorite and persists it", function()
   testlib.eq(loaded.favorites["/repo/a"], true)
   testlib.eq(state_module.toggle_favorite(loaded, "/repo/a"), false)
   testlib.eq(loaded.favorites["/repo/a"], nil)
+end)
+
+test("project state persists selected project roots without duplicates", function()
+  local state_module = require("workstation.project_state")
+  local runtime = memory_runtime()
+  local options = { home = "/home/test", runtime = runtime }
+
+  local state = state_module.load(options)
+  testlib.eq(state_module.add_root(state, "/home/test/Projects"), true)
+  testlib.eq(state_module.add_root(state, "/home/test/Projects"), false)
+  testlib.eq(state_module.add_root(state, "/mnt/code"), true)
+  testlib.truthy(state_module.save(state, options))
+
+  local loaded = state_module.load(options)
+  testlib.eq(#loaded.roots, 2)
+  testlib.eq(loaded.roots[1], "/home/test/Projects")
+  testlib.eq(loaded.roots[2], "/mnt/code")
 end)
 
 test("project state recent deduplicates and moves latest to front", function()
@@ -84,6 +102,7 @@ test("corrupt project state returns empty state with warning", function()
 
   testlib.eq(next(state.favorites), nil)
   testlib.eq(#state.recent, 0)
+  testlib.eq(#state.roots, 0)
   testlib.truthy(warning)
 end)
 
