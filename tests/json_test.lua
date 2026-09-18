@@ -35,6 +35,13 @@ test("json preserves string escapes and null sentinel", function()
   testlib.truthy(decoded.missing == json.null)
 end)
 
+test("json rejects invalid fractional exponent", function()
+  local json = require("workstation.json")
+  local value, err = json.decode("1.e2")
+  testlib.eq(value, nil)
+  testlib.truthy(err)
+end)
+
 test("json rejects trailing executable text", function()
   local json = require("workstation.json")
   local value, err = json.decode('{"ok":true} os.execute("touch /tmp/pwn")')
