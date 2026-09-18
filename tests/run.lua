@@ -34,6 +34,7 @@ require("tests.launcher_protocol_test")
 require("tests.project_launcher_cli_test")
 require("tests.project_launcher_qml_test")
 require("tests.workspace_overview_qml_test")
+require("tests.workspace_overview_binding_test")
 require("tests.project_launcher_binding_test")
 require("tests.launcher_installer_test")
 
