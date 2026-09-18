@@ -19,3 +19,5 @@ jobs:
         run: lua5.1 tests/run.lua
       - name: Parse Lua files
         run: find . -name '*.lua' -type f -print0 | xargs -0 -n1 luac5.1 -p
+      - name: Parse launcher shell
+        run: bash -n bin/hyprland-workstation-launcher
