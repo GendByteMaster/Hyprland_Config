@@ -1,3 +1,5 @@
+local compat = require("hypr.workstation.compat")
+
 local M = {}
 
 local function overview_path(options)
@@ -43,6 +45,13 @@ function M.register(hl, _o, options)
   end
 
   register_binding(hl, "SUPER + TAB", command, "Workspace Overview")
+
+  -- Windows owns Win+Tab before the guest sees it unless QEMU has raw
+  -- keyboard grab. Keep a two-key fallback only in Try Omarchy.
+  if compat.is_try_omarchy(options) then
+    register_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
+  end
+
   return true
 end
 
