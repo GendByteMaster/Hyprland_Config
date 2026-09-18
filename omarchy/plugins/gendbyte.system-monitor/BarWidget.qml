@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "ServiceHost.js" as ServiceHost
@@ -81,11 +80,6 @@ BarWidget {
     opacity: root.service.collectorHealthy ? 1.0 : 0.65
   }
 
-  Process {
-    id: activityProcess
-    command: ["omarchy-launch-or-focus-tui", "btop"]
-  }
-
   MouseArea {
     anchors.fill: parent
     hoverEnabled: true
@@ -93,8 +87,8 @@ BarWidget {
     cursorShape: Qt.PointingHandCursor
 
     onClicked: function(mouse) {
-      if (mouse.button === Qt.LeftButton && !activityProcess.running) {
-        activityProcess.running = true
+      if (mouse.button === Qt.LeftButton && root.bar) {
+        root.bar.run("omarchy-launch-or-focus-tui btop")
       }
     }
 
