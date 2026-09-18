@@ -116,3 +116,14 @@ t.test("bindings entrypoint registers project launcher after existing layers", f
   t.truthy(compat < mouse)
   t.truthy(mouse < launcher)
 end)
+
+t.test("project launcher wrapper tolerates slow cold start and serializes startup", function()
+  local source = read_file("bin/hyprland-workstation-launcher")
+
+  t.truthy(source:find("STARTUP_ATTEMPTS=100", 1, true))
+  t.truthy(source:find("STARTUP_DELAY=0.05", 1, true))
+  t.truthy(source:find("acquire_start_lock", 1, true))
+  t.truthy(source:find("wait_for_ipc", 1, true))
+  t.truthy(source:find("project-launcher.log", 1, true))
+  t.eq(source:find("seq 1 20", 1, true), nil)
+end)
