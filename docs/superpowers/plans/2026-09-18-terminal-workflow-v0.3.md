@@ -714,7 +714,9 @@ Wrapper outline:
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG_DIR="<resolved installed quickshell config>"
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(cd -- "$(dirname -- "$SCRIPT_PATH")/.." && pwd -P)"
+CONFIG_DIR="$REPO_ROOT/quickshell/gendbyte-project-launcher"
 
 if quickshell ipc -p "$CONFIG_DIR" call gendbyte-project-launcher toggle >/dev/null 2>&1; then
   exit 0
@@ -1045,7 +1047,7 @@ If Quickshell exposes a non-interactive config validation command in the install
 On the user's machine:
 
 ```bash
-git checkout <implementation-branch>
+git checkout feat/terminal-workflow-v0.3
 lua5.1 reinstall.lua
 hyprctl reload
 hyprctl configerrors
