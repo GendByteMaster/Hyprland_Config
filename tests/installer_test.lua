@@ -228,6 +228,48 @@ t.test("installer rolls back when Omarchy cannot enable the system monitor", fun
   command.remove_tree(root)
 end)
 
+t.test("installer disables system monitor when state write fails after enable", function()
+  local root = temp_dir("state-write-failure")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  local calls = {}
+  fake_repo(repo)
+
+  local original_write = install_state.write
+  install_state.write = function()
+    error("forced state write failure")
+  end
+
+  local ok, err = pcall(function()
+    install(
+      { home = home, repo_root = repo, timestamp = "first" },
+      fake_omarchy_runtime(calls)
+    )
+  end)
+
+  install_state.write = original_write
+
+  t.eq(ok, false)
+  t.truthy(tostring(err):match("forced state write failure"))
+  t.eq(#calls, 2)
+  t.eq(calls[1].action, "enable")
+  t.eq(calls[1].id, "gendbyte.system-monitor")
+  t.eq(calls[2].action, "disable")
+  t.eq(calls[2].id, "gendbyte.system-monitor")
+  t.eq(
+    command.exists_or_symlink(
+      paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")
+    ),
+    false
+  )
+  t.eq(
+    command.exists(paths.join(home, ".local", "state", "hyprland_config", "active.state")),
+    false
+  )
+
+  command.remove_tree(root)
+end)
+
 t.test("installer aborts when active managed target was replaced", function()
   local root = temp_dir("conflict")
   local home = paths.join(root, "home")
