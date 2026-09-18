@@ -18,7 +18,6 @@ local project_config = require("workstation.project_config")
 local project_discovery = require("workstation.project_discovery")
 local project_search = require("workstation.project_search")
 local project_state = require("workstation.project_state")
-local project_model = require("workstation.project_model")
 local project_types = require("workstation.project_types")
 local protocol = require("workstation.launcher_protocol")
 
