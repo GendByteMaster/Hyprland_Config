@@ -54,6 +54,28 @@ t.test("workspace overview owns Super Tab only when installed", function()
   t.eq(calls.binds[1].options.description, "Workspace Overview")
 end)
 
+t.test("workspace overview adds Super F9 fallback only in Try Omarchy", function()
+  local hl, calls = fake_hyprland()
+
+  local registered = overview.register(hl, {}, {
+    launcher = "/home/test/.local/bin/hyprland-workspace-overview",
+    exists = function() return true end,
+    kernel_cmdline = "quiet splash omarchy.qemu=1",
+  })
+
+  t.eq(registered, true)
+  t.eq(#calls.unbinds, 2)
+  t.eq(calls.unbinds[1], "SUPER + TAB")
+  t.eq(calls.unbinds[2], "SUPER + F9")
+  t.eq(#calls.binds, 2)
+  t.eq(calls.binds[1].keys, "SUPER + TAB")
+  t.eq(calls.binds[2].keys, "SUPER + F9")
+  t.eq(
+    calls.binds[2].dispatcher.command,
+    "/home/test/.local/bin/hyprland-workspace-overview"
+  )
+end)
+
 t.test("workspace overview leaves Super Tab untouched before install", function()
   local hl, calls = fake_hyprland()
 
