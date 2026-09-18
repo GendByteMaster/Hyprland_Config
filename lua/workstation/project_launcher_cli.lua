@@ -135,6 +135,23 @@ local function actions(ctx, project_id)
   })
 end
 
+local function browse(ctx, path)
+  if type(ctx.browse_directory) ~= "function" then
+    return protocol.failure("folder browser is unavailable")
+  end
+
+  local result, browse_error = ctx.browse_directory(path)
+  if not result then
+    return protocol.failure(browse_error or "failed to browse folder")
+  end
+
+  return protocol.success({
+    path = result.path,
+    parent = result.parent,
+    entries = protocol.list(result.entries or {}),
+  })
+end
+
 local function add_root(ctx, path)
   if type(path) ~= "string" or path == "" then
     return protocol.failure("usage: add-root <path>")
@@ -302,6 +319,9 @@ function M.run(args, ctx)
     end
     return toggle_favorite(ctx, args[2])
   end
+  if command == "browse" then
+    return browse(ctx, args[2])
+  end
   if command == "add-root" then
     return add_root(ctx, args[2])
   end
@@ -309,7 +329,7 @@ function M.run(args, ctx)
     return run_action(ctx, args)
   end
   if command == nil then
-    return protocol.failure("usage: refresh | query <text> | actions <project_id> | favorite <project_id> | add-root <path> | run <project_id> <action_id> [--confirmed]")
+    return protocol.failure("usage: refresh | query <text> | actions <project_id> | favorite <project_id> | browse [path] | add-root <path> | run <project_id> <action_id> [--confirmed]")
   end
   return protocol.failure("unknown launcher command: " .. tostring(command))
 end
