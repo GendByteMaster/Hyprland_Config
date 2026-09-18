@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -59,6 +60,17 @@ FloatingWindow {
     statusText = warnings.length > 0 ? warnings.join(" · ") : ""
   }
 
+  function localFolderPath(url) {
+    var value = String(url || "")
+    if (value.indexOf("file://") === 0)
+      value = value.substring(7)
+    return decodeURIComponent(value)
+  }
+
+  function chooseProjectFolder() {
+    folderDialog.open()
+  }
+
   function showLauncher() {
     visible = true
     pendingAction = null
@@ -107,6 +119,22 @@ FloatingWindow {
     if (!payload.ok) {
       statusError = true
       statusText = payload.error || "Project query failed"
+      return
+    }
+
+    projects = Array.isArray(payload.data.projects) ? payload.data.projects : []
+    selectedProjectIndex = projects.length > 0 ? 0 : -1
+    showWarnings(payload.data)
+    requestActions()
+  }
+
+  function handleRootResponse(text) {
+    var payload = parseEnvelope(text)
+    if (!payload)
+      return
+    if (!payload.ok) {
+      statusError = true
+      statusText = payload.error || "Failed to add project folder"
       return
     }
 
@@ -234,6 +262,14 @@ FloatingWindow {
   }
 
   Process {
+    id: rootProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.handleRootResponse(this.text)
+    }
+  }
+
+  Process {
     id: actionProcess
     stdout: StdioCollector {
       waitForEnd: true
@@ -246,6 +282,17 @@ FloatingWindow {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.handleRunResponse(this.text)
+    }
+  }
+
+  FolderDialog {
+    id: folderDialog
+    title: "Choose project folder"
+
+    onAccepted: {
+      var path = root.localFolderPath(selectedFolder)
+      if (path !== "")
+        rootProcess.exec(root.backendArgs(["add-root", path]))
     }
   }
 
@@ -292,14 +339,61 @@ FloatingWindow {
             anchors.margins: 10
             spacing: 8
 
-            Text {
-              text: "Projects"
-              color: "#9a9a9a"
-              font.family: "monospace"
-              font.pixelSize: 11
-              font.bold: true
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 8
+
+              Text {
+                text: "Projects"
+                color: "#9a9a9a"
+                font.family: "monospace"
+                font.pixelSize: 11
+                font.bold: true
+              }
+
+              Item {
+                Layout.fillWidth: true
+              }
+
+              Button {
+                text: "+ Folder"
+                flat: true
+                focusPolicy: Qt.NoFocus
+                onClicked: root.chooseProjectFolder()
+
+                contentItem: Text {
+                  text: parent.text
+                  color: "#c8c8c8"
+                  font.family: "monospace"
+                  font.pixelSize: 10
+                  horizontalAlignment: Text.AlignHCenter
+                  verticalAlignment: Text.AlignVCenter
+                }
+              }
             }
 
+            Item {
+              Layout.fillWidth: true
+              Layout.fillHeight: true
+
+              Components.ProjectList {
+                id: projectList
+                anchors.fill: parent
+                projectsModel: root.projects
+                currentIndex: root.selectedProjectIndex
+                onSelected: function(index) { root.selectProject(index) }
+              }
+
+              Button {
+                anchors.centerIn: parent
+                visible: root.projects.length === 0
+                text: "Choose project folder…"
+                focusPolicy: Qt.NoFocus
+                onClicked: root.chooseProjectFolder()
+              }
+            }
+
+            /*
             Components.ProjectList {
               id: projectList
               Layout.fillWidth: true
@@ -308,6 +402,7 @@ FloatingWindow {
               currentIndex: root.selectedProjectIndex
               onSelected: function(index) { root.selectProject(index) }
             }
+            */
           }
         }
 
@@ -360,7 +455,7 @@ FloatingWindow {
 
       Text {
         Layout.fillWidth: true
-        text: "↑↓ navigate   Tab/→ actions   Enter run   Esc close"
+        text: "↑↓ navigate   Tab/→ actions   Enter run   + Folder add root   Esc close"
         color: "#686868"
         horizontalAlignment: Text.AlignRight
         font.family: "monospace"
