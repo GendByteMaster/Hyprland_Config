@@ -23,7 +23,7 @@ function M.local_path(value)
     end)
   end
 
-  if path == "" or path:find("%z", 1, true) then
+  if path == "" or path:find(string.char(0), 1, true) then
     return nil
   end
   return path
