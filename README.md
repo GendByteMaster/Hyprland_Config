@@ -88,6 +88,14 @@ to toggle a centered floating Quickshell Project Launcher.
 
 `Super + H` is intentionally left free.
 
+When running under **Try Omarchy for Windows**, Windows may intercept some Win/Super chords before Hyprland receives them. The launcher therefore also binds:
+
+```text
+Ctrl + Alt + R
+```
+
+as a Try-Omarchy-only fallback. The preferred fix for `Super + R` itself is to focus the Try Omarchy window and press `Ctrl + Alt + G` to grab raw keyboard input; press it again to release the grab.
+
 The launcher is keyboard-first and uses the approved two-pane layout:
 
 ```text

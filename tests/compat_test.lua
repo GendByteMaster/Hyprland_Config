@@ -37,3 +37,14 @@ t.test("normal Omarchy leaves cursor visibility untouched", function()
   t.eq(applied, false)
   t.eq(#configs, 0)
 end)
+
+t.test("try-omarchy detection is reusable without mutating Hyprland", function()
+  local compat = require("hypr.workstation.compat")
+
+  t.eq(compat.is_try_omarchy({
+    kernel_cmdline = "quiet omarchy.qemu=1 tryomarchy.render=gpu",
+  }), true)
+  t.eq(compat.is_try_omarchy({
+    kernel_cmdline = "quiet splash",
+  }), false)
+end)

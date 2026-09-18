@@ -4,7 +4,8 @@ set -euo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd -- "$(dirname -- "$SCRIPT_PATH")/.." && pwd -P)"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-CONFIG_DIR="$CONFIG_HOME/quickshell/gendbyte-project-launcher"
+CONFIG_NAME="gendbyte-project-launcher"
+CONFIG_DIR="$CONFIG_HOME/quickshell/$CONFIG_NAME"
 RUNTIME_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 LOG_DIR="$STATE_HOME/hyprland_config"
@@ -13,14 +14,21 @@ LOCK_DIR="$RUNTIME_ROOT/gendbyte-project-launcher-${UID:-$(id -u)}.lock"
 STARTUP_ATTEMPTS=100
 STARTUP_DELAY=0.05
 
-if [[ ! -f "$CONFIG_DIR/shell.qml" ]]; then
+if [[ -f "$CONFIG_DIR/shell.qml" ]]; then
+  QS_SELECTOR=(-c "$CONFIG_NAME")
+else
   CONFIG_DIR="$REPO_ROOT/quickshell/gendbyte-project-launcher"
+  QS_SELECTOR=(-p "$CONFIG_DIR")
 fi
 
 mkdir -p "$LOG_DIR"
 
+qs_config() {
+  qs "${QS_SELECTOR[@]}" "$@"
+}
+
 ipc() {
-  qs -p "$CONFIG_DIR" ipc call gendbyte-project-launcher "$1"
+  qs_config ipc call gendbyte-project-launcher "$1"
 }
 
 wait_for_ipc() {
@@ -93,7 +101,7 @@ fi
 export HYPRLAND_WORKSTATION_REPO_ROOT="$REPO_ROOT"
 export QS_NO_RELOAD_POPUP=1
 
-setsid qs -p "$CONFIG_DIR" >>"$LOG_FILE" 2>&1 &
+setsid qs "${QS_SELECTOR[@]}" >>"$LOG_FILE" 2>&1 &
 
 if wait_for_ipc; then
   ipc show

@@ -53,6 +53,7 @@ t.test("project launcher owns Super R and dispatches only wrapper exec", functio
 
   launcher.register(hl, {}, {
     launcher = "/home/test/.local/bin/hyprland-workstation-launcher",
+    kernel_cmdline = "quiet splash",
   })
 
   t.eq(#calls.unbinds, 1)
@@ -73,6 +74,7 @@ t.test("project launcher registers narrow centered floating rule", function()
 
   launcher.register(hl, {}, {
     launcher = "/home/test/.local/bin/hyprland-workstation-launcher",
+    kernel_cmdline = "quiet splash",
   })
 
   t.eq(#calls.rules, 1)
@@ -90,6 +92,7 @@ t.test("project launcher falls back when unbind API is absent", function()
   local ok = pcall(function()
     launcher.register(hl, {}, {
       launcher = "/home/test/.local/bin/hyprland-workstation-launcher",
+    kernel_cmdline = "quiet splash",
     })
   end)
 
@@ -126,4 +129,23 @@ t.test("project launcher wrapper tolerates slow cold start and serializes startu
   t.truthy(source:find("wait_for_ipc", 1, true))
   t.truthy(source:find("project-launcher.log", 1, true))
   t.eq(source:find("seq 1 20", 1, true), nil)
+end)
+
+t.test("Try Omarchy gets a no-Super launcher fallback", function()
+  local launcher = require("hypr.workstation.project_launcher")
+  local hl, calls = fake_hyprland()
+
+  launcher.register(hl, {}, {
+    launcher = "/home/test/.local/bin/hyprland-workstation-launcher",
+    kernel_cmdline = "quiet omarchy.qemu=1 tryomarchy.render=cpu",
+  })
+
+  t.eq(#calls.unbinds, 2)
+  t.eq(calls.unbinds[1], "SUPER + R")
+  t.eq(calls.unbinds[2], "CTRL + ALT + R")
+  t.eq(#calls.binds, 2)
+  t.eq(calls.binds[1].keys, "SUPER + R")
+  t.eq(calls.binds[2].keys, "CTRL + ALT + R")
+  t.eq(calls.binds[2].dispatcher.command, "/home/test/.local/bin/hyprland-workstation-launcher")
+  t.eq(calls.binds[2].options.description, "Project Launcher (Try Omarchy fallback)")
 end)

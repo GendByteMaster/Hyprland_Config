@@ -24,7 +24,7 @@ local function has_kernel_option(cmdline, expected)
   return false
 end
 
-function M.apply(hl, options)
+function M.is_try_omarchy(options)
   options = options or {}
 
   local cmdline = options.kernel_cmdline
@@ -32,7 +32,13 @@ function M.apply(hl, options)
     cmdline = read_kernel_cmdline()
   end
 
-  if not has_kernel_option(cmdline, "omarchy.qemu=1") then
+  return has_kernel_option(cmdline, "omarchy.qemu=1")
+end
+
+function M.apply(hl, options)
+  options = options or {}
+
+  if not M.is_try_omarchy(options) then
     return false
   end
 
