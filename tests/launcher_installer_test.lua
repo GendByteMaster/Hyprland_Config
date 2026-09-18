@@ -85,7 +85,7 @@ local function active_state(home)
   return assert(install_state.read(paths.join(home, ".local", "state", "hyprland_config", "active.state")))
 end
 
-t.test("plain Hyprland install succeeds without Omarchy and installs launcher", function()
+t.test("plain Hyprland install succeeds without Omarchy and installs managed UI", function()
   local root = temp_dir("launcher-generic")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
@@ -108,18 +108,27 @@ t.test("plain Hyprland install succeeds without Omarchy and installs launcher", 
     command.realpath(paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")),
     command.realpath(paths.join(repo, "quickshell", "gendbyte-project-launcher"))
   )
+  t.eq(
+    command.realpath(paths.join(home, ".local", "bin", "hyprland-workspace-overview")),
+    command.realpath(paths.join(repo, "bin", "hyprland-workspace-overview"))
+  )
+  t.eq(
+    command.realpath(paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")),
+    command.realpath(paths.join(repo, "quickshell", "gendbyte-workspace-overview"))
+  )
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy")), false)
 
   local state = active_state(home)
-  t.eq(state.version, 2)
+  t.eq(state.version, 3)
   t.eq(state.launcher, true)
+  t.eq(state.workspace_overview, true)
   t.eq(state.omarchy_hud, false)
   t.eq(state.omarchy_system_monitor, false)
 
   command.remove_tree(root)
 end)
 
-t.test("Omarchy install records optional components in v2 state", function()
+t.test("Omarchy install records managed components in v3 state", function()
   local root = temp_dir("launcher-omarchy")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
@@ -135,8 +144,9 @@ t.test("Omarchy install records optional components in v2 state", function()
   })
 
   local state = active_state(home)
-  t.eq(state.version, 2)
+  t.eq(state.version, 3)
   t.eq(state.launcher, true)
+  t.eq(state.workspace_overview, true)
   t.eq(state.omarchy_hud, true)
   t.eq(state.omarchy_system_monitor, true)
   t.truthy(command.is_symlink(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud")))
@@ -198,7 +208,7 @@ t.test("installer refuses an unrelated launcher target", function()
   command.remove_tree(root)
 end)
 
-t.test("v1 active install upgrades in place to v2 and adds launcher", function()
+t.test("v1 active install upgrades in place to v3 and adds managed UI", function()
   local root = temp_dir("launcher-v1-upgrade")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
@@ -233,19 +243,75 @@ t.test("v1 active install upgrades in place to v2 and adds launcher", function()
 
   t.eq(result.changed, true)
   local state = active_state(home)
-  t.eq(state.version, 2)
+  t.eq(state.version, 3)
   t.eq(state.launcher, true)
+  t.eq(state.workspace_overview, true)
   t.eq(state.omarchy_hud, true)
   t.eq(state.omarchy_system_monitor, true)
   t.truthy(command.is_symlink(paths.join(plugin_dir, "gendbyte.mouse-hud")))
   t.truthy(command.is_symlink(paths.join(plugin_dir, "gendbyte.system-monitor")))
   t.truthy(command.is_symlink(paths.join(home, ".local", "bin", "hyprland-workstation-launcher")))
   t.truthy(command.is_symlink(paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")))
+  t.truthy(command.is_symlink(paths.join(home, ".local", "bin", "hyprland-workspace-overview")))
+  t.truthy(command.is_symlink(paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")))
 
   command.remove_tree(root)
 end)
 
-t.test("failed optional Omarchy enable rolls back newly added launcher on fresh install", function()
+t.test("v2 active install upgrades in place to v3 and adds workspace overview", function()
+  local root = temp_dir("overview-v2-upgrade")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+
+  local config_dir = paths.join(home, ".config", "hypr")
+  local state_dir = paths.join(home, ".local", "state", "hyprland_config")
+  assert(command.mkdir_p(config_dir))
+  assert(command.mkdir_p(state_dir))
+  assert(command.mkdir_p(paths.join(home, ".local", "bin")))
+  assert(command.mkdir_p(paths.join(home, ".config", "quickshell")))
+
+  assert(command.symlink(paths.join(repo, "hypr", "bindings.lua"), paths.join(config_dir, "bindings.lua")))
+  assert(command.symlink(paths.join(repo, "hypr", "workstation"), paths.join(config_dir, "workstation")))
+  assert(command.symlink(
+    paths.join(repo, "bin", "hyprland-workstation-launcher"),
+    paths.join(home, ".local", "bin", "hyprland-workstation-launcher")
+  ))
+  assert(command.symlink(
+    paths.join(repo, "quickshell", "gendbyte-project-launcher"),
+    paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")
+  ))
+
+  install_state.write(paths.join(state_dir, "active.state"), {
+    version = 2,
+    repo_root = assert(command.realpath(repo)),
+    backup_dir = "",
+    preserved_bindings = false,
+    preserved_workstation = false,
+    launcher = true,
+    omarchy_hud = false,
+    omarchy_system_monitor = false,
+  })
+
+  local result = installer.install({
+    home = home,
+    repo_root = repo,
+    timestamp = "upgrade",
+    runtime = generic_runtime(true),
+    omarchy_runtime = omarchy_runtime(false),
+  })
+
+  t.eq(result.changed, true)
+  local state = active_state(home)
+  t.eq(state.version, 3)
+  t.eq(state.workspace_overview, true)
+  t.truthy(command.is_symlink(paths.join(home, ".local", "bin", "hyprland-workspace-overview")))
+  t.truthy(command.is_symlink(paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")))
+
+  command.remove_tree(root)
+end)
+
+t.test("failed optional Omarchy enable rolls back newly added managed UI on fresh install", function()
   local root = temp_dir("launcher-rollback")
   local home = paths.join(root, "home")
   local repo = paths.join(root, "repo")
@@ -264,6 +330,8 @@ t.test("failed optional Omarchy enable rolls back newly added launcher on fresh 
   t.eq(ok, false)
   t.eq(command.exists_or_symlink(paths.join(home, ".local", "bin", "hyprland-workstation-launcher")), false)
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".local", "bin", "hyprland-workspace-overview")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")), false)
   t.eq(command.exists_or_symlink(paths.join(home, ".local", "state", "hyprland_config", "active.state")), false)
 
   command.remove_tree(root)
