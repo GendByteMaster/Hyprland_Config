@@ -18,5 +18,8 @@ require("tests.telemetry_collector_test")
 require("tests.system_monitor_plugin_test")
 require("tests.reinstall_safety_test")
 require("tests.json_test")
+require("tests.project_model_test")
+require("tests.project_config_test")
+require("tests.project_discovery_test")
 
 require("tests.testlib").run()
