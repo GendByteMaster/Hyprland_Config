@@ -102,6 +102,8 @@ t.test("uninstall restores configuration and removes project plugins", function(
   t.eq(read(paths.join(home, ".config", "hypr", "workstation", "local.lua")), "return true\n")
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.mouse-hud")), false)
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".local", "bin", "hyprland-workspace-overview")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")), false)
   t.eq(command.exists(paths.join(home, ".local", "state", "hyprland_config", "active.state")), false)
   t.eq(command.exists_or_symlink(paths.join(home, ".local", "state", "hyprland_config", "preserved_bindings.lua")), false)
   t.eq(#calls, 1)
@@ -231,6 +233,8 @@ t.test("generic uninstall removes launcher and restores Hyprland config without 
   install_generic({ home = home, repo_root = repo, timestamp = "backup" })
   t.truthy(command.is_symlink(paths.join(home, ".local", "bin", "hyprland-workstation-launcher")))
   t.truthy(command.is_symlink(paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")))
+  t.truthy(command.is_symlink(paths.join(home, ".local", "bin", "hyprland-workspace-overview")))
+  t.truthy(command.is_symlink(paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")))
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "omarchy")), false)
 
   local result = uninstaller.uninstall({
@@ -242,9 +246,39 @@ t.test("generic uninstall removes launcher and restores Hyprland config without 
   t.eq(#calls, 0)
   t.eq(command.exists_or_symlink(paths.join(home, ".local", "bin", "hyprland-workstation-launcher")), false)
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".local", "bin", "hyprland-workspace-overview")), false)
+  t.eq(command.exists_or_symlink(paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")), false)
   t.eq(read(paths.join(home, ".config", "hypr", "bindings.lua")), "-- generic original\n")
   t.eq(read(paths.join(home, ".config", "hypr", "workstation", "local.lua")), "return 'generic'\n")
   t.eq(command.exists_or_symlink(paths.join(home, ".local", "state", "hyprland_config", "active.state")), false)
+
+  command.remove_tree(root)
+end)
+
+t.test("generic uninstall refuses unrelated workspace overview replacement", function()
+  local root = temp_dir("generic-overview-conflict")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+
+  install_generic({ home = home, repo_root = repo, timestamp = "backup" })
+
+  local overview = paths.join(home, ".local", "bin", "hyprland-workspace-overview")
+  assert(command.remove(overview))
+  write(overview, "#!/bin/sh\necho replacement\n")
+
+  local ok, err = pcall(function()
+    uninstaller.uninstall({
+      home = home,
+      omarchy_runtime = fake_runtime({}, { available = false }),
+    })
+  end)
+
+  t.eq(ok, false)
+  t.truthy(tostring(err):find("Workspace Overview", 1, true))
+  t.truthy(read(overview):find("replacement", 1, true))
+  t.truthy(command.is_symlink(paths.join(home, ".config", "hypr", "bindings.lua")))
+  t.truthy(command.exists(paths.join(home, ".local", "state", "hyprland_config", "active.state")))
 
   command.remove_tree(root)
 end)
