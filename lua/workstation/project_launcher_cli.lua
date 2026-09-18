@@ -83,8 +83,8 @@ local function refresh(ctx)
   end
 
   return protocol.success({
-    projects = ctx.rank(projects, "", state),
-    warnings = warnings,
+    projects = protocol.list(ctx.rank(projects, "", state)),
+    warnings = protocol.list(warnings),
   })
 end
 
@@ -101,8 +101,8 @@ local function query(ctx, text)
   end
 
   return protocol.success({
-    projects = ctx.rank(projects, text or "", state),
-    warnings = warnings,
+    projects = protocol.list(ctx.rank(projects, text or "", state)),
+    warnings = protocol.list(warnings),
   })
 end
 
@@ -130,8 +130,8 @@ local function actions(ctx, project_id)
 
   return protocol.success({
     project = project,
-    actions = resolved,
-    warnings = warnings,
+    actions = protocol.list(resolved),
+    warnings = protocol.list(warnings),
   })
 end
 
@@ -158,7 +158,7 @@ local function toggle_favorite(ctx, project_id)
 
   return protocol.success({
     favorite = favorite,
-    warnings = warnings,
+    warnings = protocol.list(warnings),
   })
 end
 
@@ -213,7 +213,7 @@ local function run_action(ctx, args)
     end
     return protocol.success({
       favorite = favorite,
-      warnings = warnings,
+      warnings = protocol.list(warnings),
     })
   end
 
@@ -226,7 +226,7 @@ local function run_action(ctx, args)
       requires_confirmation = true,
       project = project,
       action = selected,
-      warnings = warnings,
+      warnings = protocol.list(warnings),
     })
   end
   if not execution.ok then
@@ -243,7 +243,7 @@ local function run_action(ctx, args)
 
   return protocol.success({
     dispatched = true,
-    warnings = warnings,
+    warnings = protocol.list(warnings),
   })
 end
 
