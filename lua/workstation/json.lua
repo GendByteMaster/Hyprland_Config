@@ -250,19 +250,52 @@ local function decoder(text)
   end
 
   local function parse_number()
-    local rest = text:sub(index)
-    local raw = rest:match("^%-?%d+%.?%d*[eE][%+%-]?%d+")
-      or rest:match("^%-?%d+%.%d+")
-      or rest:match("^%-?%d+")
+    local start = index
 
-    if not raw then
+    if text:sub(index, index) == "-" then
+      index = index + 1
+    end
+
+    local first = text:sub(index, index)
+    if first == "0" then
+      index = index + 1
+      if text:sub(index, index):match("%d") then
+        fail("leading zero in number")
+      end
+    elseif first:match("[1-9]") then
+      repeat
+        index = index + 1
+      until not text:sub(index, index):match("%d")
+    else
       fail("invalid number")
     end
-    if raw:match("^%-?0%d") then
-      fail("leading zero in number")
+
+    if text:sub(index, index) == "." then
+      index = index + 1
+      if not text:sub(index, index):match("%d") then
+        fail("fraction requires digits")
+      end
+      repeat
+        index = index + 1
+      until not text:sub(index, index):match("%d")
     end
 
-    index = index + #raw
+    local exponent = text:sub(index, index)
+    if exponent == "e" or exponent == "E" then
+      index = index + 1
+      local sign = text:sub(index, index)
+      if sign == "+" or sign == "-" then
+        index = index + 1
+      end
+      if not text:sub(index, index):match("%d") then
+        fail("exponent requires digits")
+      end
+      repeat
+        index = index + 1
+      until not text:sub(index, index):match("%d")
+    end
+
+    local raw = text:sub(start, index - 1)
     local value = tonumber(raw)
     if value == nil then
       fail("invalid number")
