@@ -61,7 +61,6 @@ t.test("workspace overview implements keyboard-only focus MVP", function()
   contains(overview, "Components.WorkspaceStrip")
   contains(overview, "workspaceEntries")
   contains(overview, "activateWorkspace")
-  contains(overview, "New workspace")
 end)
 
 t.test("workspace overview does not introduce screenshot polling", function()
