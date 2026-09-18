@@ -9,7 +9,7 @@ The feature is **Hyprland-first**. Omarchy is a supported integration, not a run
 The primary user flow is:
 
 ```text
-Super + R
+Super + Alt + R
   -> floating launcher
   -> select project
   -> select action
@@ -31,7 +31,7 @@ v0.3 owns these capabilities:
 - automatic actions plus per-project manual overrides;
 - generic terminal/editor/file-manager adapters;
 - an optional Omarchy adapter;
-- `Super + R` as the launcher hotkey;
+- `Super + Alt + R` as the launcher hotkey;
 - capability-based installation that does not require Omarchy;
 - safe failure behavior when projects or external tools are missing.
 
@@ -46,7 +46,7 @@ The core is independent of Omarchy.
 ```text
 Hyprland
    |
-   | Super + R
+   | Super + Alt + R
    v
 launcher wrapper
    |
@@ -85,11 +85,11 @@ Only one lightweight launcher Quickshell process should exist per graphical sess
 
 ### Hyprland binding
 
-Repository-owned Hyprland Lua registers `Super + R`.
+Repository-owned Hyprland Lua registers `Super + Alt + R`.
 
 Its only responsibility is to invoke the launcher wrapper. It does not know about projects, Git, Cargo, Node, Docker, favorites, or Omarchy.
 
-The project intentionally claims `Super + R` in the managed binding layer. Existing preserved user bindings are loaded first, then this project registers its own launcher binding. The implementation must make the ownership explicit and test it.
+The project intentionally claims `Super + Alt + R` in the managed binding layer. Existing preserved user bindings are loaded first, then this project registers its own launcher binding. The implementation must make the ownership explicit and test it.
 
 ### Launcher wrapper
 
@@ -506,7 +506,7 @@ The approved layout is a centered floating two-pane launcher.
 
 ### Keyboard behavior
 
-- `Super + R`: show/toggle launcher;
+- `Super + Alt + R`: show/toggle launcher;
 - opening focuses the search field;
 - typing fuzzy-filters projects;
 - `Up/Down`: move through projects or actions in the focused pane;
@@ -605,7 +605,7 @@ The current installer hard-requires Omarchy because v0.2 installs Omarchy-specif
 On every supported system the installer manages:
 
 - Hyprland workstation Lua;
-- the `Super + R` binding;
+- the `Super + Alt + R` binding;
 - launcher wrapper;
 - Quickshell launcher configuration;
 - Lua backend/runtime files;
@@ -676,7 +676,7 @@ Cover:
 
 Cover:
 
-- `Super + R` binding registration without using `Super + H`;
+- `Super + Alt + R` binding registration without using `Super + H`;
 - wrapper lifecycle behavior: IPC existing instance vs start new instance;
 - generic install without Omarchy;
 - Omarchy install preserving existing v0.1/v0.2 components;
@@ -690,7 +690,7 @@ Cover:
 Before v0.3 is considered complete:
 
 1. install/reinstall on the user's Omarchy machine;
-2. `Super + R` opens the centered launcher;
+2. `Super + Alt + R` opens the centered launcher;
 3. projects under `~/Repository` appear;
 4. fuzzy search works;
 5. favorite/recent ordering persists across launcher restarts;
@@ -710,7 +710,7 @@ v0.3 is complete when all of the following are true:
 
 - the launcher works on supported plain Hyprland without Omarchy;
 - Omarchy is an optional adapter/capability, not a core dependency;
-- `Super + R` toggles the launcher without blocking Hyprland on discovery;
+- `Super + Alt + R` toggles the launcher without blocking Hyprland on discovery;
 - `Super + H` remains free;
 - default discovery finds Git projects under `~/Repository`;
 - extra roots and explicit projects work through config;
