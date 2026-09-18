@@ -151,4 +151,4 @@ t.test("project launcher folder picker is dark and keyboard navigable", function
   assert_contains(picker, "Qt.Key_Return")
   assert_contains(picker, 'color: "#151515"')
   assert_not_contains(picker, "FolderDialog")
-})
+end)
