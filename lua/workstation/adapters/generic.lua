@@ -9,6 +9,18 @@ local KNOWN_TERMINALS = {
   "alacritty",
 }
 
+local PROJECT_COMMANDS = {
+  "git",
+  "cargo",
+  "pnpm",
+  "yarn",
+  "bun",
+  "npm",
+  "pytest",
+  "docker",
+  "bash",
+}
+
 local function append(base, extra)
   local result = {}
   for _, value in ipairs(base or {}) do
@@ -188,11 +200,17 @@ function M.detect(config, runtime)
   }
 
   function adapter.capabilities()
+    local commands = {}
+    for _, name in ipairs(PROJECT_COMMANDS) do
+      commands[name] = runtime.command_exists(name)
+    end
+
     return {
       terminal = terminal_kind ~= nil,
       editor = editor ~= nil,
       file_manager = file_manager ~= nil,
       clipboard = clipboard ~= nil,
+      commands = commands,
     }
   end
 
