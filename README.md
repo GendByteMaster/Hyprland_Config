@@ -1,34 +1,31 @@
 # Hyprland_Config
 
-Personal Lua-first workstation layer for the Hyprland configuration shipped by Omarchy.
+A Lua-first workstation layer for **Hyprland** with optional Omarchy integration.
 
-This project does **not** fork Omarchy, replace Hyprland, or edit `/usr/share/omarchy`. Omarchy remains the base system; this repository owns only selected user overrides under `~/.config/hypr`.
+The project does **not** fork Hyprland or Omarchy and does not edit `/usr/share/omarchy`. It owns a small set of user-level configuration links, launcher files, state, and optional Omarchy plugins.
 
-## v0.1
+## Current scope
 
-The first release focuses on a safe foundation and a NumFlow-like keyboard Mouse Mode.
+- **v0.1** — Num Lock Mouse Mode
+- **v0.2** — System Monitor topbar + `btop`
+- **v0.3** — Project Launcher / Terminal Workflow Layer
 
-### Architecture
+The architecture is Hyprland-first. Omarchy-specific pieces are adapters or optional plugins rather than a runtime requirement for the core workstation layer.
 
-```text
-Omarchy
-  └─ Hyprland
-      └─ ~/.config/hypr/bindings.lua
-          ├─ preserved personal bindings
-          └─ hypr.workstation.mouse
-              ├─ Num Lock state bridge
-              ├─ global conditional NumPad binds
-              ├─ cursor movement
-              ├─ acceleration
-              ├─ mouse buttons
-              └─ optional PipeWire sound feedback
-```
+## Requirements
 
-Project-owned behavior is Lua-first. v0.1 introduces no Bash, Python, Rust, `ydotool`, `/dev/uinput`, privileged daemon, `sudo`, or `pkexec` requirement.
+Core v0.3:
 
-Omarchy already ships Lua 5.1 for standalone tooling. Hyprland supplies the Lua API used by Mouse Mode. Optional audio feedback uses the existing PipeWire `pw-play` utility when available.
+- Hyprland 0.55+
+- Lua 5.1
+- `luac5.1`
+- Quickshell with the `qs` CLI
 
-## Mouse Mode
+Optional capabilities are detected at runtime. Depending on which project actions you use, tools such as Git, Cargo, npm/pnpm/yarn/bun, pytest, Docker, `wl-copy`, an editor, or a file manager may also be used.
+
+Omarchy is optional. When present, the installer can also manage the Mouse Mode HUD and System Monitor plugins.
+
+## v0.1 — Mouse Mode
 
 Num Lock is the mode switch:
 
@@ -37,11 +34,7 @@ Num Lock OFF -> Mouse Mode ON
 Num Lock ON  -> Mouse Mode OFF / normal NumPad
 ```
 
-The project sets `numlock_by_default = true`, so a fresh Hyprland session starts with normal NumPad behavior. Mouse Mode does **not** enter a Hyprland submap. Instead, the NumPad bindings stay in the global keymap and use Hyprland's `auto_consuming` behavior: while Num Lock is off they consume the NumPad event and perform the mouse action; while Num Lock is on they return `{ ok = false }` so the original key event passes through normally.
-
-Keeping Mouse Mode out of a submap is intentional: Omarchy's regular global shortcuts such as `Super + 1..10`, `Super + Tab`, and `Super + Arrow` remain available while Mouse Mode is active.
-
-`Num_Lock` is registered as a `submap_universal` and `non_consuming` bind so it continues to work if another Hyprland submap is active and the real Num Lock state still changes. `Super + M` is not used by v0.1.
+Mouse Mode stays in the global Hyprland keymap rather than entering a dedicated submap, so normal `Super + ...` shortcuts continue to work.
 
 | Key while Num Lock is OFF | Action |
 | --- | --- |
@@ -53,75 +46,212 @@ Keeping Mouse Mode out of a submap is intentional: Omarchy's regular global shor
 | NumPad 9 | Move up-right |
 | NumPad 1 | Move down-left |
 | NumPad 3 | Move down-right |
-| NumPad / | Select Left Button mode (LMB) |
-| NumPad * | Select Right Button mode (RMB) |
-| NumPad - | Select Middle Button mode (MMB) |
+| NumPad / | Select Left Button mode |
+| NumPad * | Select Right Button mode |
+| NumPad - | Select Middle Button mode |
 | NumPad 5 | Click selected button |
-| NumPad + | Double-click selected button |
+| NumPad + | Double-click |
 | NumPad 0 | Hold selected button |
 | NumPad . | Release held button |
 | Num Lock | Return to normal NumPad |
 
-The mouse-button controls use a Windows Mouse Keys-style selection model: `/`, `*`, and `-` change the active button mode without clicking immediately. The HUD shows the currently selected `LMB`, `RMB`, or `MMB` mode. `5`, `+`, `0`, and `.` then operate on that selected button. Both numeric keypad symbols and their NumLock-off navigation aliases are registered where applicable.
+The project sets `numlock_by_default = true`. Some Hyprland/XKB combinations continue to emit navigation keysyms such as `KP_End` with Num Lock on, so the workstation layer proxies those aliases back to ordinary digits while normal NumPad mode is active.
 
-Movement accelerates while a direction is held:
+Mouse Mode also keeps the cursor visible while keyboard-driven movement is active. Optional mode-change sound feedback uses local UI SFX through `pw-play` when available; audio failure never blocks Mouse Mode.
+
+The session Num Lock state is stored under `XDG_RUNTIME_DIR` and scoped to the current Hyprland instance, so `hyprctl reload` preserves Mouse Mode without carrying stale state into a new session.
+
+## v0.2 — System Monitor
+
+On Omarchy, the optional `gendbyte.system-monitor` plugin adds topbar telemetry including:
+
+- CPU utilization
+- CPU frequency
+- RAM utilization and used/total memory
+- network RX/TX
+- optional GPU utilization
+- optional temperature
+
+Clicking the monitor uses Omarchy's terminal launcher path to open or focus `btop`.
+
+This feature is optional in v0.3. A plain Hyprland installation does not create Omarchy plugin directories and does not require the Omarchy CLI.
+
+## v0.3 — Project Launcher
+
+Press:
 
 ```text
-repeats 1-2   -> 3 px
-repeats 3-5   -> 6 px
-repeats 6-10  -> 12 px
-repeats 11+   -> 24 px
+Super + R
 ```
 
-Diagonal movement is normalized so it is not faster than horizontal/vertical movement.
+to toggle a centered floating Quickshell Project Launcher.
 
-### Num Lock sound feedback
+`Super + H` is intentionally left free.
 
-Num Lock changes have two distinct short cues from the open-source [UI SFX](https://uisfx.com/) `mechanical` pack:
+The launcher is keyboard-first and uses the approved two-pane layout:
 
 ```text
-Num Lock OFF -> Mouse Mode ON  -> mechanical / toggle-on
-Num Lock ON  -> normal NumPad   -> mechanical / toggle-off
+┌──────────────────────────────────────────────────────────┐
+│ Search projects...                                      │
+├───────────────────────────┬──────────────────────────────┤
+│ Projects                  │ Actions                      │
+│                           │                              │
+│ NumFlow                   │ Open Shell                   │
+│ Voxelyra                  │ Git Status                   │
+│ Hyprland_Config           │ Tests                        │
+│ ...                       │ Dev Server                   │
+│                           │ Docker Compose               │
+│                           │ Open Editor                  │
+└───────────────────────────┴──────────────────────────────┘
 ```
 
-The generated UI SFX audio assets are CC0-1.0. They are vendored as Base64 text under `assets/sounds/` and decoded during install/reinstall to:
+Keyboard behavior:
+
+- type to fuzzy-filter projects
+- `Up/Down` moves through projects or actions
+- `Tab` / `Right` enters the Actions pane
+- `Left` returns from Actions
+- `Enter` runs the selected action
+- `Esc` closes the launcher
+
+Queries are debounced. Project detection and action logic stay in Lua; QML only renders the UI and talks to the versioned JSON backend.
+
+### Project discovery
+
+The default discovery root is:
 
 ```text
-~/.local/share/hyprland_config/sounds/toggle-on.ogg
-~/.local/share/hyprland_config/sounds/toggle-off.ogg
+~/Repository
 ```
 
-Playback is asynchronous and best-effort through `pw-play`. Missing audio files, a missing PipeWire playback utility, or playback failure never prevents Num Lock or Mouse Mode from changing. HUD feedback remains the visible source of state.
+Git project roots are discovered with bounded depth; the default maximum depth is 4. Common heavy/generated directories are pruned, symlink Git markers are rejected, and canonical paths are used as stable project IDs.
 
-### Reload synchronization
+Additional roots, explicit non-Git projects, hidden paths, application preferences, and action overrides can be configured in:
 
-The Mouse Mode state is kept in a tiny data file under `XDG_RUNTIME_DIR`, scoped by the current `HYPRLAND_INSTANCE_SIGNATURE`.
+```text
+~/.config/hyprland-workstation/projects.lua
+```
 
-This means:
+Example:
 
-- `hyprctl reload` preserves `Num Lock OFF -> Mouse Mode ON`;
-- a new Hyprland instance starts clean with Num Lock ON;
-- reload and submap changes release any held virtual mouse button;
-- cursor movement and button actions do not require an external input daemon or privileged process;
-- optional Num Lock audio launches a short local `pw-play` process and never participates in mouse-state correctness.
+```lua
+return {
+  roots = {
+    "~/Repository",
+    "~/Projects",
+  },
+
+  projects = {
+    { path = "~/scratch/demo", name = "Demo" },
+  },
+
+  hidden = {
+    "~/Repository/archive",
+  },
+
+  max_depth = 4,
+
+  apps = {
+    terminal = "auto",
+    editor = { "code", "--reuse-window" },
+    file_manager = { "thunar" },
+  },
+
+  overrides = {
+    ["~/Repository/example"] = {
+      actions = {
+        {
+          id = "custom-dev",
+          label = "Custom Dev",
+          argv = { "bash", "-lc", "echo ok" },
+          terminal = true,
+          shell = true,
+          confirm = true,
+        },
+      },
+    },
+  },
+}
+```
+
+If the file is missing, safe defaults are used. A malformed config is ignored with a warning rather than rewritten.
+
+### Favorites, recent projects, and cache
+
+Favorites and recent-project ordering are stored as data under the XDG state directory. Recent history is bounded.
+
+Discovery results are cached under the XDG cache directory so ordinary fuzzy queries do not rescan the filesystem on every keypress.
+
+With an empty search query, favorites are shown first, then recent projects, then remaining projects. With a text query, fuzzy match relevance remains stronger than favorite/recent boosts.
+
+### Automatic action detection
+
+Universal actions include:
+
+- Open Shell
+- Open Editor
+- Open File Manager
+- Favorite / Unfavorite
+- Copy Path when a clipboard tool is available
+
+Project-specific actions are detected from project files and runtime capabilities.
+
+Supported v0.3 detection includes:
+
+- Git
+- Rust / Cargo
+- Node package scripts
+- Python / pytest
+- Docker Compose
+
+For Node projects, the package manager is selected from lockfiles with npm as the fallback. Only declared `dev`, `test`, and `build` scripts are exposed.
+
+Missing executables disable only the affected action and show a reason instead of disabling the launcher.
+
+Potentially destructive actions such as `Compose Down` require confirmation.
+
+### Terminal and desktop adapters
+
+Interactive actions run in a terminal at the selected project's canonical root. Quick actions such as editor, file manager, and copy path run directly.
+
+In `apps.terminal = "auto"` mode, the generic adapter prefers `xdg-terminal-exec`. It can also use a single unambiguous supported terminal or an exact supported `$TERMINAL` preference.
+
+Known terminal adapters include:
+
+- Foot
+- Ghostty
+- Kitty
+- Alacritty
+
+On Omarchy, v0.3 still uses the generic explicit-cwd terminal path so project actions do not inherit an unrelated active terminal directory.
+
+All action arguments are handled as argv data. Project paths and action arguments are not concatenated into an unquoted command string.
 
 ## Install
 
-Clone the repository, check out the feature/release branch you want to test, then run:
+Clone the repository and run from the checkout you want to use:
 
 ```bash
 lua5.1 install.lua
 ```
 
-The installer manages these Hyprland/Omarchy symlink targets:
+v0.3 requires Quickshell's `qs` CLI before the installer changes managed targets.
+
+The core installation manages:
 
 ```text
 ~/.config/hypr/bindings.lua
 ~/.config/hypr/workstation
-~/.config/omarchy/plugins/gendbyte.mouse-hud
+~/.local/bin/hyprland-workstation-launcher
+~/.config/quickshell/gendbyte-project-launcher
 ```
 
-It also materializes the two local UI SFX files under `~/.local/share/hyprland_config/sounds/`.
+On Omarchy, it can additionally manage:
+
+```text
+~/.config/omarchy/plugins/gendbyte.mouse-hud
+~/.config/omarchy/plugins/gendbyte.system-monitor
+```
 
 Existing Hyprland files are preserved under:
 
@@ -129,21 +259,24 @@ Existing Hyprland files are preserved under:
 ~/.local/state/hyprland_config/backups/<timestamp>/
 ```
 
-The managed `bindings.lua` loads a preserved previous user bindings file first, then registers the workstation overrides. `Num_Lock` is intentionally claimed with `o.rebind` for Mouse Mode.
+Install ownership is recorded in a versioned state file so uninstall/verify know which optional components belong to this installation.
 
-After installation reload Hyprland:
+After installation:
 
 ```bash
 hyprctl reload
+hyprctl configerrors
 ```
 
-For an already installed checkout, the repository also provides:
+### Reinstall / update
+
+For an existing installation:
 
 ```bash
 lua5.1 reinstall.lua
 ```
 
-It uninstalls and reinstalls the managed links, refreshes the local sound assets, verifies the installation, reloads Hyprland, and checks `hyprctl configerrors` before reporting success.
+Reinstall is **reconciliation**, not uninstall-then-install. Existing managed links are checked in place, missing components are added, install state is migrated when necessary, verification runs, and Hyprland is reloaded only after verification succeeds.
 
 ## Verify
 
@@ -151,12 +284,27 @@ It uninstalls and reinstalls the managed links, refreshes the local sound assets
 lua5.1 verify.lua
 ```
 
-Verification checks the Lua 5.1 runtime/compiler, repository files, install state, managed symlink ownership, preserved bindings marker, repository safety, and Lua syntax.
+Verification checks:
 
-Run the unit/integration suite from the repository root with:
+- repository safety
+- Lua runtime/compiler
+- required repository files
+- install state
+- managed Hyprland links
+- Project Launcher links
+- Quickshell availability when the launcher is installed
+- preserved bindings
+- optional Omarchy links/validation when those components are managed
+- Lua syntax
+
+Omarchy checks are skipped successfully for a generic Hyprland-only installation.
+
+Run the complete automated suite from the repository root with:
 
 ```bash
 lua5.1 tests/run.lua
+find . -name '*.lua' -type f -print0 | xargs -0 -r -n1 luac5.1 -p
+bash -n bin/hyprland-workstation-launcher
 ```
 
 ## Uninstall
@@ -165,9 +313,13 @@ lua5.1 tests/run.lua
 lua5.1 uninstall.lua
 ```
 
-The uninstaller refuses to remove a managed path if it no longer points to this installation. When the installation replaced previous bindings/workstation files, those files are restored from the recorded backup.
+The uninstaller refuses to delete a managed target that no longer points to this repository. Only components recorded as owned by the active installation are removed.
 
-Reload Hyprland afterwards:
+A generic Hyprland installation therefore uninstalls without requiring Omarchy. An Omarchy installation disables the managed System Monitor plugin before deleting its link.
+
+Previously preserved Hyprland configuration is restored from the recorded backup.
+
+Reload afterwards:
 
 ```bash
 hyprctl reload
@@ -176,42 +328,45 @@ hyprctl reload
 ## Repository layout
 
 ```text
-assets/
-  sounds/
-    uisfx-mechanical-toggle-on.ogg.b64
-    uisfx-mechanical-toggle-off.ogg.b64
-    LICENSE-UI-SFX
-
 hypr/
   bindings.lua
   workstation/
     mouse.lua
-    mouse_state.lua
-    numlock_store.lua
-    sound.lua
+    project_launcher.lua
+    ...
+
+quickshell/
+  gendbyte-project-launcher/
+    shell.qml
+    ProjectLauncher.qml
+    components/
 
 lua/workstation/
-  command.lua
-  paths.lua
-  install_state.lua
+  action_executor.lua
+  adapters/
+  project_actions.lua
+  project_cache.lua
+  project_config.lua
+  project_discovery.lua
+  project_launcher_cli.lua
+  project_model.lua
+  project_search.lua
+  project_state.lua
+  project_types.lua
+  launcher_protocol.lua
   installer.lua
-  sound_assets.lua
   uninstaller.lua
   verifier.lua
+  ...
 
-tests/
-  run.lua
-  testlib.lua
-  mouse_state_test.lua
-  numlock_store_test.lua
-  mouse_test.lua
-  numlock_sound_test.lua
-  sound_test.lua
-  sound_assets_test.lua
-  installer_test.lua
-  uninstaller_test.lua
-  verifier_test.lua
+omarchy/plugins/
+  gendbyte.mouse-hud/
+  gendbyte.system-monitor/
 
+bin/
+  hyprland-workstation-launcher
+
+project-launcher.lua
 install.lua
 reinstall.lua
 uninstall.lua
@@ -220,10 +375,10 @@ verify.lua
 
 ## Roadmap
 
-- **v0.1** — Omarchy integration + Num Lock Mouse Mode
-- **v0.2** — system monitoring/dashboard
-- **v0.3** — Ghostty/Warp-like workflow layer
-- **v0.4** — Project Launcher/workspace orchestration
+- **v0.1** — Num Lock Mouse Mode
+- **v0.2** — System Monitor / `btop` integration
+- **v0.3** — Project Launcher + Terminal Workflow Layer
+- **v0.4** — workspace orchestration around projects
 - **v0.5** — unified Command Center and optional custom shell UI
 
-The later layers keep the same rule: use Lua for project-owned logic where it is technically appropriate, while keeping Hyprland, Omarchy, Ghostty, Git, Docker, systemd and other system components as external foundations rather than reimplementing them.
+v0.3 intentionally stops short of full workspace orchestration. It provides project discovery, search, actions, and terminal/application launch primitives; v0.4 owns broader workspace lifecycle behavior.
