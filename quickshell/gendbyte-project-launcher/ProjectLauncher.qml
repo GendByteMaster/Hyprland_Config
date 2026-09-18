@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Dialogs
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -60,14 +59,22 @@ FloatingWindow {
     statusText = warnings.length > 0 ? warnings.join(" · ") : ""
   }
 
-  function folderSelectionValue(url) {
-    if (url && typeof url.toString === "function")
-      return url.toString()
-    return String(url || "")
+  function browseFolder(path) {
+    if (backendScript === "") {
+      folderPicker.fail("Launcher repository root is unavailable")
+      return
+    }
+
+    var args = ["browse"]
+    if (path)
+      args.push(path)
+    browseProcess.exec(backendArgs(args))
   }
 
   function chooseProjectFolder() {
-    folderDialog.open()
+    statusError = false
+    statusText = ""
+    folderPicker.openAt("")
   }
 
   function showLauncher() {
@@ -127,20 +134,42 @@ FloatingWindow {
     requestActions()
   }
 
+  function handleBrowseResponse(text) {
+    var payload = parseEnvelope(text)
+    if (!payload)
+      return
+    if (!payload.ok) {
+      folderPicker.fail(payload.error || "Failed to browse folder")
+      return
+    }
+
+    folderPicker.updateDirectory(
+      payload.data.path || "",
+      payload.data.parent || "",
+      Array.isArray(payload.data.entries) ? payload.data.entries : []
+    )
+  }
+
   function handleRootResponse(text) {
     var payload = parseEnvelope(text)
     if (!payload)
       return
     if (!payload.ok) {
-      statusError = true
-      statusText = payload.error || "Failed to add project folder"
+      if (folderPicker.opened)
+        folderPicker.fail(payload.error || "Failed to add project folder")
+      else {
+        statusError = true
+        statusText = payload.error || "Failed to add project folder"
+      }
       return
     }
 
+    folderPicker.closePicker()
     projects = Array.isArray(payload.data.projects) ? payload.data.projects : []
     selectedProjectIndex = projects.length > 0 ? 0 : -1
     showWarnings(payload.data)
     requestActions()
+    searchField.focusInput()
   }
 
   function handleActionResponse(text) {
@@ -261,6 +290,14 @@ FloatingWindow {
   }
 
   Process {
+    id: browseProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.handleBrowseResponse(this.text)
+    }
+  }
+
+  Process {
     id: rootProcess
     stdout: StdioCollector {
       waitForEnd: true
@@ -281,17 +318,6 @@ FloatingWindow {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.handleRunResponse(this.text)
-    }
-  }
-
-  FolderDialog {
-    id: folderDialog
-    title: "Choose project folder"
-
-    onAccepted: {
-      var selected = root.folderSelectionValue(selectedFolder)
-      if (selected !== "")
-        rootProcess.exec(root.backendArgs(["add-root", selected]))
     }
   }
 
@@ -580,6 +606,23 @@ FloatingWindow {
         horizontalAlignment: Text.AlignRight
         font.family: "monospace"
         font.pixelSize: 9
+      }
+    }
+
+    Components.FolderPicker {
+      id: folderPicker
+      anchors.fill: parent
+
+      onBrowseRequested: function(path) {
+        root.browseFolder(path)
+      }
+      onAccepted: function(path) {
+        if (path !== "")
+          rootProcess.exec(root.backendArgs(["add-root", path]))
+      }
+      onCancelled: {
+        closePicker()
+        searchField.focusInput()
       }
     }
 
