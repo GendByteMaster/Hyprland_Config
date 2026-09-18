@@ -322,6 +322,20 @@ test("run favorite action uses state layer instead of executor", function()
   testlib.eq(ctx.state_saves, 1)
 end)
 
+test("protocol encoding preserves empty launcher lists as arrays", function()
+  local cli = require("workstation.project_launcher_cli")
+  local protocol = require("workstation.launcher_protocol")
+  local ctx = fake_context({
+    discovered_projects = {},
+    warnings = {},
+  })
+
+  local result = cli.run({ "refresh" }, ctx)
+  local encoded = protocol.encode(result)
+  testlib.truthy(encoded:match('"projects":%[%]'))
+  testlib.truthy(encoded:match('"warnings":%[%]'))
+end)
+
 test("unknown launcher command returns protocol failure", function()
   local cli = require("workstation.project_launcher_cli")
   local result = cli.run({ "wat" }, fake_context())
