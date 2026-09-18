@@ -14,9 +14,36 @@ local function success(a, _, c)
   return false
 end
 
+function M.argv(args)
+  local quoted = {}
+  for index, value in ipairs(args) do
+    quoted[index] = M.quote(value)
+  end
+  return table.concat(quoted, " ")
+end
+
 function M.run(command)
   local a, b, c = os.execute(command)
   return success(a, b, c)
+end
+
+function M.run_argv(args)
+  return M.run(M.argv(args))
+end
+
+function M.spawn_argv(args)
+  if type(args) ~= "table" or #args == 0 then
+    return false
+  end
+  return M.run("setsid " .. M.argv(args) .. " >/dev/null 2>&1 &")
+end
+
+function M.run_argv_with_stdin(args, input)
+  if type(args) ~= "table" or #args == 0 then
+    return false
+  end
+  local shell = "printf '%s' " .. M.quote(input or "") .. " | " .. M.argv(args)
+  return M.run(shell)
 end
 
 function M.capture(command)
@@ -32,6 +59,10 @@ function M.capture(command)
   end
 
   return (output:gsub("[\r\n]+$", ""))
+end
+
+function M.capture_argv(args)
+  return M.capture(M.argv(args))
 end
 
 function M.exists(path)

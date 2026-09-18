@@ -28,6 +28,11 @@ end
 local function fake_repo(root)
   write(paths.join(root, "hypr", "bindings.lua"), "-- managed bindings\n")
   write(paths.join(root, "hypr", "workstation", "mouse.lua"), "return {}\n")
+  write(paths.join(root, "hypr", "workstation", "project_launcher.lua"), "return {}\n")
+  write(paths.join(root, "bin", "hyprland-workstation-launcher"), "#!/usr/bin/env bash\nexit 0\n")
+  write(paths.join(root, "quickshell", "gendbyte-project-launcher", "shell.qml"), "import Quickshell\nShellRoot {}\n")
+  write(paths.join(root, "quickshell", "gendbyte-project-launcher", "ProjectLauncher.qml"), "import Quickshell\nFloatingWindow {}\n")
+  write(paths.join(root, "project-launcher.lua"), "return true\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json"), "{}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "Panel.qml"), "import QtQuick\nItem {}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "manifest.json"), "{}\n")
@@ -55,7 +60,16 @@ local function fake_omarchy_runtime(calls, options)
   }
 end
 
+local function fake_generic_runtime()
+  return {
+    command_exists = function()
+      return true
+    end,
+  }
+end
+
 local function install(options, runtime)
+  options.runtime = options.runtime or fake_generic_runtime()
   options.omarchy_runtime = runtime or fake_omarchy_runtime()
   return installer.install(options)
 end
@@ -211,6 +225,48 @@ t.test("installer rolls back when Omarchy cannot enable the system monitor", fun
   t.eq(command.exists_or_symlink(paths.join(home, ".config", "hypr", "bindings.lua")), false)
   t.eq(command.exists(paths.join(home, ".local", "state", "hyprland_config", "active.state")), false)
   t.eq(read(paths.join(home, ".config", "omarchy", "shell.json")), "{\"keep\":true}\n")
+  command.remove_tree(root)
+end)
+
+t.test("installer disables system monitor when state write fails after enable", function()
+  local root = temp_dir("state-write-failure")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  local calls = {}
+  fake_repo(repo)
+
+  local original_write = install_state.write
+  install_state.write = function()
+    error("forced state write failure")
+  end
+
+  local ok, err = pcall(function()
+    install(
+      { home = home, repo_root = repo, timestamp = "first" },
+      fake_omarchy_runtime(calls)
+    )
+  end)
+
+  install_state.write = original_write
+
+  t.eq(ok, false)
+  t.truthy(tostring(err):match("forced state write failure"))
+  t.eq(#calls, 2)
+  t.eq(calls[1].action, "enable")
+  t.eq(calls[1].id, "gendbyte.system-monitor")
+  t.eq(calls[2].action, "disable")
+  t.eq(calls[2].id, "gendbyte.system-monitor")
+  t.eq(
+    command.exists_or_symlink(
+      paths.join(home, ".config", "omarchy", "plugins", "gendbyte.system-monitor")
+    ),
+    false
+  )
+  t.eq(
+    command.exists(paths.join(home, ".local", "state", "hyprland_config", "active.state")),
+    false
+  )
+
   command.remove_tree(root)
 end)
 

@@ -38,6 +38,12 @@ local function choose_backup_dir(backups_root, timestamp)
   return base .. "-" .. index
 end
 
+local function default_runtime()
+  return {
+    command_exists = command.command_exists,
+  }
+end
+
 local function default_omarchy_runtime()
   return {
     available = function()
@@ -80,109 +86,265 @@ local function wait_for_plugin(runtime, id)
   return runtime.wait_for_plugin(id)
 end
 
+local function ensure_unoccupied_or_owned(target, source, label)
+  if target_is(target, source) then
+    return true
+  end
+  if command.exists_or_symlink(target) then
+    error(label .. " path is occupied by another file", 2)
+  end
+  return false
+end
+
+local function state_changed(active, next_state)
+  if not active or active.version ~= 2 then
+    return true
+  end
+
+  return active.launcher ~= next_state.launcher
+    or active.omarchy_hud ~= next_state.omarchy_hud
+    or active.omarchy_system_monitor ~= next_state.omarchy_system_monitor
+end
+
+local function remove_created(created)
+  for index = #created, 1, -1 do
+    command.remove(created[index])
+  end
+end
+
+local function link_component(source, target, label, created)
+  if target_is(target, source) then
+    return false
+  end
+  if command.exists_or_symlink(target) then
+    error(label .. " path is occupied by another file", 2)
+  end
+
+  assert_ok(command.mkdir_p(paths.dirname(target)), "failed to create directory for " .. label)
+  assert_ok(command.symlink(source, target), "failed to link " .. label)
+  created[#created + 1] = target
+  return true
+end
+
 function M.install(options)
+  options = options or {}
+
   local home = assert(options.home, "home is required")
-  local repo_root = assert_ok(command.realpath(assert(options.repo_root, "repo_root is required")), "repository root does not exist")
+  local repo_root = assert_ok(
+    command.realpath(assert(options.repo_root, "repo_root is required")),
+    "repository root does not exist"
+  )
   local timestamp = options.timestamp or os.date("%Y%m%d-%H%M%S")
+  local runtime = options.runtime or default_runtime()
   local omarchy_runtime = options.omarchy_runtime or default_omarchy_runtime()
+
+  assert_ok(
+    type(runtime.command_exists) == "function" and runtime.command_exists("qs"),
+    "Quickshell (qs) is required for the Project Launcher"
+  )
 
   local source_bindings = paths.join(repo_root, "hypr", "bindings.lua")
   local source_workstation = paths.join(repo_root, "hypr", "workstation")
+  local source_launcher = paths.join(repo_root, "bin", "hyprland-workstation-launcher")
+  local source_quickshell = paths.join(repo_root, "quickshell", "gendbyte-project-launcher")
+  local source_backend = paths.join(repo_root, "project-launcher.lua")
   local source_hud = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
   local source_system_monitor = paths.join(repo_root, "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
+
   assert_ok(command.exists(source_bindings), "managed bindings.lua is missing")
   assert_ok(command.exists(source_workstation), "managed workstation directory is missing")
-  assert_ok(command.exists(source_hud), "Mouse Mode HUD plugin is missing")
-  assert_ok(command.exists(source_system_monitor), "System Monitor plugin is missing")
+  assert_ok(command.exists(source_launcher), "Project Launcher wrapper is missing")
+  assert_ok(command.exists(source_quickshell), "Project Launcher Quickshell config is missing")
+  assert_ok(command.exists(source_backend), "Project Launcher backend is missing")
 
   local config_dir = paths.join(home, ".config", "hypr")
   local target_bindings = paths.join(config_dir, "bindings.lua")
   local target_workstation = paths.join(config_dir, "workstation")
+  local target_launcher = paths.join(home, ".local", "bin", "hyprland-workstation-launcher")
+  local target_quickshell = paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")
   local omarchy_plugins_dir = paths.join(home, ".config", "omarchy", "plugins")
   local target_hud = paths.join(omarchy_plugins_dir, HUD_PLUGIN_ID)
   local target_system_monitor = paths.join(omarchy_plugins_dir, SYSTEM_MONITOR_PLUGIN_ID)
+
   local state_dir = paths.join(home, ".local", "state", "hyprland_config")
   local backups_root = paths.join(state_dir, "backups")
   local state_path = paths.join(state_dir, "active.state")
   local preserved_bindings_link = paths.join(state_dir, "preserved_bindings.lua")
-
-  assert_ok(command.mkdir_p(config_dir), "failed to create Hyprland config directory")
-  assert_ok(command.mkdir_p(omarchy_plugins_dir), "failed to create Omarchy plugins directory")
-  assert_ok(command.mkdir_p(backups_root), "failed to create state directory")
 
   local active, state_error = install_state.read(state_path)
   if state_error then
     error(state_error)
   end
 
+  local omarchy_available = type(omarchy_runtime.available) == "function"
+    and omarchy_runtime.available()
+    or false
+
   if active then
     if active.repo_root ~= repo_root then
       error("another Hyprland_Config repository is already active")
     end
-    if not target_is(target_bindings, source_bindings) or not target_is(target_workstation, source_workstation) then
+
+    if not target_is(target_bindings, source_bindings)
+      or not target_is(target_workstation, source_workstation) then
       error("active installation state exists but managed Hyprland targets were modified")
     end
 
-    local hud_installed = target_is(target_hud, source_hud)
-    local monitor_installed = target_is(target_system_monitor, source_system_monitor)
+    local launcher_owned = ensure_unoccupied_or_owned(
+      target_launcher,
+      source_launcher,
+      "Project Launcher wrapper"
+    )
+    local quickshell_owned = ensure_unoccupied_or_owned(
+      target_quickshell,
+      source_quickshell,
+      "Project Launcher Quickshell config"
+    )
 
-    if not hud_installed and command.exists_or_symlink(target_hud) then
-      error("Mouse Mode HUD plugin path is occupied by another file")
-    end
-    if not monitor_installed and command.exists_or_symlink(target_system_monitor) then
-      error("System Monitor plugin path is occupied by another file")
-    end
-    if hud_installed and monitor_installed then
-      return { changed = false, state_path = state_path, backup_dir = active.backup_dir }
-    end
-    if not monitor_installed then
-      assert_ok(omarchy_runtime.available(), "Omarchy CLI and shell are required to enable the System Monitor plugin")
-    end
+    local hud_owned = target_is(target_hud, source_hud)
+    local monitor_owned = target_is(target_system_monitor, source_system_monitor)
 
-    local linked_hud = false
-    local linked_monitor = false
-    local ok, err = pcall(function()
-      if not hud_installed then
-        assert_ok(command.symlink(source_hud, target_hud), "failed to link Mouse Mode HUD plugin")
-        linked_hud = true
+    if active.version == 1 then
+      if command.exists_or_symlink(target_hud) and not hud_owned then
+        error("managed Mouse Mode HUD plugin was modified")
       end
-      if not monitor_installed then
-        assert_ok(command.symlink(source_system_monitor, target_system_monitor), "failed to link System Monitor plugin")
-        linked_monitor = true
-        assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
-        assert_ok(
-          wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
-          "System Monitor plugin was not discovered after rescan"
-        )
-        assert_ok(
-          omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
-          "failed to enable System Monitor plugin"
-        )
+      if command.exists_or_symlink(target_system_monitor) and not monitor_owned then
+        error("managed System Monitor plugin was modified")
+      end
+    else
+      if active.omarchy_hud and command.exists_or_symlink(target_hud) and not hud_owned then
+        error("managed Mouse Mode HUD plugin was modified")
+      end
+      if active.omarchy_system_monitor
+        and command.exists_or_symlink(target_system_monitor)
+        and not monitor_owned then
+        error("managed System Monitor plugin was modified")
+      end
+    end
+
+    if omarchy_available then
+      assert_ok(command.exists(source_hud), "Mouse Mode HUD plugin is missing")
+      assert_ok(command.exists(source_system_monitor), "System Monitor plugin is missing")
+
+      if not hud_owned and command.exists_or_symlink(target_hud) then
+        error("Mouse Mode HUD plugin path is occupied by another file")
+      end
+      if not monitor_owned and command.exists_or_symlink(target_system_monitor) then
+        error("System Monitor plugin path is occupied by another file")
+      end
+    end
+
+    local created = {}
+    local changed = false
+    local monitor_enabled_during_install = false
+
+    local ok, err = pcall(function()
+      if not launcher_owned then
+        link_component(source_launcher, target_launcher, "Project Launcher wrapper", created)
+        changed = true
+      end
+      if not quickshell_owned then
+        link_component(source_quickshell, target_quickshell, "Project Launcher Quickshell config", created)
+        changed = true
+      end
+
+      if omarchy_available then
+        if not hud_owned then
+          link_component(source_hud, target_hud, "Mouse Mode HUD plugin", created)
+          hud_owned = true
+          changed = true
+        end
+
+        if not monitor_owned then
+          link_component(
+            source_system_monitor,
+            target_system_monitor,
+            "System Monitor plugin",
+            created
+          )
+          monitor_owned = true
+          changed = true
+
+          assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
+          assert_ok(
+            wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
+            "System Monitor plugin was not discovered after rescan"
+          )
+          assert_ok(
+            omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
+            "failed to enable System Monitor plugin"
+          )
+          monitor_enabled_during_install = true
+        end
+      end
+
+      launcher_owned = target_is(target_launcher, source_launcher)
+        and target_is(target_quickshell, source_quickshell)
+      hud_owned = target_is(target_hud, source_hud)
+      monitor_owned = target_is(target_system_monitor, source_system_monitor)
+
+      local next_state = {
+        version = 2,
+        repo_root = repo_root,
+        backup_dir = active.backup_dir or "",
+        preserved_bindings = active.preserved_bindings,
+        preserved_workstation = active.preserved_workstation,
+        launcher = launcher_owned,
+        omarchy_hud = hud_owned,
+        omarchy_system_monitor = monitor_owned,
+      }
+
+      if state_changed(active, next_state) then
+        install_state.write(state_path, next_state)
+        changed = true
       end
     end)
 
     if not ok then
-      if linked_monitor then command.remove(target_system_monitor) end
-      if linked_hud then command.remove(target_hud) end
+      if monitor_enabled_during_install
+        and type(omarchy_runtime.disable_plugin) == "function" then
+        pcall(omarchy_runtime.disable_plugin, SYSTEM_MONITOR_PLUGIN_ID)
+      end
+      remove_created(created)
       error(err, 0)
     end
 
-    return { changed = true, state_path = state_path, backup_dir = active.backup_dir }
+    return {
+      changed = changed,
+      state_path = state_path,
+      backup_dir = active.backup_dir or "",
+      components = {
+        launcher = launcher_owned,
+        omarchy_hud = hud_owned,
+        omarchy_system_monitor = monitor_owned,
+      },
+      omarchy_available = omarchy_available,
+    }
   end
 
   if target_is(target_bindings, source_bindings) or target_is(target_workstation, source_workstation) then
     error("managed Hyprland links exist without active installation state")
   end
-  if command.exists_or_symlink(target_hud) then
-    error("Mouse Mode HUD plugin path already exists")
+  if command.exists_or_symlink(target_launcher) then
+    error("Project Launcher wrapper path already exists")
   end
-  if command.exists_or_symlink(target_system_monitor) then
-    error("System Monitor plugin path already exists")
+  if command.exists_or_symlink(target_quickshell) then
+    error("Project Launcher Quickshell config path already exists")
   end
   if command.exists_or_symlink(preserved_bindings_link) then
     error("preserved bindings marker exists without active installation state")
   end
-  assert_ok(omarchy_runtime.available(), "Omarchy CLI and shell are required to enable the System Monitor plugin")
+
+  if omarchy_available then
+    assert_ok(command.exists(source_hud), "Mouse Mode HUD plugin is missing")
+    assert_ok(command.exists(source_system_monitor), "System Monitor plugin is missing")
+    if command.exists_or_symlink(target_hud) then
+      error("Mouse Mode HUD plugin path already exists")
+    end
+    if command.exists_or_symlink(target_system_monitor) then
+      error("System Monitor plugin path already exists")
+    end
+  end
 
   local has_bindings = command.exists_or_symlink(target_bindings)
   local has_workstation = command.exists_or_symlink(target_workstation)
@@ -191,17 +353,26 @@ function M.install(options)
   local backup_bindings = paths.join(backup_hypr, "bindings.lua")
   local backup_workstation = paths.join(backup_hypr, "workstation")
 
+  assert_ok(command.mkdir_p(config_dir), "failed to create Hyprland config directory")
+  assert_ok(command.mkdir_p(paths.dirname(target_launcher)), "failed to create launcher bin directory")
+  assert_ok(command.mkdir_p(paths.dirname(target_quickshell)), "failed to create Quickshell config directory")
+  assert_ok(command.mkdir_p(backups_root), "failed to create state directory")
+  if omarchy_available then
+    assert_ok(command.mkdir_p(omarchy_plugins_dir), "failed to create Omarchy plugins directory")
+  end
+
   if has_bindings or has_workstation then
     assert_ok(command.mkdir_p(backup_hypr), "failed to create backup directory")
   end
 
   local moved_bindings = false
   local moved_workstation = false
-  local linked_bindings = false
-  local linked_workstation = false
-  local linked_hud = false
-  local linked_monitor = false
   local preserved_linked = false
+  local created = {}
+
+  local hud_owned = false
+  local monitor_owned = false
+  local monitor_enabled_during_install = false
 
   local ok, err = pcall(function()
     if has_bindings then
@@ -209,52 +380,83 @@ function M.install(options)
       moved_bindings = true
     end
     if has_workstation then
-      assert_ok(command.move(target_workstation, backup_workstation), "failed to preserve existing workstation directory")
+      assert_ok(
+        command.move(target_workstation, backup_workstation),
+        "failed to preserve existing workstation directory"
+      )
       moved_workstation = true
     end
 
-    assert_ok(command.symlink(source_bindings, target_bindings), "failed to link managed bindings.lua")
-    linked_bindings = true
-    assert_ok(command.symlink(source_workstation, target_workstation), "failed to link managed workstation directory")
-    linked_workstation = true
-    assert_ok(command.symlink(source_hud, target_hud), "failed to link Mouse Mode HUD plugin")
-    linked_hud = true
-    assert_ok(command.symlink(source_system_monitor, target_system_monitor), "failed to link System Monitor plugin")
-    linked_monitor = true
+    link_component(source_bindings, target_bindings, "managed bindings.lua", created)
+    link_component(source_workstation, target_workstation, "managed workstation directory", created)
+    link_component(source_launcher, target_launcher, "Project Launcher wrapper", created)
+    link_component(
+      source_quickshell,
+      target_quickshell,
+      "Project Launcher Quickshell config",
+      created
+    )
 
     if moved_bindings then
-      assert_ok(command.symlink(backup_bindings, preserved_bindings_link), "failed to expose preserved bindings")
+      assert_ok(
+        command.symlink(backup_bindings, preserved_bindings_link),
+        "failed to expose preserved bindings"
+      )
       preserved_linked = true
     end
 
+    if omarchy_available then
+      link_component(source_hud, target_hud, "Mouse Mode HUD plugin", created)
+      hud_owned = true
+
+      link_component(
+        source_system_monitor,
+        target_system_monitor,
+        "System Monitor plugin",
+        created
+      )
+      monitor_owned = true
+
+      assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
+      assert_ok(
+        wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
+        "System Monitor plugin was not discovered after rescan"
+      )
+      assert_ok(
+        omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
+        "failed to enable System Monitor plugin"
+      )
+      monitor_enabled_during_install = true
+    end
+
     install_state.write(state_path, {
-      version = 1,
+      version = 2,
       repo_root = repo_root,
       backup_dir = (has_bindings or has_workstation) and backup_dir or "",
       preserved_bindings = moved_bindings,
       preserved_workstation = moved_workstation,
+      launcher = true,
+      omarchy_hud = hud_owned,
+      omarchy_system_monitor = monitor_owned,
     })
-
-    assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
-    assert_ok(
-      wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
-      "System Monitor plugin was not discovered after rescan"
-    )
-    assert_ok(
-      omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
-      "failed to enable System Monitor plugin"
-    )
   end)
 
   if not ok then
+    if monitor_enabled_during_install
+      and type(omarchy_runtime.disable_plugin) == "function" then
+      pcall(omarchy_runtime.disable_plugin, SYSTEM_MONITOR_PLUGIN_ID)
+    end
     command.remove(state_path)
-    if preserved_linked then command.remove(preserved_bindings_link) end
-    if linked_monitor then command.remove(target_system_monitor) end
-    if linked_hud then command.remove(target_hud) end
-    if linked_workstation then command.remove(target_workstation) end
-    if linked_bindings then command.remove(target_bindings) end
-    if moved_workstation then command.move(backup_workstation, target_workstation) end
-    if moved_bindings then command.move(backup_bindings, target_bindings) end
+    if preserved_linked then
+      command.remove(preserved_bindings_link)
+    end
+    remove_created(created)
+    if moved_workstation then
+      command.move(backup_workstation, target_workstation)
+    end
+    if moved_bindings then
+      command.move(backup_bindings, target_bindings)
+    end
     error(err, 0)
   end
 
@@ -262,6 +464,12 @@ function M.install(options)
     changed = true,
     state_path = state_path,
     backup_dir = (has_bindings or has_workstation) and backup_dir or "",
+    components = {
+      launcher = true,
+      omarchy_hud = hud_owned,
+      omarchy_system_monitor = monitor_owned,
+    },
+    omarchy_available = omarchy_available,
   }
 end
 

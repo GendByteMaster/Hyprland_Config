@@ -15,17 +15,28 @@ local function decode(value)
   end))
 end
 
+local function bool_field(value)
+  return value and "1" or "0"
+end
+
 function M.write(path, state)
   assert(command.mkdir_p(paths.dirname(path)), "failed to create state directory")
 
+  local version = state.version or 1
   local file = assert(io.open(path, "w"))
   local fields = {
-    { "version", state.version or 1 },
+    { "version", version },
     { "repo_root", state.repo_root },
     { "backup_dir", state.backup_dir or "" },
-    { "preserved_bindings", state.preserved_bindings and "1" or "0" },
-    { "preserved_workstation", state.preserved_workstation and "1" or "0" },
+    { "preserved_bindings", bool_field(state.preserved_bindings) },
+    { "preserved_workstation", bool_field(state.preserved_workstation) },
   }
+
+  if version >= 2 then
+    fields[#fields + 1] = { "launcher", bool_field(state.launcher) }
+    fields[#fields + 1] = { "omarchy_hud", bool_field(state.omarchy_hud) }
+    fields[#fields + 1] = { "omarchy_system_monitor", bool_field(state.omarchy_system_monitor) }
+  end
 
   for _, item in ipairs(fields) do
     file:write(item[1], "=", encode(item[2]), "\n")
@@ -54,8 +65,26 @@ function M.read(path)
   end
 
   state.version = tonumber(state.version or "1")
+  if state.version == nil or state.version < 1 or state.version > 2 then
+    return nil, "unsupported install state version"
+  end
+
   state.preserved_bindings = state.preserved_bindings == "1"
   state.preserved_workstation = state.preserved_workstation == "1"
+
+  if state.version >= 2 then
+    state.launcher = state.launcher == "1"
+    state.omarchy_hud = state.omarchy_hud == "1"
+    state.omarchy_system_monitor = state.omarchy_system_monitor == "1"
+  else
+    -- v1 predates component ownership flags. Keep them unknown so the
+    -- installer can derive ownership from repository-owned targets before
+    -- migrating state to v2.
+    state.launcher = nil
+    state.omarchy_hud = nil
+    state.omarchy_system_monitor = nil
+  end
+
   return state
 end
 
