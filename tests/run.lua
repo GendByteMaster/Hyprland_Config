@@ -26,5 +26,7 @@ require("tests.project_search_test")
 require("tests.project_cache_test")
 require("tests.project_types_test")
 require("tests.project_actions_test")
+require("tests.adapters_test")
+require("tests.action_executor_test")
 
 require("tests.testlib").run()
