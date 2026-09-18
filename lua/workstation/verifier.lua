@@ -77,6 +77,7 @@ function M.verify(options)
   add("install state", state ~= nil and state_error == nil, state_error or state_path)
 
   local launcher_expected = state ~= nil and state.version >= 2 and state.launcher == true
+  local overview_expected = state ~= nil and state.version >= 3 and state.workspace_overview == true
   local hud_expected = state ~= nil and (
     (state.version >= 2 and state.omarchy_hud == true)
   )
@@ -89,6 +90,8 @@ function M.verify(options)
   local source_launcher = paths.join(repo_root, "bin", "hyprland-workstation-launcher")
   local source_quickshell = paths.join(repo_root, "quickshell", "gendbyte-project-launcher")
   local source_backend = paths.join(repo_root, "project-launcher.lua")
+  local source_overview_launcher = paths.join(repo_root, "bin", "hyprland-workspace-overview")
+  local source_overview_quickshell = paths.join(repo_root, "quickshell", "gendbyte-workspace-overview")
   local hud_source = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
   local hud_manifest = paths.join(hud_source, "manifest.json")
   local hud_panel = paths.join(hud_source, "Panel.qml")
@@ -105,11 +108,19 @@ function M.verify(options)
     paths.join(repo_root, "hypr", "workstation", "mouse_state.lua"),
     paths.join(repo_root, "hypr", "workstation", "hud.lua"),
     paths.join(repo_root, "hypr", "workstation", "project_launcher.lua"),
+    paths.join(repo_root, "hypr", "workstation", "workspace_overview.lua"),
     source_launcher,
     source_quickshell,
     paths.join(source_quickshell, "shell.qml"),
     paths.join(source_quickshell, "ProjectLauncher.qml"),
     source_backend,
+    source_overview_launcher,
+    source_overview_quickshell,
+    paths.join(source_overview_quickshell, "shell.qml"),
+    paths.join(source_overview_quickshell, "Overview.qml"),
+    paths.join(source_overview_quickshell, "components", "WindowPreview.qml"),
+    paths.join(source_overview_quickshell, "components", "WorkspaceStrip.qml"),
+    paths.join(repo_root, "lua", "workstation", "overview_model.lua"),
     paths.join(repo_root, "lua", "workstation", "telemetry.lua"),
     paths.join(repo_root, "lua", "workstation", "telemetry_collector.lua"),
     paths.join(repo_root, "telemetry-collector.lua"),
@@ -122,14 +133,14 @@ function M.verify(options)
     add("file: " .. path:sub(#repo_root + 2), command.exists(path), path)
   end
 
-  if launcher_expected then
+  if launcher_expected or overview_expected then
     add(
       "Quickshell",
       runtime.command_exists("qs"),
-      "qs must be installed for the Project Launcher"
+      "qs must be installed for managed workstation UI"
     )
   else
-    add("Quickshell", true, "Project Launcher is not installed", true)
+    add("Quickshell", true, "managed Quickshell UI is not installed", true)
   end
 
   -- Plugin source files remain part of the repository and are checked even on
@@ -175,6 +186,18 @@ function M.verify(options)
       "quickshell",
       "gendbyte-project-launcher"
     )
+    local target_overview_launcher = paths.join(
+      home,
+      ".local",
+      "bin",
+      "hyprland-workspace-overview"
+    )
+    local target_overview_quickshell = paths.join(
+      home,
+      ".config",
+      "quickshell",
+      "gendbyte-workspace-overview"
+    )
     local target_hud = paths.join(
       home,
       ".config",
@@ -219,6 +242,32 @@ function M.verify(options)
         "Project Launcher Quickshell config link",
         true,
         "Project Launcher is not installed",
+        true
+      )
+    end
+
+    if overview_expected then
+      add(
+        "Workspace Overview wrapper link",
+        target_is(target_overview_launcher, source_overview_launcher),
+        target_overview_launcher
+      )
+      add(
+        "Workspace Overview Quickshell config link",
+        target_is(target_overview_quickshell, source_overview_quickshell),
+        target_overview_quickshell
+      )
+    else
+      add(
+        "Workspace Overview wrapper link",
+        true,
+        "Workspace Overview is not installed",
+        true
+      )
+      add(
+        "Workspace Overview Quickshell config link",
+        true,
+        "Workspace Overview is not installed",
         true
       )
     end
@@ -276,6 +325,16 @@ function M.verify(options)
     )
     add(
       "Project Launcher Quickshell config link",
+      false,
+      "cannot validate without install state"
+    )
+    add(
+      "Workspace Overview wrapper link",
+      false,
+      "cannot validate without install state"
+    )
+    add(
+      "Workspace Overview Quickshell config link",
       false,
       "cannot validate without install state"
     )
