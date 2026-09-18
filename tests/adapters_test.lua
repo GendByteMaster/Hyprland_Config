@@ -140,6 +140,25 @@ test("adapter capabilities reflect resolved tools", function()
   testlib.eq(caps.clipboard, true)
 end)
 
+test("adapter capabilities include project command availability", function()
+  local generic = require("workstation.adapters.generic")
+  local adapter = generic.detect({ apps = { terminal = "auto" } }, runtime({
+    git = true,
+    cargo = true,
+    pnpm = true,
+    docker = true,
+    pytest = true,
+  }))
+
+  local caps = adapter.capabilities()
+  testlib.eq(caps.commands.git, true)
+  testlib.eq(caps.commands.cargo, true)
+  testlib.eq(caps.commands.pnpm, true)
+  testlib.eq(caps.commands.docker, true)
+  testlib.eq(caps.commands.pytest, true)
+  testlib.eq(caps.commands.npm, false)
+end)
+
 test("omarchy adapter is selected only when omarchy exists", function()
   local omarchy = require("workstation.adapters.omarchy")
 
