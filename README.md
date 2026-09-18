@@ -81,20 +81,14 @@ This feature is optional in v0.3. A plain Hyprland installation does not create 
 Press:
 
 ```text
-Super + Alt + P
+Super + F8
 ```
 
 to toggle a centered floating Quickshell Project Launcher.
 
 `Super + H` is intentionally left free.
 
-When running under **Try Omarchy for Windows**, Windows may intercept some Win/Super chords before Hyprland receives them. The launcher therefore also binds:
-
-```text
-Ctrl + Alt + R
-```
-
-as a Try-Omarchy-only fallback. The preferred fix for `Super + Alt + P` itself is to focus the Try Omarchy window and press `Ctrl + Alt + G` to grab raw keyboard input; press it again to release the grab.
+When running under **Try Omarchy for Windows**, the Windows host may intercept some Super/Win shortcuts before Hyprland receives them. If `Super + F8` does not reach the guest, focus the Try Omarchy window and press `Ctrl + Alt + G` to grab raw keyboard input; press it again to release the grab.
 
 The launcher is keyboard-first and uses the approved two-pane layout:
 
