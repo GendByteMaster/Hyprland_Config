@@ -43,9 +43,9 @@ local function fake_repo(root)
   write(paths.join(root, "verify.lua"), "return true\n")
 end
 
-local function fake_omarchy_runtime()
+local function fake_omarchy_runtime(available)
   return {
-    available = function() return true end,
+    available = function() return available ~= false end,
     enable_plugin = function() return true end,
     disable_plugin = function() return true end,
   }
@@ -181,6 +181,104 @@ t.test("verifier reports missing Lua runtime", function()
   local result = verifier.verify({ home = home, repo_root = repo, runtime = runtime })
   t.eq(result.ok, false)
   t.eq(check(result, "luac5.1").ok, false)
+
+  command.remove_tree(root)
+end)
+
+t.test("generic verification passes without Omarchy and validates launcher", function()
+  local root = temp_dir("verify-generic")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+
+  local install_runtime = fake_runtime()
+  installer.install({
+    home = home,
+    repo_root = repo,
+    timestamp = "backup",
+    runtime = install_runtime,
+    omarchy_runtime = fake_omarchy_runtime(false),
+  })
+
+  local plugin_calls = 0
+  local runtime = fake_runtime()
+  runtime.command_exists = function(name)
+    return name ~= "omarchy" and name ~= "omarchy-shell"
+  end
+  runtime.plugin_validate = function()
+    plugin_calls = plugin_calls + 1
+    return true
+  end
+
+  local result = verifier.verify({ home = home, repo_root = repo, runtime = runtime })
+  t.eq(result.ok, true)
+  t.eq(check(result, "Quickshell").ok, true)
+  t.eq(check(result, "Project Launcher wrapper link").ok, true)
+  t.eq(check(result, "Project Launcher Quickshell config link").ok, true)
+  t.eq(check(result, "Omarchy CLI").ok, true)
+  t.eq(check(result, "Omarchy CLI").skipped, true)
+  t.eq(check(result, "Omarchy plugin validation").ok, true)
+  t.eq(check(result, "Omarchy plugin validation").skipped, true)
+  t.eq(plugin_calls, 0)
+
+  command.remove_tree(root)
+end)
+
+t.test("verifier fails installed launcher when qs disappears", function()
+  local root = temp_dir("verify-no-qs")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+
+  installer.install({
+    home = home,
+    repo_root = repo,
+    timestamp = "backup",
+    runtime = fake_runtime(),
+    omarchy_runtime = fake_omarchy_runtime(false),
+  })
+
+  local runtime = fake_runtime()
+  runtime.command_exists = function(name)
+    if name == "qs" then
+      return false
+    end
+    return name ~= "omarchy" and name ~= "omarchy-shell"
+  end
+
+  local result = verifier.verify({ home = home, repo_root = repo, runtime = runtime })
+  t.eq(result.ok, false)
+  t.eq(check(result, "Quickshell").ok, false)
+
+  command.remove_tree(root)
+end)
+
+t.test("verifier detects replaced launcher target", function()
+  local root = temp_dir("verify-launcher-replaced")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+
+  installer.install({
+    home = home,
+    repo_root = repo,
+    timestamp = "backup",
+    runtime = fake_runtime(),
+    omarchy_runtime = fake_omarchy_runtime(false),
+  })
+
+  local launcher = paths.join(home, ".local", "bin", "hyprland-workstation-launcher")
+  assert(command.remove(launcher))
+  write(launcher, "#!/bin/sh\necho replacement\n")
+
+  local runtime = fake_runtime()
+  runtime.command_exists = function(name)
+    return name ~= "omarchy" and name ~= "omarchy-shell"
+  end
+
+  local result = verifier.verify({ home = home, repo_root = repo, runtime = runtime })
+  t.eq(result.ok, false)
+  t.eq(check(result, "Project Launcher wrapper link").ok, false)
 
   command.remove_tree(root)
 end)
