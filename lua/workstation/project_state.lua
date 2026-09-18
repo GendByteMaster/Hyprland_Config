@@ -8,6 +8,7 @@ local function empty_state()
   return {
     favorites = {},
     recent = {},
+    roots = {},
   }
 end
 
@@ -74,6 +75,29 @@ local function valid_favorites(value)
   return true
 end
 
+local function valid_roots(value)
+  if value == nil then
+    return true
+  end
+  if type(value) ~= "table" then
+    return false
+  end
+
+  local count = 0
+  local max = 0
+  for key, item in pairs(value) do
+    if type(key) ~= "number" or key < 1 or key % 1 ~= 0
+      or type(item) ~= "string" or item == "" then
+      return false
+    end
+    count = count + 1
+    if key > max then
+      max = key
+    end
+  end
+  return count == max
+end
+
 local function valid_recent(value)
   if type(value) ~= "table" then
     return false
@@ -120,7 +144,8 @@ function M.load(options)
   if type(decoded) ~= "table"
     or decoded.version ~= 1
     or not valid_favorites(decoded.favorites)
-    or not valid_recent(decoded.recent) then
+    or not valid_recent(decoded.recent)
+    or not valid_roots(decoded.roots) then
     return empty_state(), "invalid project launcher state shape"
   end
 
@@ -139,6 +164,9 @@ function M.load(options)
       used_at = item.used_at,
     }
   end
+  for index, root in ipairs(decoded.roots or {}) do
+    state.roots[index] = root
+  end
   return state, nil
 end
 
@@ -152,6 +180,21 @@ function M.toggle_favorite(state, project_id)
   end
 
   state.favorites[project_id] = true
+  return true
+end
+
+function M.add_root(state, root)
+  assert(type(state) == "table", "state is required")
+  assert(type(root) == "string" and root ~= "", "root is required")
+
+  state.roots = state.roots or {}
+  for _, existing in ipairs(state.roots) do
+    if existing == root then
+      return false
+    end
+  end
+
+  state.roots[#state.roots + 1] = root
   return true
 end
 
@@ -193,10 +236,16 @@ function M.save(state, options)
     }
   end
 
+  local roots = json.array({})
+  for index, root in ipairs(state.roots or {}) do
+    roots[index] = root
+  end
+
   local payload = json.encode({
     version = 1,
     favorites = state.favorites or {},
     recent = recent,
+    roots = roots,
   })
 
   local ok, err = runtime.write_atomic(path, payload)
