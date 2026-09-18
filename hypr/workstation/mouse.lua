@@ -29,21 +29,6 @@ local function bind_aliases(bind_fn, keys, dispatcher, options)
   end
 end
 
-local function ensure_kb_option(current, required)
-  if type(current) ~= "string" or current == "" then
-    return required
-  end
-
-  for option in current:gmatch("[^,]+") do
-    local normalized = option:match("^%s*(.-)%s*$")
-    if normalized == required then
-      return current
-    end
-  end
-
-  return current .. "," .. required
-end
-
 local function rebind_compat(hl, o, keys, description, dispatcher, options)
   if type(o.rebind) == "function" then
     return o.rebind(keys, description, dispatcher, options)
@@ -79,22 +64,11 @@ function M.register(hl, o, options)
   local held_key = nil
   local live_timers = {}
   local mouse_bind_handles = {}
-
-  local current_kb_options = ""
-  if type(hl.get_config) == "function" then
-    local ok, value = pcall(hl.get_config, "input.kb_options")
-    if ok and type(value) == "string" then
-      current_kb_options = value
-    end
-  end
+  local numeric_bind_handles = {}
 
   hl.config({
     input = {
       numlock_by_default = true,
-      -- Mouse Mode owns Num Lock as a mode switch. Force stable numeric keypad
-      -- keysyms so Num Lock ON produces digits instead of KP_Left/KP_Up/etc.
-      -- Preserve any existing XKB options configured by Omarchy or the user.
-      kb_options = ensure_kb_option(current_kb_options, "numpad:mac"),
     },
     cursor = {
       -- Omarchy hides the cursor after keyboard input by default. Mouse Mode
@@ -114,6 +88,22 @@ function M.register(hl, o, options)
 
   local function set_mouse_bindings_enabled(enabled)
     for _, handle in ipairs(mouse_bind_handles) do
+      if handle and type(handle.set_enabled) == "function" then
+        handle:set_enabled(enabled)
+      end
+    end
+  end
+
+  local function register_numeric_bind(key, dispatcher, bind_options)
+    local handle = hl.bind(key, dispatcher, bind_options)
+    if handle then
+      table.insert(numeric_bind_handles, handle)
+    end
+    return handle
+  end
+
+  local function set_numeric_bindings_enabled(enabled)
+    for _, handle in ipairs(numeric_bind_handles) do
       if handle and type(handle.set_enabled) == "function" then
         handle:set_enabled(enabled)
       end
@@ -227,6 +217,7 @@ function M.register(hl, o, options)
   end
 
   local function enter()
+    set_numeric_bindings_enabled(false)
     set_mouse_bindings_enabled(true)
     cleanup()
     show_hud("mouse")
@@ -235,6 +226,7 @@ function M.register(hl, o, options)
   local function exit()
     cleanup()
     set_mouse_bindings_enabled(false)
+    set_numeric_bindings_enabled(true)
     show_hud("numpad")
   end
 
@@ -325,6 +317,34 @@ function M.register(hl, o, options)
     non_consuming = true,
   })
 
+  -- Some Hyprland/XKB combinations keep emitting the navigation keysyms
+  -- (KP_End/KP_Down/...) even when Num Lock is visually on. In normal NumPad
+  -- mode, translate only those navigation aliases to ordinary digit keys.
+  -- If the keyboard already emits KP_1..KP_9, those events pass through
+  -- untouched because there is no proxy bind for them.
+  local numeric_aliases = {
+    { key = "KP_End", output = "1" },
+    { key = "KP_Down", output = "2" },
+    { key = "KP_Next", output = "3" },
+    { key = "KP_Left", output = "4" },
+    { key = "KP_Begin", output = "5" },
+    { key = "KP_Right", output = "6" },
+    { key = "KP_Home", output = "7" },
+    { key = "KP_Up", output = "8" },
+    { key = "KP_Prior", output = "9" },
+    { key = "KP_Insert", output = "0" },
+    { key = "KP_Delete", output = "period" },
+  }
+
+  for _, mapping in ipairs(numeric_aliases) do
+    local current = mapping
+    register_numeric_bind(current.key, function()
+      send_button(current.output, "down")
+      send_button(current.output, "up")
+      return { ok = true }
+    end, { repeating = true })
+  end
+
   -- Mouse Mode stays in the global submap, but its NumPad binds are enabled
   -- only while Num Lock is off. With Num Lock on, Hyprland sees no active
   -- custom NumPad bind and the focused application receives normal NumPad input.
@@ -359,6 +379,7 @@ function M.register(hl, o, options)
   bind_aliases(register_mouse_bind, { "KP_Decimal", "KP_Delete" }, mouse_only(release_held), { auto_consuming = true })
 
   set_mouse_bindings_enabled(not numlock_on)
+  set_numeric_bindings_enabled(numlock_on)
 
   hl.on("config.reloaded", function()
     cleanup()
