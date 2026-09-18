@@ -137,7 +137,7 @@ end)
 
 t.test("overview model rejects malformed clients without breaking visible list", function()
   local visible = model.visible_clients({
-    { address = "bad", workspace = { id = 1 } },
+    { address = "0xzz", workspace = { id = 1 } },
     client("0x7", 1, 0, 0, 100, 100),
     { address = "0x8" },
   })
