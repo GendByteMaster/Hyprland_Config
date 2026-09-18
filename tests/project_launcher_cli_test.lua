@@ -12,7 +12,7 @@ local function fake_context(options)
     cache_projects = options.cache_projects,
     discovered_projects = options.discovered_projects or {},
     warnings = options.warnings or {},
-    state = options.state or { favorites = {}, recent = {} },
+    state = options.state or { favorites = {}, recent = {}, roots = {} },
     action_list = options.action_list or {},
     execute_result = options.execute_result or { ok = true },
     now_value = options.now_value or 100,
@@ -56,6 +56,17 @@ local function fake_context(options)
     ctx.state_saves = ctx.state_saves + 1
     ctx.state = state
     return true
+  end
+
+  function ctx.add_root(path)
+    ctx.state.roots = ctx.state.roots or {}
+    for _, root in ipairs(ctx.state.roots) do
+      if root == path then
+        return path
+      end
+    end
+    ctx.state.roots[#ctx.state.roots + 1] = path
+    return path
   end
 
   function ctx.rank(projects, query, state)
@@ -199,6 +210,23 @@ test("actions rejects unknown project", function()
   local result = cli.run({ "actions", "/repo/missing" }, ctx)
   testlib.eq(result.ok, false)
   testlib.truthy(result.error:match("project"))
+end)
+
+test("add-root persists selection and refreshes discovery", function()
+  local cli = require("workstation.project_launcher_cli")
+  local ctx = fake_context({
+    discovered_projects = {
+      project("/chosen/NumFlow", "NumFlow"),
+    },
+  })
+
+  local result = cli.run({ "add-root", "/chosen" }, ctx)
+  testlib.eq(result.ok, true)
+  testlib.eq(result.data.root, "/chosen")
+  testlib.eq(result.data.roots[1], "/chosen")
+  testlib.eq(result.data.projects[1].name, "NumFlow")
+  testlib.eq(ctx.discovery_calls, 1)
+  testlib.eq(ctx.cache_writes, 1)
 end)
 
 test("favorite toggles and persists state", function()
