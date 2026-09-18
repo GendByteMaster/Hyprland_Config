@@ -101,10 +101,17 @@ t.test("Num Lock mode disables every Mouse Mode NumPad bind", function()
 
   local numlock_bind
   local mouse_binds = {}
+  local mouse_only_keys = {
+    KP_8 = true, KP_2 = true, KP_4 = true, KP_6 = true,
+    KP_7 = true, KP_9 = true, KP_1 = true, KP_3 = true,
+    KP_5 = true, KP_0 = true, KP_Decimal = true,
+    KP_Divide = true, KP_Multiply = true, KP_Subtract = true, KP_Add = true,
+  }
+
   for _, bind in ipairs(calls.binds) do
     if bind.key == "Num_Lock" then
       numlock_bind = bind
-    else
+    elseif mouse_only_keys[bind.key] then
       table.insert(mouse_binds, bind)
     end
   end
