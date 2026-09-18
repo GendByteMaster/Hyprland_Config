@@ -8,4 +8,4 @@ if preserved then
 end
 
 require("hypr.workstation.compat").apply(hl)
-require("hypr.workstation.mouse").register(hl, o)
+require("hypr.workstation.mouse").register(hl, o)\nrequire("hypr.workstation.project_launcher").register(hl, o)
