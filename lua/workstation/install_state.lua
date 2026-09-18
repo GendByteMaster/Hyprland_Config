@@ -37,6 +37,9 @@ function M.write(path, state)
     fields[#fields + 1] = { "omarchy_hud", bool_field(state.omarchy_hud) }
     fields[#fields + 1] = { "omarchy_system_monitor", bool_field(state.omarchy_system_monitor) }
   end
+  if version >= 3 then
+    fields[#fields + 1] = { "workspace_overview", bool_field(state.workspace_overview) }
+  end
 
   for _, item in ipairs(fields) do
     file:write(item[1], "=", encode(item[2]), "\n")
@@ -65,7 +68,7 @@ function M.read(path)
   end
 
   state.version = tonumber(state.version or "1")
-  if state.version == nil or state.version < 1 or state.version > 2 then
+  if state.version == nil or state.version < 1 or state.version > 3 then
     return nil, "unsupported install state version"
   end
 
@@ -76,6 +79,7 @@ function M.read(path)
     state.launcher = state.launcher == "1"
     state.omarchy_hud = state.omarchy_hud == "1"
     state.omarchy_system_monitor = state.omarchy_system_monitor == "1"
+    state.workspace_overview = state.version >= 3 and state.workspace_overview == "1" or false
   else
     -- v1 predates component ownership flags. Keep them unknown so the
     -- installer can derive ownership from repository-owned targets before
@@ -83,6 +87,7 @@ function M.read(path)
     state.launcher = nil
     state.omarchy_hud = nil
     state.omarchy_system_monitor = nil
+    state.workspace_overview = nil
   end
 
   return state
