@@ -30,10 +30,10 @@ function M.register(hl, _o, options)
 
   local command = launcher_path(options)
 
-  register_binding(hl, "SUPER + ALT + R", command, "Project Launcher")
+  register_binding(hl, "SUPER + ALT + P", command, "Project Launcher")
 
   -- Try Omarchy for Windows can lose Win/Super chords to the Windows host.
-  -- Keep the intended Super+Alt+R binding, but expose a no-Super fallback only
+  -- Keep the intended Super+Alt+P binding, but expose a no-Super fallback only
   -- inside the QEMU guest so the real Hyprland keymap is unchanged.
   if compat.is_try_omarchy(options) then
     register_binding(

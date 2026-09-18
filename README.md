@@ -81,7 +81,7 @@ This feature is optional in v0.3. A plain Hyprland installation does not create 
 Press:
 
 ```text
-Super + Alt + R
+Super + Alt + P
 ```
 
 to toggle a centered floating Quickshell Project Launcher.
@@ -94,7 +94,7 @@ When running under **Try Omarchy for Windows**, Windows may intercept some Win/S
 Ctrl + Alt + R
 ```
 
-as a Try-Omarchy-only fallback. The preferred fix for `Super + Alt + R` itself is to focus the Try Omarchy window and press `Ctrl + Alt + G` to grab raw keyboard input; press it again to release the grab.
+as a Try-Omarchy-only fallback. The preferred fix for `Super + Alt + P` itself is to focus the Try Omarchy window and press `Ctrl + Alt + G` to grab raw keyboard input; press it again to release the grab.
 
 The launcher is keyboard-first and uses the approved two-pane layout:
 
