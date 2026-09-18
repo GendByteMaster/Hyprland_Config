@@ -28,6 +28,11 @@ end
 local function fake_repo(root)
   write(paths.join(root, "hypr", "bindings.lua"), "-- managed bindings\n")
   write(paths.join(root, "hypr", "workstation", "mouse.lua"), "return {}\n")
+  write(paths.join(root, "hypr", "workstation", "project_launcher.lua"), "return {}\n")
+  write(paths.join(root, "bin", "hyprland-workstation-launcher"), "#!/usr/bin/env bash\nexit 0\n")
+  write(paths.join(root, "quickshell", "gendbyte-project-launcher", "shell.qml"), "import Quickshell\nShellRoot {}\n")
+  write(paths.join(root, "quickshell", "gendbyte-project-launcher", "ProjectLauncher.qml"), "import Quickshell\nFloatingWindow {}\n")
+  write(paths.join(root, "project-launcher.lua"), "return true\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json"), "{}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "Panel.qml"), "import QtQuick\nItem {}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "manifest.json"), "{}\n")
@@ -54,6 +59,11 @@ local function fake_runtime(calls, options)
 end
 
 local function install(options)
+  options.runtime = {
+    command_exists = function()
+      return true
+    end,
+  }
   options.omarchy_runtime = fake_runtime()
   return installer.install(options)
 end
