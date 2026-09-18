@@ -58,6 +58,17 @@ local function fake_context(options)
     return true
   end
 
+  function ctx.browse_directory(path)
+    local current = path or "/home/test"
+    return {
+      path = current,
+      parent = current == "/" and nil or "/",
+      entries = {
+        { name = "Projects", path = current .. "/Projects" },
+      },
+    }
+  end
+
   function ctx.add_root(path)
     ctx.state.roots = ctx.state.roots or {}
     for _, root in ipairs(ctx.state.roots) do
@@ -210,6 +221,17 @@ test("actions rejects unknown project", function()
   local result = cli.run({ "actions", "/repo/missing" }, ctx)
   testlib.eq(result.ok, false)
   testlib.truthy(result.error:match("project"))
+end)
+
+test("browse returns directories for built-in picker", function()
+  local cli = require("workstation.project_launcher_cli")
+  local result = cli.run({ "browse", "/home/test" }, fake_context())
+
+  testlib.eq(result.ok, true)
+  testlib.eq(result.data.path, "/home/test")
+  testlib.eq(result.data.parent, "/")
+  testlib.eq(result.data.entries[1].name, "Projects")
+  testlib.eq(result.data.entries[1].path, "/home/test/Projects")
 end)
 
 test("add-root persists selection and refreshes discovery", function()
