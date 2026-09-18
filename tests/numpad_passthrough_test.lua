@@ -19,12 +19,20 @@ local function fake_store(initial)
   return store
 end
 
-local function fake_api()
+local function fake_api(options)
+  options = options or {}
   local calls = { binds = {}, events = {}, configs = {} }
   local hl = { dsp = {} }
 
   function hl.config(config)
     table.insert(calls.configs, config)
+  end
+
+  function hl.get_config(key)
+    if key == "input.kb_options" then
+      return options.kb_options or ""
+    end
+    return nil
   end
 
   function hl.bind(key, dispatcher, options)
@@ -105,4 +113,16 @@ t.test("Num Lock mode disables every Mouse Mode NumPad bind", function()
   for _, bind in ipairs(mouse_binds) do
     t.eq(bind.enabled, false)
   end
+end)
+
+
+t.test("Mouse Mode forces stable numeric keypad mapping without dropping keyboard options", function()
+  local hl, o, calls = fake_api({ kb_options = "compose:ralt" })
+  mouse.register(hl, o, {
+    numlock_store = fake_store(true),
+    hud = fake_hud(),
+    sound = fake_sound(),
+  })
+
+  t.eq(calls.configs[1].input.kb_options, "compose:ralt,numpad:mac")
 end)
