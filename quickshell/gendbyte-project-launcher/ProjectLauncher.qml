@@ -341,6 +341,7 @@ FloatingWindow {
 
             RowLayout {
               Layout.fillWidth: true
+              Layout.preferredHeight: 30
               spacing: 8
 
               Text {
@@ -355,19 +356,41 @@ FloatingWindow {
                 Layout.fillWidth: true
               }
 
-              Button {
-                text: "+ Folder"
-                flat: true
-                focusPolicy: Qt.NoFocus
-                onClicked: root.chooseProjectFolder()
+              Rectangle {
+                id: addFolderButton
+                Layout.preferredWidth: 104
+                Layout.preferredHeight: 30
+                radius: 8
+                color: addFolderMouse.containsMouse ? "#25201c" : "#1b1b1b"
+                border.width: 1
+                border.color: addFolderMouse.containsMouse ? "#ff8a3d" : "#383838"
 
-                contentItem: Text {
-                  text: parent.text
-                  color: "#c8c8c8"
-                  font.family: "monospace"
-                  font.pixelSize: 10
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
+                Row {
+                  anchors.centerIn: parent
+                  spacing: 7
+
+                  Text {
+                    text: "+"
+                    color: "#ff8a3d"
+                    font.family: "monospace"
+                    font.pixelSize: 15
+                    font.bold: true
+                  }
+
+                  Text {
+                    text: "Add folder"
+                    color: "#d6d6d6"
+                    font.family: "monospace"
+                    font.pixelSize: 10
+                  }
+                }
+
+                MouseArea {
+                  id: addFolderMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.chooseProjectFolder()
                 }
               }
             }
@@ -379,17 +402,125 @@ FloatingWindow {
               Components.ProjectList {
                 id: projectList
                 anchors.fill: parent
+                visible: root.projects.length > 0
                 projectsModel: root.projects
                 currentIndex: root.selectedProjectIndex
                 onSelected: function(index) { root.selectProject(index) }
               }
 
-              Button {
+              Rectangle {
+                id: emptyProjectsState
                 anchors.centerIn: parent
+                width: Math.min(parent.width - 28, 290)
+                height: 190
                 visible: root.projects.length === 0
-                text: "Choose project folder…"
-                focusPolicy: Qt.NoFocus
-                onClicked: root.chooseProjectFolder()
+                radius: 14
+                color: "#181818"
+                border.width: 1
+                border.color: "#303030"
+
+                Column {
+                  anchors.centerIn: parent
+                  width: parent.width - 36
+                  spacing: 10
+
+                  Item {
+                    width: parent.width
+                    height: 42
+
+                    Item {
+                      anchors.centerIn: parent
+                      width: 42
+                      height: 34
+
+                      Rectangle {
+                        x: 5
+                        y: 3
+                        width: 18
+                        height: 9
+                        radius: 3
+                        color: "#30241c"
+                        border.width: 1
+                        border.color: "#ff8a3d"
+                      }
+
+                      Rectangle {
+                        x: 2
+                        y: 9
+                        width: 38
+                        height: 24
+                        radius: 6
+                        color: "#241d18"
+                        border.width: 1
+                        border.color: "#ff8a3d"
+                      }
+                    }
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: "No project folders yet"
+                    color: "#eeeeee"
+                    horizontalAlignment: Text.AlignHCenter
+                    font.family: "monospace"
+                    font.pixelSize: 13
+                    font.bold: true
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: "Choose a folder that contains your Git projects.\nYou can add more folders later."
+                    color: "#777777"
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    font.family: "monospace"
+                    font.pixelSize: 9
+                    lineHeight: 1.2
+                  }
+
+                  Item {
+                    width: parent.width
+                    height: 42
+
+                    Rectangle {
+                      id: selectFolderButton
+                      anchors.centerIn: parent
+                      width: 154
+                      height: 34
+                      radius: 9
+                      color: selectFolderMouse.containsMouse ? "#ff9857" : "#ff8a3d"
+
+                      Row {
+                        anchors.centerIn: parent
+                        spacing: 7
+
+                        Text {
+                          text: "+"
+                          color: "#151515"
+                          font.family: "monospace"
+                          font.pixelSize: 14
+                          font.bold: true
+                        }
+
+                        Text {
+                          text: "Select folder"
+                          color: "#151515"
+                          font.family: "monospace"
+                          font.pixelSize: 11
+                          font.bold: true
+                        }
+                      }
+
+                      MouseArea {
+                        id: selectFolderMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.chooseProjectFolder()
+                      }
+                    }
+                  }
+                }
               }
             }
 
@@ -445,7 +576,7 @@ FloatingWindow {
 
       Text {
         Layout.fillWidth: true
-        text: "↑↓ navigate   Tab/→ actions   Enter run   + Folder add root   Esc close"
+        text: "↑↓ navigate   Tab/→ actions   Enter run   Esc close"
         color: "#686868"
         horizontalAlignment: Text.AlignRight
         font.family: "monospace"
