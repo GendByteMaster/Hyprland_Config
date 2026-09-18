@@ -9,6 +9,7 @@ package.path = script_dir .. "/lua/?.lua;" .. script_dir .. "/lua/?/init.lua;" .
 local action_executor = require("workstation.action_executor")
 local command = require("workstation.command")
 local generic_adapter = require("workstation.adapters.generic")
+local folder_browser = require("workstation.folder_browser")
 local launcher_cli = require("workstation.project_launcher_cli")
 local omarchy_adapter = require("workstation.adapters.omarchy")
 local project_actions = require("workstation.project_actions")
@@ -87,16 +88,14 @@ function context.save_state(state)
   return project_state.save(state, { home = home })
 end
 
-function context.add_root(path)
-  local local_path = project_model.local_path(path)
-  if not local_path then
-    return nil, "project root path is invalid"
-  end
+function context.browse_directory(path)
+  return folder_browser.list(path, { home = home })
+end
 
-  local canonical = command.realpath(local_path)
-  if not canonical or canonical == ""
-    or not command.run("test -d -- " .. command.quote(canonical)) then
-    return nil, "selected project root is not a directory: " .. tostring(local_path)
+function context.add_root(path)
+  local canonical, canonical_error = folder_browser.canonical_directory(path, { home = home })
+  if not canonical then
+    return nil, canonical_error or "selected project root is not available"
   end
 
   local state, warning = project_state.load({ home = home })
