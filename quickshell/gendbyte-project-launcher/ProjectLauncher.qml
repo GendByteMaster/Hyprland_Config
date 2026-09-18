@@ -393,16 +393,6 @@ FloatingWindow {
               }
             }
 
-            /*
-            Components.ProjectList {
-              id: projectList
-              Layout.fillWidth: true
-              Layout.fillHeight: true
-              projectsModel: root.projects
-              currentIndex: root.selectedProjectIndex
-              onSelected: function(index) { root.selectProject(index) }
-            }
-            */
           }
         }
 
