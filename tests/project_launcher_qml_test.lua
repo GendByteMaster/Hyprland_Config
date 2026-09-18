@@ -56,8 +56,11 @@ t.test("project launcher UI is a hidden floating window with backend processes",
   assert_contains(qml, "import QtQuick.Dialogs")
   assert_contains(qml, "FolderDialog {")
   assert_contains(qml, 'root.backendArgs(["add-root", path])')
-  assert_contains(qml, 'text: "+ Folder"')
-  assert_contains(qml, 'text: "Choose project folder…"')
+  assert_contains(qml, 'text: "Add folder"')
+  assert_contains(qml, 'text: "No project folders yet"')
+  assert_contains(qml, 'text: "Select folder"')
+  assert_contains(qml, 'color: "#ff8a3d"')
+  assert_not_contains(qml, 'text: "Choose project folder…"')
 end)
 
 t.test("project launcher QML keeps project detection in Lua", function()
