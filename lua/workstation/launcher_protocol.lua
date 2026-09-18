@@ -4,6 +4,10 @@ local M = {}
 
 M.VERSION = 1
 
+function M.list(values)
+  return json.array(values or {})
+end
+
 function M.success(data)
   return {
     version = M.VERSION,
