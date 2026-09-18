@@ -15,7 +15,10 @@ Item {
     : -1
 
   readonly property var visibleWindows: {
-    var values = Hyprland.toplevels ? Hyprland.toplevels.values : []
+    var focused = Hyprland.focusedWorkspace
+    var values = focused && focused.toplevels
+      ? focused.toplevels.values
+      : (Hyprland.toplevels ? Hyprland.toplevels.values : [])
     var result = []
 
     for (var i = 0; i < values.length; ++i) {
@@ -27,9 +30,11 @@ Item {
       if (address === "")
         continue
 
-      var workspace = toplevel.workspace
-      if (!workspace || Number(workspace.id) !== root.focusedWorkspaceId)
-        continue
+      if (!(focused && focused.toplevels)) {
+        var workspace = toplevel.workspace
+        if (!workspace || Number(workspace.id) !== root.focusedWorkspaceId)
+          continue
+      }
 
       result.push(toplevel)
     }
