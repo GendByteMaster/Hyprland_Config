@@ -135,6 +135,38 @@ local function actions(ctx, project_id)
   })
 end
 
+local function add_root(ctx, path)
+  if type(path) ~= "string" or path == "" then
+    return protocol.failure("usage: add-root <path>")
+  end
+  if type(ctx.add_root) ~= "function" then
+    return protocol.failure("project root selection is unavailable")
+  end
+
+  local root, add_error = ctx.add_root(path)
+  if not root then
+    return protocol.failure(add_error or "failed to add project root")
+  end
+
+  local warnings = {}
+  local projects, discovery_error = discover_projects(ctx, warnings)
+  if not projects then
+    return protocol.failure(discovery_error)
+  end
+
+  local state, state_error = load_state(ctx, warnings)
+  if not state then
+    return protocol.failure(state_error)
+  end
+
+  return protocol.success({
+    root = root,
+    roots = protocol.list(state.roots or {}),
+    projects = protocol.list(ctx.rank(projects, "", state)),
+    warnings = protocol.list(warnings),
+  })
+end
+
 local function toggle_favorite(ctx, project_id)
   local warnings = {}
   local projects, cache_error = cached_or_discover(ctx, warnings)
@@ -270,11 +302,14 @@ function M.run(args, ctx)
     end
     return toggle_favorite(ctx, args[2])
   end
+  if command == "add-root" then
+    return add_root(ctx, args[2])
+  end
   if command == "run" then
     return run_action(ctx, args)
   end
   if command == nil then
-    return protocol.failure("usage: refresh | query <text> | actions <project_id> | favorite <project_id> | run <project_id> <action_id> [--confirmed]")
+    return protocol.failure("usage: refresh | query <text> | actions <project_id> | favorite <project_id> | add-root <path> | run <project_id> <action_id> [--confirmed]")
   end
   return protocol.failure("unknown launcher command: " .. tostring(command))
 end
