@@ -97,11 +97,12 @@ local function ensure_unoccupied_or_owned(target, source, label)
 end
 
 local function state_changed(active, next_state)
-  if not active or active.version ~= 2 then
+  if not active or active.version ~= 3 then
     return true
   end
 
   return active.launcher ~= next_state.launcher
+    or active.workspace_overview ~= next_state.workspace_overview
     or active.omarchy_hud ~= next_state.omarchy_hud
     or active.omarchy_system_monitor ~= next_state.omarchy_system_monitor
 end
@@ -140,7 +141,7 @@ function M.install(options)
 
   assert_ok(
     type(runtime.command_exists) == "function" and runtime.command_exists("qs"),
-    "Quickshell (qs) is required for the Project Launcher"
+    "Quickshell (qs) is required for managed workstation UI"
   )
 
   local source_bindings = paths.join(repo_root, "hypr", "bindings.lua")
@@ -148,6 +149,8 @@ function M.install(options)
   local source_launcher = paths.join(repo_root, "bin", "hyprland-workstation-launcher")
   local source_quickshell = paths.join(repo_root, "quickshell", "gendbyte-project-launcher")
   local source_backend = paths.join(repo_root, "project-launcher.lua")
+  local source_overview_launcher = paths.join(repo_root, "bin", "hyprland-workspace-overview")
+  local source_overview_quickshell = paths.join(repo_root, "quickshell", "gendbyte-workspace-overview")
   local source_hud = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
   local source_system_monitor = paths.join(repo_root, "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
 
@@ -156,12 +159,16 @@ function M.install(options)
   assert_ok(command.exists(source_launcher), "Project Launcher wrapper is missing")
   assert_ok(command.exists(source_quickshell), "Project Launcher Quickshell config is missing")
   assert_ok(command.exists(source_backend), "Project Launcher backend is missing")
+  assert_ok(command.exists(source_overview_launcher), "Workspace Overview wrapper is missing")
+  assert_ok(command.exists(source_overview_quickshell), "Workspace Overview Quickshell config is missing")
 
   local config_dir = paths.join(home, ".config", "hypr")
   local target_bindings = paths.join(config_dir, "bindings.lua")
   local target_workstation = paths.join(config_dir, "workstation")
   local target_launcher = paths.join(home, ".local", "bin", "hyprland-workstation-launcher")
   local target_quickshell = paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")
+  local target_overview_launcher = paths.join(home, ".local", "bin", "hyprland-workspace-overview")
+  local target_overview_quickshell = paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")
   local omarchy_plugins_dir = paths.join(home, ".config", "omarchy", "plugins")
   local target_hud = paths.join(omarchy_plugins_dir, HUD_PLUGIN_ID)
   local target_system_monitor = paths.join(omarchy_plugins_dir, SYSTEM_MONITOR_PLUGIN_ID)
@@ -199,6 +206,16 @@ function M.install(options)
       target_quickshell,
       source_quickshell,
       "Project Launcher Quickshell config"
+    )
+    local overview_launcher_owned = ensure_unoccupied_or_owned(
+      target_overview_launcher,
+      source_overview_launcher,
+      "Workspace Overview wrapper"
+    )
+    local overview_quickshell_owned = ensure_unoccupied_or_owned(
+      target_overview_quickshell,
+      source_overview_quickshell,
+      "Workspace Overview Quickshell config"
     )
 
     local hud_owned = target_is(target_hud, source_hud)
@@ -247,6 +264,24 @@ function M.install(options)
         link_component(source_quickshell, target_quickshell, "Project Launcher Quickshell config", created)
         changed = true
       end
+      if not overview_launcher_owned then
+        link_component(
+          source_overview_launcher,
+          target_overview_launcher,
+          "Workspace Overview wrapper",
+          created
+        )
+        changed = true
+      end
+      if not overview_quickshell_owned then
+        link_component(
+          source_overview_quickshell,
+          target_overview_quickshell,
+          "Workspace Overview Quickshell config",
+          created
+        )
+        changed = true
+      end
 
       if omarchy_available then
         if not hud_owned then
@@ -280,16 +315,19 @@ function M.install(options)
 
       launcher_owned = target_is(target_launcher, source_launcher)
         and target_is(target_quickshell, source_quickshell)
+      local overview_owned = target_is(target_overview_launcher, source_overview_launcher)
+        and target_is(target_overview_quickshell, source_overview_quickshell)
       hud_owned = target_is(target_hud, source_hud)
       monitor_owned = target_is(target_system_monitor, source_system_monitor)
 
       local next_state = {
-        version = 2,
+        version = 3,
         repo_root = repo_root,
         backup_dir = active.backup_dir or "",
         preserved_bindings = active.preserved_bindings,
         preserved_workstation = active.preserved_workstation,
         launcher = launcher_owned,
+        workspace_overview = overview_owned,
         omarchy_hud = hud_owned,
         omarchy_system_monitor = monitor_owned,
       }
@@ -315,6 +353,8 @@ function M.install(options)
       backup_dir = active.backup_dir or "",
       components = {
         launcher = launcher_owned,
+        workspace_overview = target_is(target_overview_launcher, source_overview_launcher)
+          and target_is(target_overview_quickshell, source_overview_quickshell),
         omarchy_hud = hud_owned,
         omarchy_system_monitor = monitor_owned,
       },
@@ -330,6 +370,12 @@ function M.install(options)
   end
   if command.exists_or_symlink(target_quickshell) then
     error("Project Launcher Quickshell config path already exists")
+  end
+  if command.exists_or_symlink(target_overview_launcher) then
+    error("Workspace Overview wrapper path already exists")
+  end
+  if command.exists_or_symlink(target_overview_quickshell) then
+    error("Workspace Overview Quickshell config path already exists")
   end
   if command.exists_or_symlink(preserved_bindings_link) then
     error("preserved bindings marker exists without active installation state")
@@ -396,6 +442,18 @@ function M.install(options)
       "Project Launcher Quickshell config",
       created
     )
+    link_component(
+      source_overview_launcher,
+      target_overview_launcher,
+      "Workspace Overview wrapper",
+      created
+    )
+    link_component(
+      source_overview_quickshell,
+      target_overview_quickshell,
+      "Workspace Overview Quickshell config",
+      created
+    )
 
     if moved_bindings then
       assert_ok(
@@ -430,12 +488,13 @@ function M.install(options)
     end
 
     install_state.write(state_path, {
-      version = 2,
+      version = 3,
       repo_root = repo_root,
       backup_dir = (has_bindings or has_workstation) and backup_dir or "",
       preserved_bindings = moved_bindings,
       preserved_workstation = moved_workstation,
       launcher = true,
+      workspace_overview = true,
       omarchy_hud = hud_owned,
       omarchy_system_monitor = monitor_owned,
     })
@@ -466,6 +525,7 @@ function M.install(options)
     backup_dir = (has_bindings or has_workstation) and backup_dir or "",
     components = {
       launcher = true,
+      workspace_overview = true,
       omarchy_hud = hud_owned,
       omarchy_system_monitor = monitor_owned,
     },
