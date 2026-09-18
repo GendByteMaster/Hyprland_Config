@@ -20,7 +20,7 @@ local function default_runtime()
 
       local entries = {}
       for name in output:gmatch("([^%z]+)%z") do
-        if name ~= "" and name:sub(1, 1) ~= "." then
+        if name ~= "" then
           entries[#entries + 1] = name
         end
       end
@@ -69,7 +69,14 @@ function M.list(path, options)
     return nil, list_error or "failed to list folder"
   end
 
-  table.sort(names, function(left, right)
+  local visible_names = {}
+  for _, name in ipairs(visible_names) do
+    if type(name) == "string" and name ~= "" and name:sub(1, 1) ~= "." then
+      visible_names[#visible_names + 1] = name
+    end
+  end
+
+  table.sort(visible_names, function(left, right)
     local left_lower = left:lower()
     local right_lower = right:lower()
     if left_lower == right_lower then
