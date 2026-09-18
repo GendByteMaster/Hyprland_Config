@@ -29,6 +29,21 @@ local function bind_aliases(bind_fn, keys, dispatcher, options)
   end
 end
 
+local function ensure_kb_option(current, required)
+  if type(current) ~= "string" or current == "" then
+    return required
+  end
+
+  for option in current:gmatch("[^,]+") do
+    local normalized = option:match("^%s*(.-)%s*$")
+    if normalized == required then
+      return current
+    end
+  end
+
+  return current .. "," .. required
+end
+
 local function rebind_compat(hl, o, keys, description, dispatcher, options)
   if type(o.rebind) == "function" then
     return o.rebind(keys, description, dispatcher, options)
@@ -65,9 +80,21 @@ function M.register(hl, o, options)
   local live_timers = {}
   local mouse_bind_handles = {}
 
+  local current_kb_options = ""
+  if type(hl.get_config) == "function" then
+    local ok, value = pcall(hl.get_config, "input.kb_options")
+    if ok and type(value) == "string" then
+      current_kb_options = value
+    end
+  end
+
   hl.config({
     input = {
       numlock_by_default = true,
+      -- Mouse Mode owns Num Lock as a mode switch. Force stable numeric keypad
+      -- keysyms so Num Lock ON produces digits instead of KP_Left/KP_Up/etc.
+      -- Preserve any existing XKB options configured by Omarchy or the user.
+      kb_options = ensure_kb_option(current_kb_options, "numpad:mac"),
     },
     cursor = {
       -- Omarchy hides the cursor after keyboard input by default. Mouse Mode
