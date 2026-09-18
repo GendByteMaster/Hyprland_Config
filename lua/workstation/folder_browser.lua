@@ -70,7 +70,7 @@ function M.list(path, options)
   end
 
   local visible_names = {}
-  for _, name in ipairs(visible_names) do
+  for _, name in ipairs(names) do
     if type(name) == "string" and name ~= "" and name:sub(1, 1) ~= "." then
       visible_names[#visible_names + 1] = name
     end
@@ -86,7 +86,7 @@ function M.list(path, options)
   end)
 
   local entries = {}
-  for _, name in ipairs(names) do
+  for _, name in ipairs(visible_names) do
     entries[#entries + 1] = {
       name = name,
       path = paths.join(canonical, name),
