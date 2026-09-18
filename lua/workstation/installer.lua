@@ -5,6 +5,8 @@ local install_state = require("workstation.install_state")
 local M = {}
 
 local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
+local SYSTEM_MONITOR_PLUGIN_ID = "gendbyte.system-monitor"
+local SYSTEM_MONITOR_SECTION = "right"
 
 local function assert_ok(value, message)
   if not value then
@@ -36,23 +38,69 @@ local function choose_backup_dir(backups_root, timestamp)
   return base .. "-" .. index
 end
 
+local function default_omarchy_runtime()
+  return {
+    available = function()
+      return command.command_exists("omarchy") and command.command_exists("omarchy-shell")
+    end,
+    rescan_plugins = function()
+      return command.run("omarchy-shell shell rescanPlugins")
+    end,
+    wait_for_plugin = function(id)
+      local filter = "any(.[]; .id == $id)"
+      local poll = "attempt=0; while [ \"$attempt\" -lt 40 ]; do "
+        .. "if omarchy plugin list --json | jq -e --arg id " .. command.quote(id) .. " "
+        .. command.quote(filter) .. " >/dev/null 2>&1; then exit 0; fi; "
+        .. "attempt=$((attempt + 1)); sleep 0.05; done; exit 1"
+      return command.run(poll)
+    end,
+    enable_plugin = function(id, section)
+      return command.run(
+        "omarchy plugin enable " .. command.quote(id)
+          .. " --section " .. command.quote(section)
+      )
+    end,
+    disable_plugin = function(id)
+      return command.run("omarchy plugin disable " .. command.quote(id))
+    end,
+  }
+end
+
+local function rescan_plugins(runtime)
+  if type(runtime.rescan_plugins) ~= "function" then
+    return true
+  end
+  return runtime.rescan_plugins()
+end
+
+local function wait_for_plugin(runtime, id)
+  if type(runtime.wait_for_plugin) ~= "function" then
+    return true
+  end
+  return runtime.wait_for_plugin(id)
+end
+
 function M.install(options)
   local home = assert(options.home, "home is required")
   local repo_root = assert_ok(command.realpath(assert(options.repo_root, "repo_root is required")), "repository root does not exist")
   local timestamp = options.timestamp or os.date("%Y%m%d-%H%M%S")
+  local omarchy_runtime = options.omarchy_runtime or default_omarchy_runtime()
 
   local source_bindings = paths.join(repo_root, "hypr", "bindings.lua")
   local source_workstation = paths.join(repo_root, "hypr", "workstation")
   local source_hud = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
+  local source_system_monitor = paths.join(repo_root, "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
   assert_ok(command.exists(source_bindings), "managed bindings.lua is missing")
   assert_ok(command.exists(source_workstation), "managed workstation directory is missing")
   assert_ok(command.exists(source_hud), "Mouse Mode HUD plugin is missing")
+  assert_ok(command.exists(source_system_monitor), "System Monitor plugin is missing")
 
   local config_dir = paths.join(home, ".config", "hypr")
   local target_bindings = paths.join(config_dir, "bindings.lua")
   local target_workstation = paths.join(config_dir, "workstation")
   local omarchy_plugins_dir = paths.join(home, ".config", "omarchy", "plugins")
   local target_hud = paths.join(omarchy_plugins_dir, HUD_PLUGIN_ID)
+  local target_system_monitor = paths.join(omarchy_plugins_dir, SYSTEM_MONITOR_PLUGIN_ID)
   local state_dir = paths.join(home, ".local", "state", "hyprland_config")
   local backups_root = paths.join(state_dir, "backups")
   local state_path = paths.join(state_dir, "active.state")
@@ -75,14 +123,50 @@ function M.install(options)
       error("active installation state exists but managed Hyprland targets were modified")
     end
 
-    if target_is(target_hud, source_hud) then
-      return { changed = false, state_path = state_path, backup_dir = active.backup_dir }
-    end
-    if command.exists_or_symlink(target_hud) then
+    local hud_installed = target_is(target_hud, source_hud)
+    local monitor_installed = target_is(target_system_monitor, source_system_monitor)
+
+    if not hud_installed and command.exists_or_symlink(target_hud) then
       error("Mouse Mode HUD plugin path is occupied by another file")
     end
+    if not monitor_installed and command.exists_or_symlink(target_system_monitor) then
+      error("System Monitor plugin path is occupied by another file")
+    end
+    if hud_installed and monitor_installed then
+      return { changed = false, state_path = state_path, backup_dir = active.backup_dir }
+    end
+    if not monitor_installed then
+      assert_ok(omarchy_runtime.available(), "Omarchy CLI and shell are required to enable the System Monitor plugin")
+    end
 
-    assert_ok(command.symlink(source_hud, target_hud), "failed to link Mouse Mode HUD plugin")
+    local linked_hud = false
+    local linked_monitor = false
+    local ok, err = pcall(function()
+      if not hud_installed then
+        assert_ok(command.symlink(source_hud, target_hud), "failed to link Mouse Mode HUD plugin")
+        linked_hud = true
+      end
+      if not monitor_installed then
+        assert_ok(command.symlink(source_system_monitor, target_system_monitor), "failed to link System Monitor plugin")
+        linked_monitor = true
+        assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
+        assert_ok(
+          wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
+          "System Monitor plugin was not discovered after rescan"
+        )
+        assert_ok(
+          omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
+          "failed to enable System Monitor plugin"
+        )
+      end
+    end)
+
+    if not ok then
+      if linked_monitor then command.remove(target_system_monitor) end
+      if linked_hud then command.remove(target_hud) end
+      error(err, 0)
+    end
+
     return { changed = true, state_path = state_path, backup_dir = active.backup_dir }
   end
 
@@ -92,9 +176,13 @@ function M.install(options)
   if command.exists_or_symlink(target_hud) then
     error("Mouse Mode HUD plugin path already exists")
   end
+  if command.exists_or_symlink(target_system_monitor) then
+    error("System Monitor plugin path already exists")
+  end
   if command.exists_or_symlink(preserved_bindings_link) then
     error("preserved bindings marker exists without active installation state")
   end
+  assert_ok(omarchy_runtime.available(), "Omarchy CLI and shell are required to enable the System Monitor plugin")
 
   local has_bindings = command.exists_or_symlink(target_bindings)
   local has_workstation = command.exists_or_symlink(target_workstation)
@@ -112,6 +200,7 @@ function M.install(options)
   local linked_bindings = false
   local linked_workstation = false
   local linked_hud = false
+  local linked_monitor = false
   local preserved_linked = false
 
   local ok, err = pcall(function()
@@ -130,6 +219,8 @@ function M.install(options)
     linked_workstation = true
     assert_ok(command.symlink(source_hud, target_hud), "failed to link Mouse Mode HUD plugin")
     linked_hud = true
+    assert_ok(command.symlink(source_system_monitor, target_system_monitor), "failed to link System Monitor plugin")
+    linked_monitor = true
 
     if moved_bindings then
       assert_ok(command.symlink(backup_bindings, preserved_bindings_link), "failed to expose preserved bindings")
@@ -143,11 +234,22 @@ function M.install(options)
       preserved_bindings = moved_bindings,
       preserved_workstation = moved_workstation,
     })
+
+    assert_ok(rescan_plugins(omarchy_runtime), "failed to rescan Omarchy plugins")
+    assert_ok(
+      wait_for_plugin(omarchy_runtime, SYSTEM_MONITOR_PLUGIN_ID),
+      "System Monitor plugin was not discovered after rescan"
+    )
+    assert_ok(
+      omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
+      "failed to enable System Monitor plugin"
+    )
   end)
 
   if not ok then
     command.remove(state_path)
     if preserved_linked then command.remove(preserved_bindings_link) end
+    if linked_monitor then command.remove(target_system_monitor) end
     if linked_hud then command.remove(target_hud) end
     if linked_workstation then command.remove(target_workstation) end
     if linked_bindings then command.remove(target_bindings) end

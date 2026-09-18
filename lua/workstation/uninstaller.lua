@@ -5,6 +5,7 @@ local install_state = require("workstation.install_state")
 local M = {}
 
 local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
+local SYSTEM_MONITOR_PLUGIN_ID = "gendbyte.system-monitor"
 
 local function target_is(target, source)
   if not command.is_symlink(target) then
@@ -14,6 +15,17 @@ local function target_is(target, source)
   local target_real = command.realpath(target)
   local source_real = command.realpath(source)
   return target_real ~= nil and source_real ~= nil and target_real == source_real
+end
+
+local function default_omarchy_runtime()
+  return {
+    available = function()
+      return command.command_exists("omarchy")
+    end,
+    disable_plugin = function(id)
+      return command.run("omarchy plugin disable " .. command.quote(id))
+    end,
+  }
 end
 
 function M.uninstall(options)
@@ -30,16 +42,20 @@ function M.uninstall(options)
     return { changed = false }
   end
 
+  local omarchy_runtime = options.omarchy_runtime or default_omarchy_runtime()
   local repo_root = state.repo_root
   local source_bindings = paths.join(repo_root, "hypr", "bindings.lua")
   local source_workstation = paths.join(repo_root, "hypr", "workstation")
   local source_hud = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
+  local source_system_monitor = paths.join(repo_root, "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
   local config_dir = paths.join(home, ".config", "hypr")
   local target_bindings = paths.join(config_dir, "bindings.lua")
   local target_workstation = paths.join(config_dir, "workstation")
   local target_hud = paths.join(home, ".config", "omarchy", "plugins", HUD_PLUGIN_ID)
+  local target_system_monitor = paths.join(home, ".config", "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
   local backup_bindings = state.backup_dir ~= "" and paths.join(state.backup_dir, "hypr", "bindings.lua") or nil
   local backup_workstation = state.backup_dir ~= "" and paths.join(state.backup_dir, "hypr", "workstation") or nil
+  local monitor_present = command.exists_or_symlink(target_system_monitor)
 
   if not target_is(target_bindings, source_bindings) then
     error("managed bindings.lua was modified; refusing to remove it")
@@ -49,6 +65,9 @@ function M.uninstall(options)
   end
   if not target_is(target_hud, source_hud) then
     error("managed Mouse Mode HUD plugin was modified; refusing to remove it")
+  end
+  if monitor_present and not target_is(target_system_monitor, source_system_monitor) then
+    error("managed System Monitor plugin was modified; refusing to remove it")
   end
   if state.preserved_bindings then
     if not backup_bindings or not command.exists_or_symlink(backup_bindings) then
@@ -62,9 +81,24 @@ function M.uninstall(options)
     error("preserved workstation backup is missing")
   end
 
+  -- v0.1 install state predates the System Monitor plugin. If that path is
+  -- absent there is nothing to disable or remove; existing paths still have
+  -- to match the repository-owned symlink before we touch them.
+  if monitor_present then
+    if not omarchy_runtime.available() then
+      error("Omarchy CLI is required to disable the System Monitor plugin")
+    end
+    if not omarchy_runtime.disable_plugin(SYSTEM_MONITOR_PLUGIN_ID) then
+      error("failed to disable System Monitor plugin")
+    end
+  end
+
   assert(command.remove(target_bindings), "failed to remove managed bindings.lua")
   assert(command.remove(target_workstation), "failed to remove managed workstation directory")
   assert(command.remove(target_hud), "failed to remove Mouse Mode HUD plugin")
+  if monitor_present then
+    assert(command.remove(target_system_monitor), "failed to remove System Monitor plugin")
+  end
 
   if state.preserved_bindings then
     assert(command.move(backup_bindings, target_bindings), "failed to restore previous bindings.lua")

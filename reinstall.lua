@@ -9,32 +9,17 @@ package.path = script_dir .. "/lua/?.lua;" .. script_dir .. "/lua/?/init.lua;" .
 local command = require("workstation.command")
 local installer = require("workstation.installer")
 local sound_assets = require("workstation.sound_assets")
-local uninstaller = require("workstation.uninstaller")
 local verifier = require("workstation.verifier")
 
 local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
 local home = assert(os.getenv("HOME"), "HOME is not set")
 local repo_root = assert(command.realpath(script_dir), "cannot resolve repository root")
 
-print("Reinstalling Hyprland_Config...")
-
-if command.command_exists("omarchy-shell") then
-  command.capture("omarchy-shell shell setPluginEnabled " .. HUD_PLUGIN_ID .. " false")
-end
-
-local uninstall_result = uninstaller.uninstall({ home = home })
-if uninstall_result.changed then
-  print("Existing Hyprland_Config installation removed.")
-  if uninstall_result.restored_from ~= "" then
-    print("Previous configuration temporarily restored from: " .. uninstall_result.restored_from)
-  end
-else
-  print("No existing managed installation found; continuing with a fresh install.")
-end
+print("Reconciling Hyprland_Config installation...")
 
 local install_result = installer.install({ home = home, repo_root = repo_root })
 if install_result.changed then
-  print("Fresh Hyprland_Config installation completed.")
+  print("Hyprland_Config installation updated.")
   if install_result.backup_dir ~= "" then
     print("Configuration backed up to: " .. install_result.backup_dir)
   end

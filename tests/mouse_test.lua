@@ -38,7 +38,8 @@ local function fake_api(options)
   }
   local current_definition = "reset"
   local current_submap = ""
-  local cursor = { x = 100, y = 100 }
+  local cursor = options.cursor or { x = 100, y = 100 }
+  local windows = options.windows or {}
 
   local hl = {
     dsp = { cursor = {} },
@@ -46,7 +47,10 @@ local function fake_api(options)
 
   function hl.dsp.submap(name) return { kind = "submap", name = name } end
   function hl.dsp.cursor.move(args) return { kind = "cursor_move", x = args.x, y = args.y } end
-  function hl.dsp.send_key_state(args) return { kind = "send_key_state", key = args.key, state = args.state, mods = args.mods } end
+  function hl.dsp.focus(args) return { kind = "focus", window = args.window } end
+  function hl.dsp.send_key_state(args)
+    return { kind = "send_key_state", key = args.key, state = args.state, mods = args.mods, window = args.window }
+  end
   function hl.dsp.exec_cmd() error("Mouse movement must not execute external commands") end
   function hl.config(config) table.insert(calls.configs, config) end
   function hl.bind(keys, dispatcher, bind_options)
@@ -68,6 +72,7 @@ local function fake_api(options)
     if action.kind == "cursor_move" then cursor.x, cursor.y = action.x, action.y end
   end
   function hl.get_cursor_pos() return { x = cursor.x, y = cursor.y } end
+  function hl.get_windows() return windows end
   function hl.get_current_submap() return current_submap end
   function hl.timer(fn, timer_options)
     local timer = { fn = fn, options = timer_options }
@@ -252,6 +257,56 @@ t.test("NumPad 5 clicks the selected button", function()
   t.eq(calls.dispatches[#calls.dispatches - 1].key, "mouse:273")
   t.eq(calls.dispatches[#calls.dispatches - 1].state, "down")
   t.eq(calls.dispatches[#calls.dispatches].state, "up")
+end)
+
+t.test("NumPad 5 focuses and clicks the window under the cursor", function()
+  local left = {
+    at = { x = 0, y = 0 }, size = { x = 100, y = 100 }, mapped = true,
+    visible = true, accepts_input = true, active = true,
+  }
+  local right = {
+    at = { x = 100, y = 0 }, size = { x = 100, y = 100 }, mapped = true,
+    visible = true, accepts_input = true, active = false,
+  }
+  local hl, o, calls, find = fake_api({
+    cursor = { x = 150, y = 50 },
+    windows = { left, right },
+  })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
+
+  find("KP_5", false).dispatcher()
+
+  t.eq(calls.dispatches[#calls.dispatches - 2].kind, "focus")
+  t.eq(calls.dispatches[#calls.dispatches - 2].window, right)
+  t.eq(calls.dispatches[#calls.dispatches - 1].window, right)
+  t.eq(calls.dispatches[#calls.dispatches - 1].key, "mouse:272")
+  t.eq(calls.dispatches[#calls.dispatches].window, right)
+  t.eq(calls.dispatches[#calls.dispatches].state, "up")
+end)
+
+t.test("NumPad 5 ignores windows on hidden workspaces", function()
+  local hidden_workspace = { visible = false }
+  local current_workspace = { visible = true }
+  local hidden = {
+    at = { x = 100, y = 0 }, size = { x = 100, y = 100 }, mapped = true,
+    visible = true, accepts_input = true, active = false, workspace = hidden_workspace,
+  }
+  local current = {
+    at = { x = 100, y = 0 }, size = { x = 100, y = 100 }, mapped = true,
+    visible = true, accepts_input = true, active = false, workspace = current_workspace,
+  }
+  local hl, o, calls, find = fake_api({
+    cursor = { x = 150, y = 50 },
+    windows = { hidden, current },
+  })
+  mouse.register(hl, o, { numlock_store = fake_store(false), hud = fake_hud() })
+
+  find("KP_5", false).dispatcher()
+
+  t.eq(calls.dispatches[#calls.dispatches - 2].kind, "focus")
+  t.eq(calls.dispatches[#calls.dispatches - 2].window, current)
+  t.eq(calls.dispatches[#calls.dispatches - 1].window, current)
+  t.eq(calls.dispatches[#calls.dispatches].window, current)
 end)
 
 t.test("double click uses the selected button", function()

@@ -23,9 +23,9 @@ local DIRECTIONS = {
   { id = "down_right", keys = { "KP_3", "KP_Next" }, dx = 1, dy = 1 },
 }
 
-local function bind_aliases(hl, keys, dispatcher, options)
+local function bind_aliases(bind_fn, keys, dispatcher, options)
   for _, key in ipairs(keys) do
-    hl.bind(key, dispatcher, options)
+    bind_fn(key, dispatcher, options)
   end
 end
 
@@ -63,6 +63,8 @@ function M.register(hl, o, options)
   local selected = BUTTONS.LMB
   local held_key = nil
   local live_timers = {}
+  local mouse_bind_handles = {}
+  local numeric_bind_handles = {}
 
   hl.config({
     input = {
@@ -76,21 +78,119 @@ function M.register(hl, o, options)
     },
   })
 
+  local function register_mouse_bind(key, dispatcher, bind_options)
+    local handle = hl.bind(key, dispatcher, bind_options)
+    if handle then
+      table.insert(mouse_bind_handles, handle)
+    end
+    return handle
+  end
+
+  local function set_mouse_bindings_enabled(enabled)
+    for _, handle in ipairs(mouse_bind_handles) do
+      if handle and type(handle.set_enabled) == "function" then
+        handle:set_enabled(enabled)
+      end
+    end
+  end
+
+  local function register_numeric_bind(key, dispatcher, bind_options)
+    local handle = hl.bind(key, dispatcher, bind_options)
+    if handle then
+      table.insert(numeric_bind_handles, handle)
+    end
+    return handle
+  end
+
+  local function set_numeric_bindings_enabled(enabled)
+    for _, handle in ipairs(numeric_bind_handles) do
+      if handle and type(handle.set_enabled) == "function" then
+        handle:set_enabled(enabled)
+      end
+    end
+  end
+
   local function dispatch(action)
     hl.dispatch(action)
   end
 
-  local function send_button(key, key_state)
+  local function send_button(key, key_state, target_window)
     dispatch(hl.dsp.send_key_state({
       mods = "",
       key = key,
       state = key_state,
+      window = target_window,
     }))
   end
 
+  local function window_contains_cursor(window, cursor)
+    if not window or not cursor then
+      return false
+    end
+    if window.mapped == false or window.visible == false or window.accepts_input == false then
+      return false
+    end
+
+    -- Hyprland keeps mapped windows from hidden workspaces in the global
+    -- window list. Their geometry can overlap the current workspace, so they
+    -- must never win cursor hit-testing or a click would switch workspaces.
+    local workspace = window.workspace
+    if workspace and workspace.visible == false then
+      return false
+    end
+
+    local at = window.at
+    local size = window.size
+    if not at or not size then
+      return false
+    end
+    if type(at.x) ~= "number" or type(at.y) ~= "number" or type(size.x) ~= "number" or type(size.y) ~= "number" then
+      return false
+    end
+    if size.x <= 0 or size.y <= 0 then
+      return false
+    end
+
+    return cursor.x >= at.x and cursor.x < at.x + size.x
+      and cursor.y >= at.y and cursor.y < at.y + size.y
+  end
+
+  local function window_at_cursor()
+    if type(hl.get_windows) ~= "function" then
+      return nil
+    end
+
+    local cursor = hl.get_cursor_pos()
+    local windows = hl.get_windows({ mapped = true }) or {}
+    local candidate = nil
+
+    for _, window in ipairs(windows) do
+      if window_contains_cursor(window, cursor) then
+        if window.active then
+          return window
+        end
+
+        if not candidate or (window.floating and not candidate.floating) then
+          candidate = window
+        end
+      end
+    end
+
+    return candidate
+  end
+
+  local function focus_cursor_target()
+    local target = window_at_cursor()
+    if target and not target.active then
+      dispatch(hl.dsp.focus({ window = target }))
+    end
+    return target
+  end
+
   local function click(key)
-    send_button(key, "down")
-    send_button(key, "up")
+    local target = focus_cursor_target()
+    send_button(key, "down", target)
+    send_button(key, "up", target)
   end
 
   local function release_held()
@@ -117,12 +217,16 @@ function M.register(hl, o, options)
   end
 
   local function enter()
+    set_numeric_bindings_enabled(false)
+    set_mouse_bindings_enabled(true)
     cleanup()
     show_hud("mouse")
   end
 
   local function exit()
     cleanup()
+    set_mouse_bindings_enabled(false)
+    set_numeric_bindings_enabled(true)
     show_hud("numpad")
   end
 
@@ -213,39 +317,69 @@ function M.register(hl, o, options)
     non_consuming = true,
   })
 
-  -- Mouse Mode deliberately stays in the global submap. Each NumPad bind is
-  -- auto-consuming only while Num Lock is off; with Num Lock on it returns
-  -- { ok = false }, so the original key event reaches the focused app. This
-  -- keeps Omarchy's global shortcuts (Super+1..10, Super+arrows, etc.) alive.
+  -- Some Hyprland/XKB combinations keep emitting the navigation keysyms
+  -- (KP_End/KP_Down/...) even when Num Lock is visually on. In normal NumPad
+  -- mode, translate only those navigation aliases to ordinary digit keys.
+  -- If the keyboard already emits KP_1..KP_9, those events pass through
+  -- untouched because there is no proxy bind for them.
+  local numeric_aliases = {
+    { key = "KP_End", output = "1" },
+    { key = "KP_Down", output = "2" },
+    { key = "KP_Next", output = "3" },
+    { key = "KP_Left", output = "4" },
+    { key = "KP_Begin", output = "5" },
+    { key = "KP_Right", output = "6" },
+    { key = "KP_Home", output = "7" },
+    { key = "KP_Up", output = "8" },
+    { key = "KP_Prior", output = "9" },
+    { key = "KP_Insert", output = "0" },
+    { key = "KP_Delete", output = "period" },
+  }
+
+  for _, mapping in ipairs(numeric_aliases) do
+    local current = mapping
+    register_numeric_bind(current.key, function()
+      send_button(current.output, "down")
+      send_button(current.output, "up")
+      return { ok = true }
+    end, { repeating = true })
+  end
+
+  -- Mouse Mode stays in the global submap, but its NumPad binds are enabled
+  -- only while Num Lock is off. With Num Lock on, Hyprland sees no active
+  -- custom NumPad bind and the focused application receives normal NumPad input.
   for _, direction in ipairs(DIRECTIONS) do
     local current = direction
-    bind_aliases(hl, current.keys, mouse_only(function()
+    bind_aliases(register_mouse_bind, current.keys, mouse_only(function()
       move(current)
     end), { repeating = true, auto_consuming = true })
 
-    bind_aliases(hl, current.keys, mouse_only(function()
+    bind_aliases(register_mouse_bind, current.keys, mouse_only(function()
       reset_direction(current)
     end), { release = true, auto_consuming = true })
   end
 
   -- Windows-style selection model: these keys choose which virtual mouse
   -- button 5/+ /0/. operate on. Selecting a mode does not click immediately.
-  hl.bind("KP_Divide", mouse_only(function()
+  register_mouse_bind("KP_Divide", mouse_only(function()
     select_button("LMB")
   end), { auto_consuming = true })
-  hl.bind("KP_Multiply", mouse_only(function()
+  register_mouse_bind("KP_Multiply", mouse_only(function()
     select_button("RMB")
   end), { auto_consuming = true })
-  hl.bind("KP_Subtract", mouse_only(function()
+  register_mouse_bind("KP_Subtract", mouse_only(function()
     select_button("MMB")
   end), { auto_consuming = true })
 
-  bind_aliases(hl, { "KP_5", "KP_Begin" }, mouse_only(function()
+  bind_aliases(register_mouse_bind, { "KP_5", "KP_Begin" }, mouse_only(function()
     click(selected.key)
   end), { auto_consuming = true })
-  hl.bind("KP_Add", mouse_only(double_click_selected), { auto_consuming = true })
-  bind_aliases(hl, { "KP_0", "KP_Insert" }, mouse_only(hold_selected), { auto_consuming = true })
-  bind_aliases(hl, { "KP_Decimal", "KP_Delete" }, mouse_only(release_held), { auto_consuming = true })
+  register_mouse_bind("KP_Add", mouse_only(double_click_selected), { auto_consuming = true })
+  bind_aliases(register_mouse_bind, { "KP_0", "KP_Insert" }, mouse_only(hold_selected), { auto_consuming = true })
+  bind_aliases(register_mouse_bind, { "KP_Decimal", "KP_Delete" }, mouse_only(release_held), { auto_consuming = true })
+
+  set_mouse_bindings_enabled(not numlock_on)
+  set_numeric_bindings_enabled(numlock_on)
 
   hl.on("config.reloaded", function()
     cleanup()
