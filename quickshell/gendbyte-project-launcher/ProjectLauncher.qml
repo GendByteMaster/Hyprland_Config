@@ -60,11 +60,10 @@ FloatingWindow {
     statusText = warnings.length > 0 ? warnings.join(" · ") : ""
   }
 
-  function localFolderPath(url) {
-    var value = String(url || "")
-    if (value.indexOf("file://") === 0)
-      value = value.substring(7)
-    return decodeURIComponent(value)
+  function folderSelectionValue(url) {
+    if (url && typeof url.toString === "function")
+      return url.toString()
+    return String(url || "")
   }
 
   function chooseProjectFolder() {
@@ -290,9 +289,9 @@ FloatingWindow {
     title: "Choose project folder"
 
     onAccepted: {
-      var path = root.localFolderPath(selectedFolder)
-      if (path !== "")
-        rootProcess.exec(root.backendArgs(["add-root", path]))
+      var selected = root.folderSelectionValue(selectedFolder)
+      if (selected !== "")
+        rootProcess.exec(root.backendArgs(["add-root", selected]))
     }
   }
 
