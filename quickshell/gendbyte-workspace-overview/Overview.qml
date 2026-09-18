@@ -9,11 +9,52 @@ Item {
 
   property bool opened: false
   property int selectedIndex: -1
+  property int selectedWorkspaceIndex: -1
+  property string navigationZone: "windows"
   property var targetScreen: null
 
   readonly property int focusedWorkspaceId: Hyprland.focusedWorkspace
     ? Number(Hyprland.focusedWorkspace.id)
     : -1
+
+  readonly property var workspaceEntries: {
+    var values = Hyprland.workspaces ? Hyprland.workspaces.values : []
+    var entries = []
+    var maxId = 0
+
+    for (var i = 0; i < values.length; ++i) {
+      var workspace = values[i]
+      if (!workspace)
+        continue
+
+      var id = Number(workspace.id)
+      if (!Number.isFinite(id) || id <= 0)
+        continue
+
+      maxId = Math.max(maxId, id)
+      var count = workspace.toplevels && workspace.toplevels.values
+        ? workspace.toplevels.values.length
+        : 0
+      entries.push({
+        id: id,
+        name: String(workspace.name || id),
+        count: count,
+        add: false
+      })
+    }
+
+    entries.sort(function(left, right) { return left.id - right.id })
+
+    var nextId = Math.max(1, maxId + 1)
+    entries.push({
+      id: nextId,
+      name: String(nextId),
+      count: 0,
+      add: true
+    })
+
+    return entries
+  }
 
   readonly property var visibleWindows: {
     var focused = Hyprland.focusedWorkspace
@@ -68,6 +109,14 @@ Item {
     return screens.length > 0 ? screens[0] : null
   }
 
+  function activeWorkspaceIndex() {
+    for (var i = 0; i < workspaceEntries.length; ++i) {
+      if (!workspaceEntries[i].add && Number(workspaceEntries[i].id) === focusedWorkspaceId)
+        return i
+    }
+    return workspaceEntries.length > 0 ? 0 : -1
+  }
+
   function selectedWindow() {
     if (selectedIndex < 0 || selectedIndex >= visibleWindows.length)
       return null
@@ -91,13 +140,17 @@ Item {
     Hyprland.refreshWorkspaces()
     Hyprland.refreshToplevels()
     targetScreen = focusedScreen()
-    selectedIndex = 0
+    selectedIndex = visibleWindows.length > 0 ? 0 : -1
+    selectedWorkspaceIndex = activeWorkspaceIndex()
+    navigationZone = visibleWindows.length > 0 ? "windows" : "workspaces"
     opened = true
   }
 
   function hideOverview() {
     opened = false
     selectedIndex = -1
+    selectedWorkspaceIndex = -1
+    navigationZone = "windows"
     targetScreen = null
   }
 
@@ -115,6 +168,35 @@ Item {
 
     hideOverview()
     Hyprland.dispatch('hl.dsp.focus({ window = "address:' + address + '" })')
+  }
+
+  function activateWorkspace(index) {
+    if (index < 0 || index >= workspaceEntries.length)
+      return
+
+    var entry = workspaceEntries[index]
+    var id = Number(entry.id)
+    if (!Number.isFinite(id) || id <= 0)
+      return
+
+    hideOverview()
+    Hyprland.dispatch('hl.dsp.focus({ workspace = "' + id + '" })')
+  }
+
+  function selectWorkspace(index) {
+    if (index < 0 || index >= workspaceEntries.length)
+      return
+    selectedWorkspaceIndex = index
+    navigationZone = "workspaces"
+  }
+
+  function moveWorkspaceSelection(delta) {
+    if (workspaceEntries.length === 0)
+      return
+    var current = selectedWorkspaceIndex
+    if (current < 0)
+      current = activeWorkspaceIndex()
+    selectedWorkspaceIndex = Math.max(0, Math.min(workspaceEntries.length - 1, current + delta))
   }
 
   onVisibleWindowsChanged: reconcileSelection()
@@ -198,7 +280,9 @@ Item {
 
         Grid {
           id: grid
-          anchors.centerIn: parent
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.verticalCenterOffset: -54
           columns: surface.columns
           spacing: 16
 
@@ -253,10 +337,31 @@ Item {
           }
         }
 
-        Text {
+        Components.WorkspaceStrip {
+          id: workspaceStrip
+          anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
-          text: "←→↑↓ navigate   Enter focus   Esc close"
+          height: 94
+          workspacesModel: root.workspaceEntries
+          selectedIndex: root.navigationZone === "workspaces" ? root.selectedWorkspaceIndex : -1
+          activeWorkspaceId: root.focusedWorkspaceId
+
+          onSelected: function(index) {
+            root.selectWorkspace(index)
+          }
+          onActivated: function(index) {
+            root.activateWorkspace(index)
+          }
+        }
+
+        Text {
+          anchors.right: parent.right
+          anchors.bottom: workspaceStrip.top
+          anchors.bottomMargin: 10
+          text: root.navigationZone === "workspaces"
+            ? "←→ workspace   Enter switch/create   Tab windows   Esc close"
+            : "←→↑↓ windows   Enter focus   Tab workspaces   Esc close"
           color: "#686868"
           font.family: "monospace"
           font.pixelSize: 9
@@ -279,10 +384,49 @@ Item {
             return
           }
 
+          if (event.key === Qt.Key_Tab) {
+            if (root.navigationZone === "windows") {
+              root.navigationZone = "workspaces"
+              if (root.selectedWorkspaceIndex < 0)
+                root.selectedWorkspaceIndex = root.activeWorkspaceIndex()
+            } else {
+              root.navigationZone = root.visibleWindows.length > 0 ? "windows" : "workspaces"
+            }
+            event.accepted = true
+            return
+          }
+
+          if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
+            var workspaceId = event.key - Qt.Key_0
+            for (var directIndex = 0; directIndex < root.workspaceEntries.length; ++directIndex) {
+              if (!root.workspaceEntries[directIndex].add
+                  && Number(root.workspaceEntries[directIndex].id) === workspaceId) {
+                root.activateWorkspace(directIndex)
+                event.accepted = true
+                return
+              }
+            }
+          }
+
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            var current = root.selectedWindow()
-            if (current)
-              root.activateWindow(current)
+            if (root.navigationZone === "workspaces") {
+              root.activateWorkspace(root.selectedWorkspaceIndex)
+            } else {
+              var current = root.selectedWindow()
+              if (current)
+                root.activateWindow(current)
+            }
+            event.accepted = true
+            return
+          }
+
+          if (root.navigationZone === "workspaces") {
+            if (event.key === Qt.Key_Left)
+              root.moveWorkspaceSelection(-1)
+            else if (event.key === Qt.Key_Right)
+              root.moveWorkspaceSelection(1)
+            else
+              return
             event.accepted = true
             return
           }
