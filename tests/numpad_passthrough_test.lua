@@ -21,7 +21,7 @@ end
 
 local function fake_api(options)
   options = options or {}
-  local calls = { binds = {}, events = {}, configs = {} }
+  local calls = { binds = {}, events = {}, configs = {}, dispatches = {} }
   local hl = { dsp = {} }
 
   function hl.config(config)
@@ -56,7 +56,19 @@ local function fake_api(options)
   end
 
   function hl.unbind() end
-  function hl.dispatch() end
+  function hl.dispatch(action)
+    table.insert(calls.dispatches, action)
+  end
+
+  function hl.dsp.send_key_state(spec)
+    return {
+      kind = "send_key_state",
+      mods = spec.mods,
+      key = spec.key,
+      state = spec.state,
+      window = spec.window,
+    }
+  end
   function hl.get_cursor_pos() return { x = 0, y = 0 } end
   function hl.get_windows() return {} end
   function hl.timer() return {} end
@@ -116,7 +128,8 @@ t.test("Num Lock mode disables every Mouse Mode NumPad bind", function()
 end)
 
 
-t.test("Mouse Mode forces stable numeric keypad mapping without dropping keyboard options", function()
+
+t.test("Num Lock ON translates navigation keypad aliases into digits", function()
   local hl, o, calls = fake_api({ kb_options = "compose:ralt" })
   mouse.register(hl, o, {
     numlock_store = fake_store(true),
@@ -124,5 +137,32 @@ t.test("Mouse Mode forces stable numeric keypad mapping without dropping keyboar
     sound = fake_sound(),
   })
 
-  t.eq(calls.configs[1].input.kb_options, "compose:ralt,numpad:mac")
+  local kp_end
+  for _, bind in ipairs(calls.binds) do
+    if bind.key == "KP_End" and bind.enabled then
+      kp_end = bind
+      break
+    end
+  end
+
+  t.truthy(kp_end ~= nil)
+  kp_end.dispatcher()
+
+  t.eq(#calls.dispatches, 2)
+  t.eq(calls.dispatches[1].kind, "send_key_state")
+  t.eq(calls.dispatches[1].key, "1")
+  t.eq(calls.dispatches[1].state, "down")
+  t.eq(calls.dispatches[2].key, "1")
+  t.eq(calls.dispatches[2].state, "up")
+end)
+
+t.test("Mouse Mode does not rewrite global keyboard options", function()
+  local hl, o, calls = fake_api({ kb_options = "compose:ralt" })
+  mouse.register(hl, o, {
+    numlock_store = fake_store(true),
+    hud = fake_hud(),
+    sound = fake_sound(),
+  })
+
+  t.eq(calls.configs[1].input.kb_options, nil)
 end)
