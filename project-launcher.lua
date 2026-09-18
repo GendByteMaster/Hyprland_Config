@@ -17,6 +17,7 @@ local project_config = require("workstation.project_config")
 local project_discovery = require("workstation.project_discovery")
 local project_search = require("workstation.project_search")
 local project_state = require("workstation.project_state")
+local project_model = require("workstation.project_model")
 local project_types = require("workstation.project_types")
 local protocol = require("workstation.launcher_protocol")
 
@@ -87,14 +88,15 @@ function context.save_state(state)
 end
 
 function context.add_root(path)
-  if type(path) ~= "string" or path == "" then
-    return nil, "project root path is required"
+  local local_path = project_model.local_path(path)
+  if not local_path then
+    return nil, "project root path is invalid"
   end
 
-  local canonical = command.realpath(path)
+  local canonical = command.realpath(local_path)
   if not canonical or canonical == ""
     or not command.run("test -d -- " .. command.quote(canonical)) then
-    return nil, "selected project root is not a directory"
+    return nil, "selected project root is not a directory: " .. tostring(local_path)
   end
 
   local state, warning = project_state.load({ home = home })
