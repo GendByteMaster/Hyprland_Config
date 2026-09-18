@@ -21,5 +21,8 @@ require("tests.json_test")
 require("tests.project_model_test")
 require("tests.project_config_test")
 require("tests.project_discovery_test")
+require("tests.project_state_test")
+require("tests.project_search_test")
+require("tests.project_cache_test")
 
 require("tests.testlib").run()
