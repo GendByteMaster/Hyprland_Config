@@ -27,12 +27,25 @@ end
 local function fake_repo(root)
   write(paths.join(root, "hypr", "bindings.lua"), "-- managed bindings\n")
   write(paths.join(root, "hypr", "workstation", "mouse.lua"), "return {}\n")
+  write(paths.join(root, "hypr", "workstation", "project_launcher.lua"), "return {}\n")
+  write(paths.join(root, "bin", "hyprland-workstation-launcher"), "#!/usr/bin/env bash\nexit 0\n")
+  write(paths.join(root, "quickshell", "gendbyte-project-launcher", "shell.qml"), "import Quickshell\nShellRoot {}\n")
+  write(paths.join(root, "quickshell", "gendbyte-project-launcher", "ProjectLauncher.qml"), "import Quickshell\nFloatingWindow {}\n")
+  write(paths.join(root, "project-launcher.lua"), "return true\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.mouse-hud", "manifest.json"), "{}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "manifest.json"), "{}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "Service.qml"), "import QtQuick\nItem {}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "BarWidget.qml"), "import QtQuick\nItem {}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "ServiceHost.js"), "function hostedService() {}\n")
   write(paths.join(root, "omarchy", "plugins", "gendbyte.system-monitor", "telemetry-collector.lua"), "return true\n")
+end
+
+local function generic_runtime()
+  return {
+    command_exists = function()
+      return true
+    end,
+  }
 end
 
 local function runtime(calls, options)
@@ -66,6 +79,7 @@ t.test("installer rescans and waits for Omarchy discovery before enabling system
     home = home,
     repo_root = repo,
     timestamp = "first",
+    runtime = generic_runtime(),
     omarchy_runtime = runtime(calls),
   })
 
