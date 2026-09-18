@@ -131,7 +131,7 @@ The backend owns deterministic workstation logic:
 - adapter selection;
 - safe command construction.
 
-The backend exposes a stable machine-readable interface to QML. The preferred protocol is versioned JSON emitted by a Lua CLI entry point. JSON encoding/decoding used by the core must not require Omarchy or `jq`.
+The backend exposes a stable machine-readable interface to QML. The v0.3 protocol is versioned JSON emitted by a Lua CLI entry point. JSON encoding/decoding used by the core must not require Omarchy or `jq`.
 
 ### Adapters
 
@@ -235,7 +235,7 @@ Defaults:
 
 - recursive search under each root;
 - no symlink traversal;
-- configurable maximum depth, with a conservative default;
+- configurable maximum depth, defaulting to 4 directory levels below each configured root;
 - skip known heavy/generated directories such as `.git`, `node_modules`, `target`, `.venv`, `dist`, `build`, and cache directories;
 - deduplicate projects by canonical path;
 - allow nested Git repositories when they appear within the configured depth;
@@ -277,6 +277,12 @@ return {
     "~/Repository/archive/old-project",
   },
 
+  apps = {
+    terminal = "auto",
+    editor = { "code" },
+    file_manager = { "thunar" },
+  },
+
   overrides = {
     ["~/Repository/example"] = {
       actions = {
@@ -297,6 +303,8 @@ Configuration rules:
 - `~/Repository` is used when no roots are configured;
 - explicit `projects` may add non-Git or out-of-root projects;
 - `hidden` removes matching projects from the normal list;
+- `apps.terminal` is `"auto"` by default and may select a known terminal adapter such as `foot`, `ghostty`, `kitty`, or `alacritty`;
+- `apps.editor` and `apps.file_manager` are optional argv arrays; when omitted, the generic adapter uses safe environment/default discovery;
 - project action overrides take precedence over auto-detected actions with the same stable action ID;
 - command overrides use argv arrays, not shell command strings, by default;
 - a deliberately shell-based custom action must opt into shell execution explicitly;
@@ -351,7 +359,10 @@ Every valid project exposes:
 - Open Shell;
 - Open Editor;
 - Open File Manager;
+- Favorite / Unfavorite;
 - Copy Path, when clipboard capability exists.
+
+Favorite / Unfavorite is a quick action and is the primary v0.3 UI mechanism for changing favorite state.
 
 ### Git actions
 
@@ -373,7 +384,7 @@ If `cargo` is missing, the actions remain visible but disabled with a reason.
 
 ### Node actions
 
-When `package.json` exists, the backend detects the preferred package manager using lockfiles when possible and exposes only meaningful declared/conventional actions.
+When `package.json` exists, the backend detects the preferred package manager using lockfiles when possible and exposes `dev`, `test`, and `build` only when the corresponding scripts are actually declared in `package.json`.
 
 Examples:
 
@@ -455,10 +466,12 @@ The implementation must not hard-code Foot.
 
 The generic adapter resolves terminal capability in this order:
 
-1. explicit user launcher/terminal configuration;
+1. an explicit `apps.terminal` adapter id from `projects.lua`, when it is not `"auto"`;
 2. `xdg-terminal-exec` when available;
-3. conservative support for known terminal executables when an unambiguous environment preference is available;
+3. conservative support for known installed terminal executables and an unambiguous environment preference;
 4. otherwise mark terminal actions unavailable with a clear reason.
+
+The generic adapter recognizes at least Foot, Ghostty, Kitty, and Alacritty. Their differing cwd/exec flags remain inside the adapter and never leak into action resolution.
 
 Commands are passed as argv wherever the selected mechanism supports it. The project must not build a shell string from an untrusted project path.
 
