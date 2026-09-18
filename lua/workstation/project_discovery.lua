@@ -62,6 +62,27 @@ local function warning(result, message)
   result.warnings[#result.warnings + 1] = message
 end
 
+local function within_depth(root, project_path, max_depth)
+  local normalized_root = tostring(root):gsub("/+$", "")
+  local normalized_project = tostring(project_path):gsub("/+$", "")
+
+  if normalized_project == normalized_root then
+    return true
+  end
+
+  local prefix = normalized_root .. "/"
+  if normalized_project:sub(1, #prefix) ~= prefix then
+    return false
+  end
+
+  local relative = normalized_project:sub(#prefix + 1)
+  local depth = 0
+  for _ in relative:gmatch("[^/]+") do
+    depth = depth + 1
+  end
+  return depth <= max_depth
+end
+
 function M.discover(config, runtime)
   assert(type(config) == "table", "config is required")
   runtime = runtime or default_runtime()
@@ -97,17 +118,19 @@ function M.discover(config, runtime)
         for _, marker in ipairs(markers) do
           if not runtime.is_symlink(marker) then
             local project_path = paths.dirname(marker)
-            local project, project_error = project_model.new(project_path, {
-              home = home,
-              source = "discovered",
-            }, runtime)
+            if within_depth(root, project_path, config.max_depth or 4) then
+              local project, project_error = project_model.new(project_path, {
+                home = home,
+                source = "discovered",
+              }, runtime)
 
-            if project then
-              if not hidden[project.id] and not by_id[project.id] then
-                by_id[project.id] = project
+              if project then
+                if not hidden[project.id] and not by_id[project.id] then
+                  by_id[project.id] = project
+                end
+              else
+                warning(result, project_error)
               end
-            else
-              warning(result, project_error)
             end
           end
         end
