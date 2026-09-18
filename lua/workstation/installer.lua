@@ -236,6 +236,7 @@ function M.install(options)
 
     local created = {}
     local changed = false
+    local monitor_enabled_during_install = false
 
     local ok, err = pcall(function()
       if not launcher_owned then
@@ -273,6 +274,7 @@ function M.install(options)
             omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
             "failed to enable System Monitor plugin"
           )
+          monitor_enabled_during_install = true
         end
       end
 
@@ -299,6 +301,10 @@ function M.install(options)
     end)
 
     if not ok then
+      if monitor_enabled_during_install
+        and type(omarchy_runtime.disable_plugin) == "function" then
+        pcall(omarchy_runtime.disable_plugin, SYSTEM_MONITOR_PLUGIN_ID)
+      end
       remove_created(created)
       error(err, 0)
     end
@@ -366,6 +372,7 @@ function M.install(options)
 
   local hud_owned = false
   local monitor_owned = false
+  local monitor_enabled_during_install = false
 
   local ok, err = pcall(function()
     if has_bindings then
@@ -419,6 +426,7 @@ function M.install(options)
         omarchy_runtime.enable_plugin(SYSTEM_MONITOR_PLUGIN_ID, SYSTEM_MONITOR_SECTION),
         "failed to enable System Monitor plugin"
       )
+      monitor_enabled_during_install = true
     end
 
     install_state.write(state_path, {
@@ -434,6 +442,10 @@ function M.install(options)
   end)
 
   if not ok then
+    if monitor_enabled_during_install
+      and type(omarchy_runtime.disable_plugin) == "function" then
+      pcall(omarchy_runtime.disable_plugin, SYSTEM_MONITOR_PLUGIN_ID)
+    end
     command.remove(state_path)
     if preserved_linked then
       command.remove(preserved_bindings_link)
