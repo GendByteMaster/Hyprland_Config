@@ -105,6 +105,7 @@ t.test("installer restores previous Hyprland config when plugin rescan fails", f
       home = home,
       repo_root = repo,
       timestamp = "first",
+      runtime = generic_runtime(),
       omarchy_runtime = runtime(calls, { rescan_ok = false }),
     })
   end)
@@ -130,6 +131,7 @@ t.test("installer restores previous Hyprland config when plugin discovery times 
       home = home,
       repo_root = repo,
       timestamp = "first",
+      runtime = generic_runtime(),
       omarchy_runtime = runtime(calls, { discover_ok = false }),
     })
   end)
