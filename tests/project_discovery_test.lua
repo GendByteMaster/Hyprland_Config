@@ -53,12 +53,12 @@ test("discovery deduplicates canonical git roots", function()
 
   local result = discovery.discover(config, fake_runtime({
     roots = {
-      ["/r1"] = { "/alias/a/.git" },
-      ["/r2"] = { "/work/a/.git" },
+      ["/r1"] = { "/r1/a/.git" },
+      ["/r2"] = { "/r2/a/.git" },
     },
     realpaths = {
-      ["/alias/a"] = "/work/a",
-      ["/work/a"] = "/work/a",
+      ["/r1/a"] = "/work/a",
+      ["/r2/a"] = "/work/a",
     },
   }))
 
@@ -156,13 +156,13 @@ test("discovery hides canonical project path", function()
   local result = discovery.discover(config, fake_runtime({
     roots = {
       ["/r1"] = {
-        "/work/visible/.git",
-        "/alias/hidden/.git",
+        "/r1/visible/.git",
+        "/r1/hidden/.git",
       },
     },
     realpaths = {
-      ["/work/visible"] = "/work/visible",
-      ["/alias/hidden"] = "/work/hidden",
+      ["/r1/visible"] = "/work/visible",
+      ["/r1/hidden"] = "/work/hidden",
       ["/work/hidden"] = "/work/hidden",
     },
   }))
