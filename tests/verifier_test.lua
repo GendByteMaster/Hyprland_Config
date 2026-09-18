@@ -89,6 +89,8 @@ t.test("verifier accepts a consistent installation with project plugins", functi
   t.eq(result.ok, true)
   t.eq(check(result, "bindings link").ok, true)
   t.eq(check(result, "workstation link").ok, true)
+  t.eq(check(result, "Workspace Overview wrapper link").ok, true)
+  t.eq(check(result, "Workspace Overview Quickshell config link").ok, true)
   t.eq(check(result, "HUD plugin link").ok, true)
   t.eq(check(result, "system monitor plugin link").ok, true)
   t.eq(check(result, "system monitor manifest").ok, true)
@@ -222,6 +224,8 @@ t.test("generic verification passes without Omarchy and validates launcher", fun
   t.eq(check(result, "Quickshell").ok, true)
   t.eq(check(result, "Project Launcher wrapper link").ok, true)
   t.eq(check(result, "Project Launcher Quickshell config link").ok, true)
+  t.eq(check(result, "Workspace Overview wrapper link").ok, true)
+  t.eq(check(result, "Workspace Overview Quickshell config link").ok, true)
   t.eq(check(result, "Omarchy CLI").ok, true)
   t.eq(check(result, "Omarchy CLI").skipped, true)
   t.eq(check(result, "Omarchy plugin validation").ok, true)
@@ -256,6 +260,36 @@ t.test("verifier fails installed launcher when qs disappears", function()
   local result = verifier.verify({ home = home, repo_root = repo, runtime = runtime })
   t.eq(result.ok, false)
   t.eq(check(result, "Quickshell").ok, false)
+
+  command.remove_tree(root)
+end)
+
+t.test("verifier detects replaced workspace overview target", function()
+  local root = temp_dir("verify-overview-replaced")
+  local home = paths.join(root, "home")
+  local repo = paths.join(root, "repo")
+  fake_repo(repo)
+
+  installer.install({
+    home = home,
+    repo_root = repo,
+    timestamp = "backup",
+    runtime = fake_runtime(),
+    omarchy_runtime = fake_omarchy_runtime(false),
+  })
+
+  local overview = paths.join(home, ".local", "bin", "hyprland-workspace-overview")
+  assert(command.remove(overview))
+  write(overview, "#!/bin/sh\necho replacement\n")
+
+  local runtime = fake_runtime()
+  runtime.command_exists = function(name)
+    return name ~= "omarchy" and name ~= "omarchy-shell"
+  end
+
+  local result = verifier.verify({ home = home, repo_root = repo, runtime = runtime })
+  t.eq(result.ok, false)
+  t.eq(check(result, "Workspace Overview wrapper link").ok, false)
 
   command.remove_tree(root)
 end)
