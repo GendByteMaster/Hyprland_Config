@@ -48,3 +48,19 @@ test("project model reports unresolved paths", function()
   testlib.eq(project, nil)
   testlib.truthy(err)
 end)
+
+
+test("project model converts folder dialog file URLs to local paths", function()
+  local model = require("workstation.project_model")
+
+  testlib.eq(model.local_path("file:///home/test/Projects"), "/home/test/Projects")
+  testlib.eq(
+    model.local_path("file:///home/test/My%20Projects"),
+    "/home/test/My Projects"
+  )
+  testlib.eq(
+    model.local_path("file://localhost/home/test/Projects"),
+    "/home/test/Projects"
+  )
+  testlib.eq(model.local_path("/home/test/Projects"), "/home/test/Projects")
+end)
