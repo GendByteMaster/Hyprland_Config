@@ -98,6 +98,24 @@ test("discovery passes configured maximum depth to runtime", function()
   testlib.eq(seen_depth, 4)
 end)
 
+test("discovery excludes repositories deeper than configured maximum", function()
+  local discovery = require("workstation.project_discovery")
+  local config = base_config()
+  config.max_depth = 4
+
+  local result = discovery.discover(config, fake_runtime({
+    roots = {
+      ["/r1"] = {
+        "/r1/a/b/c/d/.git",
+        "/r1/a/b/c/d/e/.git",
+      },
+    },
+  }))
+
+  testlib.eq(#result.projects, 1)
+  testlib.eq(result.projects[1].id, "/r1/a/b/c/d")
+end)
+
 test("discovery rejects symlink git markers", function()
   local discovery = require("workstation.project_discovery")
   local result = discovery.discover(base_config(), fake_runtime({
