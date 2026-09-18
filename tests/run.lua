@@ -16,6 +16,6 @@ require("tests.telemetry_test")
 require("tests.telemetry_runtime_diagnostic_test")
 require("tests.telemetry_collector_test")
 require("tests.system_monitor_plugin_test")
-require("tests.reinstall_safety_test")
+require("tests.reinstall_safety_test")\nrequire("tests.json_test")
 
 require("tests.testlib").run()
