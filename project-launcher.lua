@@ -25,8 +25,43 @@ local home = assert(os.getenv("HOME"), "HOME is not set")
 local context = {}
 local loaded_config = nil
 
+local function merge_warning(left, right)
+  if type(right) ~= "string" or right == "" then
+    return left
+  end
+  if type(left) ~= "string" or left == "" then
+    return right
+  end
+  return left .. " · " .. right
+end
+
 function context.load_config()
   local config, warning = project_config.load({ home = home })
+  local state, state_warning = project_state.load({ home = home })
+  warning = merge_warning(warning, state_warning)
+
+  local selected_roots = state and state.roots or {}
+  if #selected_roots > 0 then
+    local user_config_path = home .. "/.config/hyprland-workstation/projects.lua"
+
+    -- UI-selected roots replace the implicit ~/Repository fallback, but never
+    -- replace roots from an explicit projects.lua.
+    if not command.exists(user_config_path) then
+      config.roots = {}
+    end
+
+    local seen = {}
+    for _, root in ipairs(config.roots or {}) do
+      seen[root] = true
+    end
+    for _, root in ipairs(selected_roots) do
+      if not seen[root] then
+        config.roots[#config.roots + 1] = root
+        seen[root] = true
+      end
+    end
+  end
+
   loaded_config = config
   return config, warning
 end
@@ -49,6 +84,34 @@ end
 
 function context.save_state(state)
   return project_state.save(state, { home = home })
+end
+
+function context.add_root(path)
+  if type(path) ~= "string" or path == "" then
+    return nil, "project root path is required"
+  end
+
+  local canonical = command.realpath(path)
+  if not canonical or canonical == ""
+    or not command.run("test -d -- " .. command.quote(canonical)) then
+    return nil, "selected project root is not a directory"
+  end
+
+  local state, warning = project_state.load({ home = home })
+  if warning then
+    return nil, warning
+  end
+
+  local changed = project_state.add_root(state, canonical)
+  if changed then
+    local ok, save_error = project_state.save(state, { home = home })
+    if not ok then
+      return nil, save_error or "failed to save project root"
+    end
+  end
+
+  loaded_config = nil
+  return canonical
 end
 
 function context.rank(projects, query, state)
