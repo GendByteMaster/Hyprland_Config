@@ -65,3 +65,16 @@ t.test("workspace overview does not introduce screenshot polling", function()
   excludes(preview, "screenshot")
   excludes(preview, "Timer {")
 end)
+
+
+t.test("workspace overview wrapper has race-safe bounded IPC startup", function()
+  local wrapper = read("bin/hyprland-workspace-overview")
+
+  contains(wrapper, 'CONFIG_NAME="gendbyte-workspace-overview"')
+  contains(wrapper, "STARTUP_ATTEMPTS=100")
+  contains(wrapper, "acquire_start_lock")
+  contains(wrapper, "wait_for_ipc")
+  contains(wrapper, "workspace-overview.log")
+  contains(wrapper, "ipc toggle")
+  contains(wrapper, "ipc show")
+end)
