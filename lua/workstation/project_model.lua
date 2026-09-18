@@ -2,6 +2,33 @@ local command = require("workstation.command")
 
 local M = {}
 
+function M.local_path(value)
+  if type(value) ~= "string" or value == "" then
+    return nil
+  end
+
+  local path = value
+  if path:sub(1, 7) == "file://" then
+    path = path:sub(8)
+
+    if path:sub(1, 9) == "localhost" then
+      path = path:sub(10)
+      if path == "" then
+        path = "/"
+      end
+    end
+
+    path = path:gsub("%%(%x%x)", function(hex)
+      return string.char(tonumber(hex, 16))
+    end)
+  end
+
+  if path == "" or path:find("%z", 1, true) then
+    return nil
+  end
+  return path
+end
+
 function M.expand_path(path, home)
   if type(path) ~= "string" or path == "" then
     return nil
