@@ -47,7 +47,7 @@ local function read_file(path)
   return content
 end
 
-t.test("project launcher owns Super Alt P and dispatches only wrapper exec", function()
+t.test("project launcher owns Super F8 and dispatches only wrapper exec", function()
   local launcher = require("hypr.workstation.project_launcher")
   local hl, calls = fake_hyprland()
 
@@ -57,9 +57,9 @@ t.test("project launcher owns Super Alt P and dispatches only wrapper exec", fun
   })
 
   t.eq(#calls.unbinds, 1)
-  t.eq(calls.unbinds[1], "SUPER + ALT + P")
+  t.eq(calls.unbinds[1], "SUPER + F8")
   t.eq(#calls.binds, 1)
-  t.eq(calls.binds[1].keys, "SUPER + ALT + P")
+  t.eq(calls.binds[1].keys, "SUPER + F8")
   t.eq(calls.binds[1].dispatcher.kind, "exec")
   t.eq(
     calls.binds[1].dispatcher.command,
@@ -92,19 +92,21 @@ t.test("project launcher falls back when unbind API is absent", function()
   local ok = pcall(function()
     launcher.register(hl, {}, {
       launcher = "/home/test/.local/bin/hyprland-workstation-launcher",
-    kernel_cmdline = "quiet splash",
+      kernel_cmdline = "quiet splash",
     })
   end)
 
   t.eq(ok, true)
   t.eq(#calls.binds, 1)
-  t.eq(calls.binds[1].keys, "SUPER + ALT + P")
+  t.eq(calls.binds[1].keys, "SUPER + F8")
 end)
 
-t.test("project launcher source never claims Super H or scans projects", function()
+t.test("project launcher source never claims Super H or old launcher chords", function()
   local source = read_file("hypr/workstation/project_launcher.lua")
   t.eq(source:find("SUPER + H", 1, true), nil)
   t.eq(source:find("SUPER,H", 1, true), nil)
+  t.eq(source:find("SUPER + ALT + P", 1, true), nil)
+  t.eq(source:find("CTRL + ALT + R", 1, true), nil)
   t.eq(source:find("project_discovery", 1, true), nil)
   t.eq(source:find("project_types", 1, true), nil)
   t.eq(source:find("find ", 1, true), nil)
@@ -129,23 +131,4 @@ t.test("project launcher wrapper tolerates slow cold start and serializes startu
   t.truthy(source:find("wait_for_ipc", 1, true))
   t.truthy(source:find("project-launcher.log", 1, true))
   t.eq(source:find("seq 1 20", 1, true), nil)
-end)
-
-t.test("Try Omarchy gets a no-Super launcher fallback", function()
-  local launcher = require("hypr.workstation.project_launcher")
-  local hl, calls = fake_hyprland()
-
-  launcher.register(hl, {}, {
-    launcher = "/home/test/.local/bin/hyprland-workstation-launcher",
-    kernel_cmdline = "quiet omarchy.qemu=1 tryomarchy.render=cpu",
-  })
-
-  t.eq(#calls.unbinds, 2)
-  t.eq(calls.unbinds[1], "SUPER + ALT + P")
-  t.eq(calls.unbinds[2], "CTRL + ALT + R")
-  t.eq(#calls.binds, 2)
-  t.eq(calls.binds[1].keys, "SUPER + ALT + P")
-  t.eq(calls.binds[2].keys, "CTRL + ALT + R")
-  t.eq(calls.binds[2].dispatcher.command, "/home/test/.local/bin/hyprland-workstation-launcher")
-  t.eq(calls.binds[2].options.description, "Project Launcher (Try Omarchy fallback)")
 end)
