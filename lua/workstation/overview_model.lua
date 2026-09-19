@@ -93,6 +93,8 @@ function M.normalize_client(raw)
     workspace_id = workspace_id,
     workspace_name = workspace_name,
     monitor_id = numeric(raw.monitor_id, numeric(raw.monitor, -1)),
+    monitor_name = trim(raw.monitor_name or raw.monitorName or ""),
+    focus_history_id = numeric(raw.focus_history_id, numeric(raw.focusHistoryID)),
     focused = raw.focused == true,
     fullscreen = raw.fullscreen == true or numeric(raw.fullscreen, 0) > 0,
     floating = raw.floating == true,
@@ -154,6 +156,27 @@ function M.workspace_ids(clients, workspaces)
   end
   table.sort(ids)
   return ids
+end
+
+function M.mru_clients(clients)
+  local ordered = {}
+
+  for index, client in ipairs(clients or {}) do
+    ordered[index] = client
+  end
+
+  table.sort(ordered, function(left, right)
+    local left_order = numeric(left and left.focus_history_id, math.huge)
+    local right_order = numeric(right and right.focus_history_id, math.huge)
+
+    if left_order ~= right_order then
+      return left_order < right_order
+    end
+
+    return tostring(left and left.address or "") < tostring(right and right.address or "")
+  end)
+
+  return ordered
 end
 
 function M.group_by_workspace(clients)
