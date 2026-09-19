@@ -575,7 +575,7 @@ FloatingWindow {
 
             Text {
               text: "Actions"
-              color: "#9a9a9a"
+              color: theme.muted
               font.family: "monospace"
               font.pixelSize: 11
               font.bold: true
