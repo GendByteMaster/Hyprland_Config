@@ -43,7 +43,19 @@ function M.register(hl, _o, options)
   local exists = options.exists or default_exists
 
   if type(hl.define_submap) == "function" then
-    hl.define_submap(MODAL_SUBMAP, function() end)
+    hl.define_submap(MODAL_SUBMAP, function()
+      -- Opening the overview with Super+Tab while Super is still held can
+      -- otherwise trigger Omarchy's single-Super menu when the modifier is
+      -- released. Shadow that release binding only inside the modal submap.
+      hl.bind("SUPER + SUPER_L", function() end, {
+        release = true,
+        description = "Suppress single-Super menu while Workspace Overview is open",
+      })
+      hl.bind("SUPER + SUPER_R", function() end, {
+        release = true,
+        description = "Suppress single-Super menu while Workspace Overview is open",
+      })
+    end)
   end
 
   if not exists(command) then
