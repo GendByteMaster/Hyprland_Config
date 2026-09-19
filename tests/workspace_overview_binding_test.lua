@@ -61,7 +61,7 @@ t.test("workspace UI owns overview and all-monitor switcher bindings when instal
   t.eq(calls.binds[2].options.description, "All-Monitor Window Switcher")
 end)
 
-t.test("workspace UI adds Try Omarchy overview and Super Home switcher fallbacks", function()
+t.test("workspace UI adds Try Omarchy overview and Super F10 switcher fallbacks", function()
   local hl, calls = fake_hyprland()
 
   local registered = overview.register(hl, {}, {
@@ -75,12 +75,12 @@ t.test("workspace UI adds Try Omarchy overview and Super Home switcher fallbacks
   t.eq(calls.unbinds[1], "SUPER + TAB")
   t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
   t.eq(calls.unbinds[3], "SUPER + F9")
-  t.eq(calls.unbinds[4], "SUPER + HOME")
+  t.eq(calls.unbinds[4], "SUPER + F10")
   t.eq(#calls.binds, 4)
   t.eq(calls.binds[1].keys, "SUPER + TAB")
   t.eq(calls.binds[2].keys, "CTRL + ALT + TAB")
   t.eq(calls.binds[3].keys, "SUPER + F9")
-  t.eq(calls.binds[4].keys, "SUPER + HOME")
+  t.eq(calls.binds[4].keys, "SUPER + F10")
   t.eq(
     calls.binds[3].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview"
