@@ -8,6 +8,7 @@ Item {
   id: root
 
   property bool opened: false
+  readonly property string modalSubmap: "gendbyte-workspace-overview-modal"
   property string viewMode: "overview"
   property int selectedIndex: -1
   property int selectedWorkspaceIndex: -1
@@ -184,6 +185,14 @@ Item {
       selectedIndex = windowModel.length - 1
   }
 
+  function enterModalMode() {
+    Hyprland.dispatch('hl.dsp.submap("' + modalSubmap + '")')
+  }
+
+  function leaveModalMode() {
+    Hyprland.dispatch('hl.dsp.submap("reset")')
+  }
+
   function refreshHyprlandState() {
     Hyprland.refreshMonitors()
     Hyprland.refreshWorkspaces()
@@ -198,6 +207,7 @@ Item {
     selectedWorkspaceIndex = activeWorkspaceIndex()
     navigationZone = visibleWindows.length > 0 ? "windows" : "workspaces"
     opened = true
+    enterModalMode()
   }
 
   function showTaskSwitcher() {
@@ -208,9 +218,11 @@ Item {
     selectedWorkspaceIndex = -1
     navigationZone = "windows"
     opened = true
+    enterModalMode()
   }
 
   function hideOverview() {
+    leaveModalMode()
     opened = false
     selectedIndex = -1
     selectedWorkspaceIndex = -1
@@ -285,7 +297,7 @@ Item {
         && screen !== null
         && String(screen.name) === String(root.targetScreen.name)
       readonly property int windowCount: Math.max(1, root.windowModel.length)
-      readonly property real gridReserve: root.viewMode === "overview" ? 170 : 92
+      readonly property real gridReserve: root.viewMode === "overview" ? 142 : 82
       readonly property real gridAvailableHeight: Math.max(180, content.height - gridReserve)
       readonly property int columns: Math.max(1, Math.min(windowCount,
         Math.ceil(Math.sqrt(windowCount * content.width / Math.max(1, gridAvailableHeight)))))
@@ -296,8 +308,8 @@ Item {
       readonly property real heightLimitedPreview: (
         gridAvailableHeight - Math.max(0, rows - 1) * 16
       ) / rows / 0.62
-      readonly property real previewWidth: Math.max(180,
-        Math.min(520, widthLimitedPreview, heightLimitedPreview))
+      readonly property real previewWidth: Math.max(200,
+        Math.min(620, widthLimitedPreview, heightLimitedPreview))
       readonly property real previewHeight: previewWidth * 0.62
 
       visible: root.opened && targetSurface
@@ -336,7 +348,7 @@ Item {
       Item {
         id: content
         anchors.fill: parent
-        anchors.margins: 42
+        anchors.margins: 28
 
         Text {
           id: heading
@@ -425,10 +437,10 @@ Item {
 
         Components.WorkspaceStrip {
           id: workspaceStrip
-          anchors.left: parent.left
-          anchors.right: parent.right
+          anchors.horizontalCenter: parent.horizontalCenter
           anchors.bottom: parent.bottom
-          height: 94
+          width: Math.min(parent.width, implicitWidth)
+          height: implicitHeight
           visible: root.viewMode === "overview"
           workspacesModel: root.workspaceEntries
           selectedIndex: root.navigationZone === "workspaces" ? root.selectedWorkspaceIndex : -1
