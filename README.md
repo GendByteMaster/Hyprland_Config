@@ -111,7 +111,7 @@ Keyboard and pointer behavior:
 
 In **Try Omarchy for Windows**, `Super + F10` is also registered as the task-switcher fallback. It avoids Omarchy's existing `Super + Home` window-width binding. Windows may still intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
 
-While either Workspace Overview or the task switcher is open, the shell activates a dedicated Hyprland submap. Normal Omarchy global bindings are suspended until the overlay closes, which prevents menus and other compositor shortcuts from appearing on top of the modal UI.
+While either Workspace Overview or the task switcher is open, the shell activates a dedicated Hyprland submap. Normal Omarchy global bindings are suspended until the overlay closes. The modal submap also shadows the single-`Super` release binding, so opening the overview with `Super + Tab` does not immediately trigger Omarchy Menu when `Super` is released.
 
 Live previews use Quickshell's Hyprland/Wayland integration and `ScreencopyView`; the implementation does not use screenshot-file polling or a render-loop `hyprctl` poller.
 
