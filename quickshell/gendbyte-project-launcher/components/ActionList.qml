@@ -6,7 +6,7 @@ Item {
 
   property var actionsModel: []
   property int currentIndex: -1
-  property var palette: null
+  property var themePalette: null
   signal selected(int index)
   signal activated(int index)
   signal back()
@@ -56,10 +56,10 @@ Item {
       radius: 9
       opacity: modelData.enabled === false ? 0.48 : 1.0
       color: index === root.currentIndex
-        ? (root.palette ? root.palette.selection : "#2a211c")
-        : (hover.hovered ? (root.palette ? root.palette.lighterBackground : "#1d1d1d") : "transparent")
+        ? (root.themePalette ? root.themePalette.selection : "#2a211c")
+        : (hover.hovered ? (root.themePalette ? root.themePalette.lighterBackground : "#1d1d1d") : "transparent")
       border.width: index === root.currentIndex ? 1 : 0
-      border.color: root.palette ? root.palette.accent : "#6b4028"
+      border.color: root.themePalette ? root.themePalette.accent : "#6b4028"
 
       HoverHandler {
         id: hover
@@ -83,8 +83,8 @@ Item {
         Text {
           width: parent.width
           text: (modelData.confirm === true ? "⚠ " : "") + (modelData.label || modelData.id)
-          color: root.palette
-            ? (modelData.enabled === false ? root.palette.muted : root.palette.foreground)
+          color: root.themePalette
+            ? (modelData.enabled === false ? root.themePalette.muted : root.themePalette.foreground)
             : (modelData.enabled === false ? "#929292" : "#eeeeee")
           elide: Text.ElideRight
           font.family: "monospace"
@@ -95,7 +95,7 @@ Item {
           width: parent.width
           visible: modelData.reason !== undefined && modelData.reason !== null && modelData.reason !== ""
           text: modelData.reason || ""
-          color: root.palette ? root.palette.muted : "#8a8a8a"
+          color: root.themePalette ? root.themePalette.muted : "#8a8a8a"
           elide: Text.ElideRight
           font.family: "monospace"
           font.pixelSize: 9
