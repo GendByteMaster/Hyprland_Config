@@ -90,12 +90,17 @@ t.test("workspace UI owns overview and all-monitor switcher bindings when instal
   t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
   t.eq(#calls.binds, 2)
   t.eq(calls.binds[1].keys, "SUPER + TAB")
-  t.eq(calls.binds[1].dispatcher.kind, "exec")
+  t.eq(type(calls.binds[1].dispatcher), "function")
+  t.eq(calls.binds[1].options.description, "Workspace Overview")
+  calls.binds[1].dispatcher()
+  t.eq(#calls.dispatched, 2)
+  t.eq(calls.dispatched[1].kind, "submap")
+  t.eq(calls.dispatched[1].name, "gendbyte-workspace-overview-opening-guard")
+  t.eq(calls.dispatched[2].kind, "exec")
   t.eq(
-    calls.binds[1].dispatcher.command,
+    calls.dispatched[2].command,
     "/home/test/.local/bin/hyprland-workspace-overview"
   )
-  t.eq(calls.binds[1].options.description, "Workspace Overview")
   t.eq(calls.binds[2].keys, "CTRL + ALT + TAB")
   t.eq(
     calls.binds[2].dispatcher.command,
@@ -124,12 +129,20 @@ t.test("workspace UI adds Try Omarchy overview and Super F10 switcher fallbacks"
   t.eq(calls.binds[2].keys, "CTRL + ALT + TAB")
   t.eq(calls.binds[3].keys, "SUPER + F9")
   t.eq(calls.binds[4].keys, "SUPER + F10")
+  t.eq(type(calls.binds[3].dispatcher), "function")
+  t.eq(type(calls.binds[4].dispatcher), "function")
+
+  calls.binds[3].dispatcher()
+  t.eq(calls.dispatched[#calls.dispatched - 1].name, "gendbyte-workspace-overview-opening-guard")
   t.eq(
-    calls.binds[3].dispatcher.command,
+    calls.dispatched[#calls.dispatched].command,
     "/home/test/.local/bin/hyprland-workspace-overview"
   )
+
+  calls.binds[4].dispatcher()
+  t.eq(calls.dispatched[#calls.dispatched - 1].name, "gendbyte-workspace-overview-opening-guard")
   t.eq(
-    calls.binds[4].dispatcher.command,
+    calls.dispatched[#calls.dispatched].command,
     "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
   )
 end)
