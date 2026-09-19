@@ -61,7 +61,9 @@ Rectangle {
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: modelData.add ? "+" : String(modelData.name || modelData.id)
-            color: palette ? (index === root.selectedIndex ? palette.accent : palette.foreground) : (index === root.selectedIndex ? "#ff9a58" : "#d7d7d7")
+            color: root.themePalette
+              ? (index === root.selectedIndex ? root.themePalette.accent : root.themePalette.foreground)
+              : (index === root.selectedIndex ? "#ff9a58" : "#d7d7d7")
             font.family: "monospace"
             font.pixelSize: modelData.add ? 22 : 12
             font.bold: true
