@@ -7,6 +7,7 @@ Rectangle {
   property var workspacesModel: []
   property int selectedIndex: -1
   property int activeWorkspaceId: -1
+  property var palette: null
 
   signal selected(int index)
   signal activated(int index)
@@ -14,9 +15,9 @@ Rectangle {
   implicitWidth: Math.max(220, workspaceRow.implicitWidth + 28)
   implicitHeight: 86
   radius: 16
-  color: "#e5131313"
+  color: palette ? palette.colorWithAlpha(palette.background, 0.92) : "#e5131313"
   border.width: 1
-  border.color: "#303030"
+  border.color: palette ? palette.border : "#303030"
 
   Row {
     id: workspaceRow
@@ -35,15 +36,19 @@ Rectangle {
         radius: 11
         color: {
           if (index === root.selectedIndex)
-            return "#2a211b"
+            return palette ? palette.selection : "#2a211b"
           if (Number(modelData.id) === root.activeWorkspaceId)
-            return "#211b18"
-          return tileMouse.containsMouse ? "#1d1d1d" : "#171717"
+            return palette ? palette.lighterBackground : "#211b18"
+          return tileMouse.containsMouse
+            ? (palette ? palette.lighterBackground : "#1d1d1d")
+            : (palette ? palette.darkBackground : "#171717")
         }
         border.width: index === root.selectedIndex ? 2 : 1
         border.color: index === root.selectedIndex
-          ? "#ff8a3d"
-          : (Number(modelData.id) === root.activeWorkspaceId ? "#72482f" : "#343434")
+          ? (palette ? palette.accent : "#ff8a3d")
+          : (Number(modelData.id) === root.activeWorkspaceId
+            ? (palette ? palette.accent : "#72482f")
+            : (palette ? palette.border : "#343434"))
 
         Behavior on color {
           ColorAnimation { duration: 80 }
@@ -56,7 +61,7 @@ Rectangle {
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: modelData.add ? "+" : String(modelData.name || modelData.id)
-            color: index === root.selectedIndex ? "#ff9a58" : "#d7d7d7"
+            color: palette ? (index === root.selectedIndex ? palette.accent : palette.foreground) : (index === root.selectedIndex ? "#ff9a58" : "#d7d7d7")
             font.family: "monospace"
             font.pixelSize: modelData.add ? 22 : 12
             font.bold: true
@@ -67,7 +72,7 @@ Rectangle {
             text: modelData.add
               ? "New workspace"
               : String(modelData.count || 0) + ((modelData.count || 0) === 1 ? " window" : " windows")
-            color: "#777777"
+            color: palette ? palette.muted : "#777777"
             font.family: "monospace"
             font.pixelSize: 8
           }
