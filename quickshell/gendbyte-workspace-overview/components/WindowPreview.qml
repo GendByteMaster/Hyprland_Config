@@ -9,6 +9,7 @@ Rectangle {
   property bool selected: false
   property bool capturing: true
 
+  signal selected()
   signal activated()
 
   readonly property var waylandToplevel: toplevel ? toplevel.wayland : null
@@ -97,6 +98,13 @@ Rectangle {
         font.family: "monospace"
         font.pixelSize: 11
       }
+    }
+  }
+
+  HoverHandler {
+    onHoveredChanged: {
+      if (hovered)
+        root.selected()
     }
   }
 
