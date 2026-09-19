@@ -12,8 +12,8 @@ Rectangle {
   signal selected(int index)
   signal activated(int index)
 
-  implicitWidth: Math.max(220, workspaceRow.implicitWidth + 28)
-  implicitHeight: 86
+  implicitWidth: Math.max(260, workspaceRow.implicitWidth + 34)
+  implicitHeight: 96
   radius: 16
   color: root.themePalette ? root.themePalette.colorWithAlpha(root.themePalette.background, 0.92) : "#e5131313"
   border.width: 1
@@ -22,7 +22,7 @@ Rectangle {
   Row {
     id: workspaceRow
     anchors.centerIn: parent
-    spacing: 10
+    spacing: 12
 
     Repeater {
       model: root.workspacesModel
@@ -31,8 +31,8 @@ Rectangle {
         required property int index
         required property var modelData
 
-        width: modelData.add ? 112 : 124
-        height: 58
+        width: modelData.add ? 126 : 142
+        height: 66
         radius: 11
         color: {
           if (index === root.selectedIndex)
@@ -65,7 +65,7 @@ Rectangle {
               ? (index === root.selectedIndex ? root.themePalette.accent : root.themePalette.foreground)
               : (index === root.selectedIndex ? "#ff9a58" : "#d7d7d7")
             font.family: "monospace"
-            font.pixelSize: modelData.add ? 22 : 12
+            font.pixelSize: modelData.add ? 24 : 13
             font.bold: true
           }
 
@@ -76,7 +76,7 @@ Rectangle {
               : String(modelData.count || 0) + ((modelData.count || 0) === 1 ? " window" : " windows")
             color: root.themePalette ? root.themePalette.muted : "#777777"
             font.family: "monospace"
-            font.pixelSize: 8
+            font.pixelSize: 9
           }
         }
 
