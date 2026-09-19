@@ -34,6 +34,8 @@ t.test("overview model normalizes client metadata", function()
     class = "code",
     workspace = { id = 4, name = "4" },
     monitor = 1,
+    monitor_name = "DP-1",
+    focusHistoryID = 2,
     at = { 100, 200 },
     size = { 1200, 800 },
     pid = 42,
@@ -45,6 +47,8 @@ t.test("overview model normalizes client metadata", function()
   t.eq(value.address, "0xabc")
   t.eq(value.workspace_id, 4)
   t.eq(value.monitor_id, 1)
+  t.eq(value.monitor_name, "DP-1")
+  t.eq(value.focus_history_id, 2)
   t.eq(value.geometry.x, 100)
   t.eq(value.geometry.height, 800)
   t.eq(value.floating, true)
@@ -95,6 +99,22 @@ t.test("overview model preserves non-contiguous workspace ids", function()
   t.eq(ids[2], 2)
   t.eq(ids[3], 4)
   t.eq(ids[4], 8)
+end)
+
+t.test("overview model sorts task switcher clients by MRU focus history", function()
+  local clients = {
+    assert(model.normalize_client(client("0x3", 1, 0, 0, 100, 100, { focusHistoryID = 3 }))),
+    assert(model.normalize_client(client("0x1", 1, 0, 0, 100, 100, { focusHistoryID = 0 }))),
+    assert(model.normalize_client(client("0x2", 1, 0, 0, 100, 100, { focusHistoryID = 1 }))),
+    assert(model.normalize_client(client("0x4", 1, 0, 0, 100, 100))),
+  }
+
+  local ordered = model.mru_clients(clients)
+
+  t.eq(ordered[1].address, "0x1")
+  t.eq(ordered[2].address, "0x2")
+  t.eq(ordered[3].address, "0x3")
+  t.eq(ordered[4].address, "0x4")
 end)
 
 t.test("overview model groups clients by workspace", function()
