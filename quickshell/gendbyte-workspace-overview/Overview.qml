@@ -300,45 +300,57 @@ Item {
       readonly property int windowCount: Math.max(1, root.windowModel.length)
       readonly property real gridReserve: {
         if (root.viewMode === "switcher")
-          return 48
-        if (windowCount <= 1)
-          return 58
-        if (windowCount === 2)
-          return 72
-        if (windowCount <= 4)
+          return 56
+        if (windowCount <= 2)
           return 92
-        return 112
+        if (windowCount <= 4)
+          return 108
+        return 124
       }
-      readonly property real gridAvailableHeight: Math.max(170, content.height - gridReserve)
+      readonly property real gridAvailableHeight: Math.max(180, content.height - gridReserve)
       readonly property int columns: {
         if (windowCount <= 1)
           return 1
         if (windowCount === 2)
           return 2
-        return Math.max(1, Math.min(windowCount,
-          Math.ceil(Math.sqrt(windowCount * content.width / Math.max(1, gridAvailableHeight)))))
+        if (windowCount === 3)
+          return 3
+        if (windowCount === 4)
+          return 2
+        if (windowCount <= 6)
+          return 3
+        if (windowCount <= 8)
+          return 4
+        if (windowCount <= 12)
+          return 4
+
+        return Math.max(4, Math.ceil(Math.sqrt(windowCount)))
       }
       readonly property int rows: Math.max(1, Math.ceil(windowCount / columns))
+      readonly property real gridWidthFraction: {
+        if (windowCount <= 1)
+          return 0.68
+        if (windowCount === 2)
+          return 0.88
+        if (windowCount === 3)
+          return 0.92
+        if (windowCount === 4)
+          return 0.84
+        if (windowCount <= 6)
+          return 0.92
+        return 0.94
+      }
+      readonly property real gridTargetWidth: content.width * gridWidthFraction
+      readonly property real previewAspect: 0.60
       readonly property real widthLimitedPreview: (
-        content.width - Math.max(0, columns - 1) * 16
+        gridTargetWidth - Math.max(0, columns - 1) * 18
       ) / columns
       readonly property real heightLimitedPreview: (
-        gridAvailableHeight - Math.max(0, rows - 1) * 16
-      ) / rows / 0.62
-      readonly property real previewCap: {
-        if (windowCount <= 1)
-          return 900
-        if (windowCount === 2)
-          return 760
-        if (windowCount <= 4)
-          return 640
-        if (windowCount <= 6)
-          return 540
-        return 460
-      }
-      readonly property real previewWidth: Math.max(180,
-        Math.min(previewCap, widthLimitedPreview, heightLimitedPreview))
-      readonly property real previewHeight: previewWidth * 0.62
+        gridAvailableHeight - Math.max(0, rows - 1) * 18
+      ) / rows / previewAspect
+      readonly property real previewWidth: Math.max(190,
+        Math.min(widthLimitedPreview, heightLimitedPreview))
+      readonly property real previewHeight: previewWidth * previewAspect
 
       visible: root.opened && targetSurface
       color: "transparent"
@@ -406,10 +418,10 @@ Item {
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
           anchors.verticalCenterOffset: root.viewMode === "overview"
-            ? (surface.windowCount <= 2 ? -28 : -44)
-            : -12
+            ? (surface.windowCount <= 2 ? -38 : -50)
+            : -18
           columns: surface.columns
-          spacing: 16
+          spacing: 18
 
           Repeater {
             model: root.windowModel
