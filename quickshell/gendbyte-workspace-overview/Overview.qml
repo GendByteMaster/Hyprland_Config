@@ -8,7 +8,6 @@ Item {
   id: root
 
   property bool opened: false
-  readonly property string modalSubmap: "gendbyte-workspace-overview-modal"
   property string viewMode: "overview"
   property int selectedIndex: -1
   property int selectedWorkspaceIndex: -1
@@ -185,14 +184,6 @@ Item {
       selectedIndex = windowModel.length - 1
   }
 
-  function enterModalMode() {
-    Hyprland.dispatch('hl.dsp.submap("' + modalSubmap + '")')
-  }
-
-  function leaveModalMode() {
-    Hyprland.dispatch('hl.dsp.submap("reset")')
-  }
-
   function refreshHyprlandState() {
     Hyprland.refreshMonitors()
     Hyprland.refreshWorkspaces()
@@ -207,7 +198,6 @@ Item {
     selectedWorkspaceIndex = activeWorkspaceIndex()
     navigationZone = visibleWindows.length > 0 ? "windows" : "workspaces"
     opened = true
-    enterModalMode()
   }
 
   function showTaskSwitcher() {
@@ -218,11 +208,9 @@ Item {
     selectedWorkspaceIndex = -1
     navigationZone = "windows"
     opened = true
-    enterModalMode()
   }
 
   function hideOverview() {
-    leaveModalMode()
     opened = false
     selectedIndex = -1
     selectedWorkspaceIndex = -1
@@ -297,10 +285,26 @@ Item {
         && screen !== null
         && String(screen.name) === String(root.targetScreen.name)
       readonly property int windowCount: Math.max(1, root.windowModel.length)
-      readonly property real gridReserve: root.viewMode === "overview" ? 142 : 82
-      readonly property real gridAvailableHeight: Math.max(180, content.height - gridReserve)
-      readonly property int columns: Math.max(1, Math.min(windowCount,
-        Math.ceil(Math.sqrt(windowCount * content.width / Math.max(1, gridAvailableHeight)))))
+      readonly property real gridReserve: {
+        if (root.viewMode === "switcher")
+          return 48
+        if (windowCount <= 1)
+          return 58
+        if (windowCount === 2)
+          return 72
+        if (windowCount <= 4)
+          return 92
+        return 112
+      }
+      readonly property real gridAvailableHeight: Math.max(170, content.height - gridReserve)
+      readonly property int columns: {
+        if (windowCount <= 1)
+          return 1
+        if (windowCount === 2)
+          return 2
+        return Math.max(1, Math.min(windowCount,
+          Math.ceil(Math.sqrt(windowCount * content.width / Math.max(1, gridAvailableHeight)))))
+      }
       readonly property int rows: Math.max(1, Math.ceil(windowCount / columns))
       readonly property real widthLimitedPreview: (
         content.width - Math.max(0, columns - 1) * 16
@@ -308,8 +312,19 @@ Item {
       readonly property real heightLimitedPreview: (
         gridAvailableHeight - Math.max(0, rows - 1) * 16
       ) / rows / 0.62
-      readonly property real previewWidth: Math.max(200,
-        Math.min(620, widthLimitedPreview, heightLimitedPreview))
+      readonly property real previewCap: {
+        if (windowCount <= 1)
+          return 900
+        if (windowCount === 2)
+          return 760
+        if (windowCount <= 4)
+          return 640
+        if (windowCount <= 6)
+          return 540
+        return 460
+      }
+      readonly property real previewWidth: Math.max(180,
+        Math.min(previewCap, widthLimitedPreview, heightLimitedPreview))
       readonly property real previewHeight: previewWidth * 0.62
 
       visible: root.opened && targetSurface
@@ -320,7 +335,7 @@ Item {
       WlrLayershell.layer: WlrLayer.Overlay
       focusable: targetSurface
       WlrLayershell.keyboardFocus: targetSurface
-        ? WlrKeyboardFocus.Exclusive
+        ? WlrKeyboardFocus.OnDemand
         : WlrKeyboardFocus.None
 
       anchors {
@@ -377,7 +392,9 @@ Item {
           id: grid
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: root.viewMode === "overview" ? -54 : -18
+          anchors.verticalCenterOffset: root.viewMode === "overview"
+            ? (surface.windowCount <= 2 ? -28 : -44)
+            : -12
           columns: surface.columns
           spacing: 16
 
