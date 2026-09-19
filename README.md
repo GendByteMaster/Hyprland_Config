@@ -107,7 +107,9 @@ Keyboard and pointer behavior:
 - click focuses the selected window
 - `Esc` closes the switcher
 
-In **Try Omarchy for Windows**, `Super + Home` is also registered as the task-switcher fallback. Windows itself may intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
+In **Try Omarchy for Windows**, `Super + F10` is also registered as the task-switcher fallback. It avoids Omarchy's existing `Super + Home` window-width binding. Windows may still intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
+
+While either Workspace Overview or the task switcher is open, the shell activates a dedicated Hyprland submap. Normal Omarchy global bindings are suspended until the overlay closes, which prevents menus and other compositor shortcuts from appearing on top of the modal UI.
 
 Live previews use Quickshell's Hyprland/Wayland integration and `ScreencopyView`; the implementation does not use screenshot-file polling or a render-loop `hyprctl` poller.
 
