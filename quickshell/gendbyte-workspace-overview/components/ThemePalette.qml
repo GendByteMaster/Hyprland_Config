@@ -2,8 +2,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-QtObject {
+Item {
   id: root
+  visible: false
 
   property string colorsPath: String(Quickshell.env("OMARCHY_THEME_COLORS") || "")
 
