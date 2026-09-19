@@ -148,6 +148,33 @@ Item {
     return "0x" + value
   }
 
+  function dimensionValue(value, namedKey, arrayIndex) {
+    if (!value)
+      return 0
+
+    var named = Number(value[namedKey])
+    if (Number.isFinite(named) && named > 0)
+      return named
+
+    var indexed = Number(value[arrayIndex])
+    if (Number.isFinite(indexed) && indexed > 0)
+      return indexed
+
+    return 0
+  }
+
+  function windowAspect(toplevel) {
+    var ipc = toplevel ? toplevel.lastIpcObject : null
+    var size = ipc ? ipc.size : null
+    var width = dimensionValue(size, "width", 0)
+    var height = dimensionValue(size, "height", 1)
+
+    if (width <= 0 || height <= 0)
+      return 1.55
+
+    return Math.max(1.15, Math.min(1.90, width / height))
+  }
+
   function focusedScreen() {
     var screens = Quickshell.screens || []
     var monitor = Hyprland.focusedMonitor
@@ -298,16 +325,6 @@ Item {
         && screen !== null
         && String(screen.name) === String(root.targetScreen.name)
       readonly property int windowCount: Math.max(1, root.windowModel.length)
-      readonly property real gridReserve: {
-        if (root.viewMode === "switcher")
-          return 56
-        if (windowCount <= 2)
-          return 92
-        if (windowCount <= 4)
-          return 108
-        return 124
-      }
-      readonly property real gridAvailableHeight: Math.max(180, content.height - gridReserve)
       readonly property int columns: {
         if (windowCount <= 1)
           return 1
@@ -323,34 +340,26 @@ Item {
           return 4
         if (windowCount <= 12)
           return 4
-
         return Math.max(4, Math.ceil(Math.sqrt(windowCount)))
       }
       readonly property int rows: Math.max(1, Math.ceil(windowCount / columns))
       readonly property real gridWidthFraction: {
         if (windowCount <= 1)
-          return 0.68
+          return 0.72
         if (windowCount === 2)
-          return 0.88
+          return 0.92
         if (windowCount === 3)
-          return 0.92
+          return 0.94
         if (windowCount === 4)
-          return 0.84
-        if (windowCount <= 6)
-          return 0.92
-        return 0.94
+          return 0.86
+        return 0.95
       }
-      readonly property real gridTargetWidth: content.width * gridWidthFraction
-      readonly property real previewAspect: 0.60
-      readonly property real widthLimitedPreview: (
-        gridTargetWidth - Math.max(0, columns - 1) * 18
-      ) / columns
-      readonly property real heightLimitedPreview: (
-        gridAvailableHeight - Math.max(0, rows - 1) * 18
-      ) / rows / previewAspect
-      readonly property real previewWidth: Math.max(190,
-        Math.min(widthLimitedPreview, heightLimitedPreview))
-      readonly property real previewHeight: previewWidth * previewAspect
+      readonly property real cellGap: 18
+      readonly property real gridTargetWidth: windowViewport.width * gridWidthFraction
+      readonly property real cellWidth: Math.max(160,
+        (gridTargetWidth - Math.max(0, columns - 1) * cellGap) / columns)
+      readonly property real cellHeight: Math.max(120,
+        (windowViewport.height - Math.max(0, rows - 1) * cellGap) / rows)
 
       visible: root.opened && targetSurface
       color: "transparent"
@@ -413,67 +422,88 @@ Item {
           font.pixelSize: 10
         }
 
-        Grid {
-          id: grid
-          anchors.horizontalCenter: parent.horizontalCenter
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: root.viewMode === "overview"
-            ? (surface.windowCount <= 2 ? -38 : -50)
-            : -18
-          columns: surface.columns
-          spacing: 18
+        Item {
+          id: windowViewport
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: heading.bottom
+          anchors.topMargin: 18
+          anchors.bottom: shortcutHint.top
+          anchors.bottomMargin: 16
+          clip: true
 
-          Repeater {
-            model: root.windowModel
+          Grid {
+            id: grid
+            anchors.centerIn: parent
+            columns: surface.columns
+            spacing: surface.cellGap
 
-            Components.WindowPreview {
-              required property int index
-              required property var modelData
+            Repeater {
+              model: root.windowModel
 
-              width: surface.previewWidth
-              height: surface.previewHeight
-              toplevel: modelData
-              selected: index === root.selectedIndex
-              capturing: surface.visible
-              themePalette: theme
+              Item {
+                required property int index
+                required property var modelData
 
-              onSelectionRequested: root.selectedIndex = index
-              onActivated: root.activateWindow(modelData)
+                width: surface.cellWidth
+                height: surface.cellHeight
+
+                readonly property real sourceAspect: root.windowAspect(modelData)
+                readonly property real titleHeight: 40
+                readonly property real maxContentHeight: Math.max(80, height - titleHeight)
+                readonly property real widthFromHeight: maxContentHeight * sourceAspect
+                readonly property real cardWidth: Math.min(width, widthFromHeight)
+                readonly property real contentHeight: cardWidth / sourceAspect
+                readonly property real cardHeight: Math.min(height, contentHeight + titleHeight)
+
+                Components.WindowPreview {
+                  anchors.centerIn: parent
+                  width: parent.cardWidth
+                  height: parent.cardHeight
+                  toplevel: parent.modelData
+                  selected: parent.index === root.selectedIndex
+                  capturing: surface.visible
+                  themePalette: theme
+
+                  onSelectionRequested: root.selectedIndex = parent.index
+                  onActivated: root.activateWindow(parent.modelData)
+                }
+              }
             }
           }
-        }
 
-        Rectangle {
-          anchors.centerIn: parent
-          visible: root.windowModel.length === 0
-          width: 320
-          height: 130
-          radius: 14
-          color: theme.darkBackground
-          border.width: 1
-          border.color: theme.border
-
-          Column {
+          Rectangle {
             anchors.centerIn: parent
-            spacing: 8
+            visible: root.windowModel.length === 0
+            width: Math.min(360, parent.width)
+            height: 130
+            radius: 14
+            color: theme.darkBackground
+            border.width: 1
+            border.color: theme.border
 
-            Text {
-              anchors.horizontalCenter: parent.horizontalCenter
-              text: root.viewMode === "switcher"
-                ? "No windows on active monitor workspaces"
-                : "No windows on this workspace"
-              color: theme.foreground
-              font.family: "monospace"
-              font.pixelSize: 12
-              font.bold: true
-            }
+            Column {
+              anchors.centerIn: parent
+              spacing: 8
 
-            Text {
-              anchors.horizontalCenter: parent.horizontalCenter
-              text: "Esc closes the overview"
-              color: theme.muted
-              font.family: "monospace"
-              font.pixelSize: 9
+              Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.viewMode === "switcher"
+                  ? "No windows on active monitor workspaces"
+                  : "No windows on this workspace"
+                color: theme.foreground
+                font.family: "monospace"
+                font.pixelSize: 12
+                font.bold: true
+              }
+
+              Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Esc closes the overview"
+                color: theme.muted
+                font.family: "monospace"
+                font.pixelSize: 9
+              }
             }
           }
         }
@@ -499,6 +529,7 @@ Item {
         }
 
         Text {
+          id: shortcutHint
           anchors.right: parent.right
           anchors.bottom: root.viewMode === "overview" ? workspaceStrip.top : parent.bottom
           anchors.bottomMargin: root.viewMode === "overview" ? 10 : 0
