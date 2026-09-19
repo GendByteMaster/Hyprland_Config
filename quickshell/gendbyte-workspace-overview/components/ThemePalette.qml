@@ -29,6 +29,16 @@ Item {
     return Qt.rgba(r, g, b, alpha)
   }
 
+  function mix(left, right, amount) {
+    var t = Math.max(0, Math.min(1, Number(amount)))
+    return Qt.rgba(
+      left.r + (right.r - left.r) * t,
+      left.g + (right.g - left.g) * t,
+      left.b + (right.b - left.b) * t,
+      left.a + (right.a - left.a) * t
+    )
+  }
+
   function parseToml(text) {
     var result = {}
     var lines = String(text || "").split("\n")
@@ -54,11 +64,17 @@ Item {
     background = raw.background || "#0b0b0b"
     foreground = raw.foreground || "#eeeeee"
     accent = raw.accent || "#ff8a3d"
-    muted = raw.muted || raw.color8 || "#707070"
-    darkBackground = raw.dark_background || raw.color0 || background
-    lighterBackground = raw.lighter_background || raw.color8 || "#202020"
-    selection = raw.selection || lighterBackground
-    border = raw.color8 || muted
+
+    var derivedMuted = mix(foreground, background, 0.52)
+    var derivedRaised = mix(background, foreground, mode === "light" ? 0.08 : 0.10)
+    var derivedSelection = mix(background, accent, mode === "light" ? 0.12 : 0.18)
+    var derivedBorder = mix(background, foreground, mode === "light" ? 0.18 : 0.22)
+
+    muted = raw.muted || derivedMuted
+    darkBackground = raw.dark_background || background
+    lighterBackground = raw.lighter_background || raw.selection || derivedRaised
+    selection = raw.selection || raw.lighter_background || derivedSelection
+    border = raw.muted || derivedBorder
   }
 
   function refresh() {
