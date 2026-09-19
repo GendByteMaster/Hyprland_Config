@@ -9,7 +9,7 @@ Rectangle {
   required property var toplevel
   property bool selected: false
   property bool capturing: true
-  property var palette: null
+  property var themePalette: null
 
   signal selectionRequested()
   signal activated()
@@ -38,9 +38,9 @@ Rectangle {
   }
 
   radius: 14
-  color: selected && palette ? palette.selection : (palette ? palette.darkBackground : "#151515")
+  color: selected && root.themePalette ? root.themePalette.selection : (root.themePalette ? root.themePalette.darkBackground : "#151515")
   border.width: selected ? 2 : 1
-  border.color: selected && palette ? palette.accent : (palette ? palette.border : "#383838")
+  border.color: selected && root.themePalette ? root.themePalette.accent : (root.themePalette ? root.themePalette.border : "#383838")
   clip: true
 
   Behavior on border.color {
@@ -54,7 +54,7 @@ Rectangle {
     anchors.top: parent.top
     anchors.bottom: titleBar.top
     captureSource: root.capturing ? root.waylandToplevel : null
-    live: root.capturing && root.visible
+    live: false
     paintCursor: false
     visible: hasContent
   }
@@ -77,7 +77,7 @@ Rectangle {
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     height: 40
-    color: palette ? palette.colorWithAlpha(palette.background, 0.92) : "#e9141414"
+    color: root.themePalette ? root.themePalette.colorWithAlpha(root.themePalette.background, 0.92) : "#e9141414"
 
     RowLayout {
       anchors.fill: parent
@@ -97,7 +97,7 @@ Rectangle {
       Text {
         Layout.fillWidth: true
         text: root.title
-        color: root.palette ? root.palette.foreground : (root.selected ? "#ffffff" : "#c4c4c4")
+        color: root.themePalette ? root.themePalette.foreground : (root.selected ? "#ffffff" : "#c4c4c4")
         elide: Text.ElideRight
         textFormat: Text.PlainText
         font.family: "monospace"
@@ -109,15 +109,15 @@ Rectangle {
         Layout.preferredWidth: monitorLabel.implicitWidth + 14
         Layout.preferredHeight: 22
         radius: 7
-        color: root.palette ? root.palette.lighterBackground : "#202020"
+        color: root.themePalette ? root.themePalette.lighterBackground : "#202020"
         border.width: 1
-        border.color: root.palette ? (root.selected ? root.palette.accent : root.palette.border) : (root.selected ? "#70472e" : "#343434")
+        border.color: root.themePalette ? (root.selected ? root.themePalette.accent : root.themePalette.border) : (root.selected ? "#70472e" : "#343434")
 
         Text {
           id: monitorLabel
           anchors.centerIn: parent
           text: root.monitorName
-          color: root.palette ? (root.selected ? root.palette.accent : root.palette.muted) : (root.selected ? "#ff9a58" : "#858585")
+          color: root.themePalette ? (root.selected ? root.themePalette.accent : root.themePalette.muted) : (root.selected ? "#ff9a58" : "#858585")
           font.family: "monospace"
           font.pixelSize: 8
         }
