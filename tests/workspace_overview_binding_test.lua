@@ -75,12 +75,12 @@ t.test("workspace overview adds Super F9 fallback only in Try Omarchy", function
   t.eq(calls.unbinds[1], "SUPER + TAB")
   t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
   t.eq(calls.unbinds[3], "SUPER + F9")
-  t.eq(calls.unbinds[4], "CTRL + ALT + F9")
+  t.eq(calls.unbinds[4], "SUPER + HOME")
   t.eq(#calls.binds, 4)
   t.eq(calls.binds[1].keys, "SUPER + TAB")
   t.eq(calls.binds[2].keys, "CTRL + ALT + TAB")
   t.eq(calls.binds[3].keys, "SUPER + F9")
-  t.eq(calls.binds[4].keys, "CTRL + ALT + F9")
+  t.eq(calls.binds[4].keys, "SUPER + HOME")
   t.eq(
     calls.binds[3].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview"
