@@ -31,7 +31,7 @@ local function fake_hyprland()
   return hl, calls
 end
 
-t.test("workspace overview owns Super Tab only when installed", function()
+t.test("workspace UI owns overview and all-monitor switcher bindings when installed", function()
   local hl, calls = fake_hyprland()
 
   local registered = overview.register(hl, {}, {
@@ -42,9 +42,10 @@ t.test("workspace overview owns Super Tab only when installed", function()
   })
 
   t.eq(registered, true)
-  t.eq(#calls.unbinds, 1)
+  t.eq(#calls.unbinds, 2)
   t.eq(calls.unbinds[1], "SUPER + TAB")
-  t.eq(#calls.binds, 1)
+  t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
+  t.eq(#calls.binds, 2)
   t.eq(calls.binds[1].keys, "SUPER + TAB")
   t.eq(calls.binds[1].dispatcher.kind, "exec")
   t.eq(
@@ -52,6 +53,12 @@ t.test("workspace overview owns Super Tab only when installed", function()
     "/home/test/.local/bin/hyprland-workspace-overview"
   )
   t.eq(calls.binds[1].options.description, "Workspace Overview")
+  t.eq(calls.binds[2].keys, "CTRL + ALT + TAB")
+  t.eq(
+    calls.binds[2].dispatcher.command,
+    "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
+  )
+  t.eq(calls.binds[2].options.description, "All-Monitor Window Switcher")
 end)
 
 t.test("workspace overview adds Super F9 fallback only in Try Omarchy", function()
@@ -64,15 +71,23 @@ t.test("workspace overview adds Super F9 fallback only in Try Omarchy", function
   })
 
   t.eq(registered, true)
-  t.eq(#calls.unbinds, 2)
+  t.eq(#calls.unbinds, 4)
   t.eq(calls.unbinds[1], "SUPER + TAB")
-  t.eq(calls.unbinds[2], "SUPER + F9")
-  t.eq(#calls.binds, 2)
+  t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
+  t.eq(calls.unbinds[3], "SUPER + F9")
+  t.eq(calls.unbinds[4], "CTRL + ALT + F9")
+  t.eq(#calls.binds, 4)
   t.eq(calls.binds[1].keys, "SUPER + TAB")
-  t.eq(calls.binds[2].keys, "SUPER + F9")
+  t.eq(calls.binds[2].keys, "CTRL + ALT + TAB")
+  t.eq(calls.binds[3].keys, "SUPER + F9")
+  t.eq(calls.binds[4].keys, "CTRL + ALT + F9")
   t.eq(
-    calls.binds[2].dispatcher.command,
+    calls.binds[3].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview"
+  )
+  t.eq(
+    calls.binds[4].dispatcher.command,
+    "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
   )
 end)
 
