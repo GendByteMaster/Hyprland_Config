@@ -61,7 +61,7 @@ t.test("workspace UI owns overview and all-monitor switcher bindings when instal
   t.eq(calls.binds[2].options.description, "All-Monitor Window Switcher")
 end)
 
-t.test("workspace overview adds Super F9 fallback only in Try Omarchy", function()
+t.test("workspace UI adds Try Omarchy overview and Super Home switcher fallbacks", function()
   local hl, calls = fake_hyprland()
 
   local registered = overview.register(hl, {}, {
