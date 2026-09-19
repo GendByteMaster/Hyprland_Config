@@ -25,6 +25,16 @@ ShellRoot {
       return "ok"
     }
 
+    function toggleSwitcher(): string {
+      overview.toggleTaskSwitcher()
+      return "ok"
+    }
+
+    function showSwitcher(): string {
+      overview.showTaskSwitcher()
+      return "ok"
+    }
+
     function hide(): string {
       overview.hideOverview()
       return "ok"
