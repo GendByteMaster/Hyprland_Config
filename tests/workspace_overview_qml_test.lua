@@ -120,9 +120,24 @@ t.test("task switcher includes windows from every active monitor workspace only"
 
   contains(overview, "var workspace = toplevel.workspace")
   contains(overview, "if (!workspace || !workspace.active)")
+  contains(overview, "focusHistoryID")
+  contains(overview, "return leftOrder - rightOrder")
   contains(overview, 'readonly property var windowModel: viewMode === "switcher"')
   contains(overview, 'visible: root.viewMode === "overview"')
   contains(overview, '"←→↑↓ select   Enter focus   Esc close"')
   contains(preview, "HoverHandler")
   contains(preview, "selectionRequested")
+  contains(preview, "monitorName")
+  contains(preview, "workspace.monitor")
+end)
+
+
+t.test("task switcher grid is bounded by both width and height", function()
+  local overview = read("quickshell/gendbyte-workspace-overview/Overview.qml")
+
+  contains(overview, "gridAvailableHeight")
+  contains(overview, "widthLimitedPreview")
+  contains(overview, "heightLimitedPreview")
+  contains(overview, "Math.ceil(windowCount / columns)")
+  contains(overview, "Math.min(520, widthLimitedPreview, heightLimitedPreview)")
 end)
