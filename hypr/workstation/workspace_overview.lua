@@ -2,6 +2,8 @@ local compat = require("hypr.workstation.compat")
 
 local M = {}
 
+local MODAL_SUBMAP = "gendbyte-workspace-overview-modal"
+
 local function overview_path(options)
   if options and type(options.launcher) == "string" and options.launcher ~= "" then
     return options.launcher
@@ -39,6 +41,10 @@ function M.register(hl, _o, options)
 
   local command = overview_path(options)
   local exists = options.exists or default_exists
+
+  if type(hl.define_submap) == "function" then
+    hl.define_submap(MODAL_SUBMAP, function() end)
+  end
 
   if not exists(command) then
     return false
