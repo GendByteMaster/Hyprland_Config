@@ -113,6 +113,7 @@ function M.verify(options)
     source_quickshell,
     paths.join(source_quickshell, "shell.qml"),
     paths.join(source_quickshell, "ProjectLauncher.qml"),
+    paths.join(source_quickshell, "components", "ThemePalette.qml"),
     source_backend,
     source_overview_launcher,
     source_overview_quickshell,
