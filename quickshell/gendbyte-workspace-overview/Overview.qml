@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Wayland
 import "components" as Components
 
@@ -13,6 +14,14 @@ Item {
   property int selectedWorkspaceIndex: -1
   property string navigationZone: "windows"
   property var targetScreen: null
+
+  Components.ThemePalette {
+    id: theme
+  }
+
+  Process {
+    id: omarchyMenuProcess
+  }
 
   readonly property int focusedWorkspaceId: Hyprland.focusedWorkspace
     ? Number(Hyprland.focusedWorkspace.id)
@@ -192,6 +201,7 @@ Item {
 
   function showOverview() {
     viewMode = "overview"
+    theme.refresh()
     refreshHyprlandState()
     targetScreen = focusedScreen()
     selectedIndex = visibleWindows.length > 0 ? 0 : -1
@@ -202,6 +212,7 @@ Item {
 
   function showTaskSwitcher() {
     viewMode = "switcher"
+    theme.refresh()
     refreshHyprlandState()
     targetScreen = focusedScreen()
     selectedIndex = switcherWindows.length > 0 ? 0 : -1
@@ -230,6 +241,13 @@ Item {
       hideOverview()
     else
       showTaskSwitcher()
+  }
+
+  function handoffToOmarchyMenu() {
+    hideOverview()
+    Qt.callLater(function() {
+      omarchyMenuProcess.exec(["omarchy", "menu"])
+    })
   }
 
   function activateWindow(toplevel) {
@@ -352,7 +370,7 @@ Item {
 
       Rectangle {
         anchors.fill: parent
-        color: "#df0b0b0b"
+        color: theme.colorWithAlpha(theme.background, 0.90)
       }
 
       MouseArea {
@@ -372,7 +390,7 @@ Item {
           text: root.viewMode === "switcher"
             ? "Windows"
             : "Workspace " + (root.focusedWorkspaceId > 0 ? root.focusedWorkspaceId : "")
-          color: "#eeeeee"
+          color: theme.foreground
           font.family: "monospace"
           font.pixelSize: 18
           font.bold: true
@@ -383,7 +401,7 @@ Item {
           anchors.leftMargin: 14
           anchors.baseline: heading.baseline
           text: root.windowModel.length + (root.windowModel.length === 1 ? " window" : " windows")
-          color: "#777777"
+          color: theme.muted
           font.family: "monospace"
           font.pixelSize: 10
         }
@@ -410,6 +428,7 @@ Item {
               toplevel: modelData
               selected: index === root.selectedIndex
               capturing: surface.visible
+              palette: theme
 
               onSelectionRequested: root.selectedIndex = index
               onActivated: root.activateWindow(modelData)
@@ -423,9 +442,9 @@ Item {
           width: 320
           height: 130
           radius: 14
-          color: "#151515"
+          color: theme.darkBackground
           border.width: 1
-          border.color: "#303030"
+          border.color: theme.border
 
           Column {
             anchors.centerIn: parent
@@ -436,7 +455,7 @@ Item {
               text: root.viewMode === "switcher"
                 ? "No windows on active monitor workspaces"
                 : "No windows on this workspace"
-              color: "#d8d8d8"
+              color: theme.foreground
               font.family: "monospace"
               font.pixelSize: 12
               font.bold: true
@@ -445,7 +464,7 @@ Item {
             Text {
               anchors.horizontalCenter: parent.horizontalCenter
               text: "Esc closes the overview"
-              color: "#666666"
+              color: theme.muted
               font.family: "monospace"
               font.pixelSize: 9
             }
@@ -462,6 +481,7 @@ Item {
           workspacesModel: root.workspaceEntries
           selectedIndex: root.navigationZone === "workspaces" ? root.selectedWorkspaceIndex : -1
           activeWorkspaceId: root.focusedWorkspaceId
+          palette: theme
 
           onSelected: function(index) {
             root.selectWorkspace(index)
@@ -480,7 +500,7 @@ Item {
             : (root.navigationZone === "workspaces"
               ? "←→ workspace   Enter switch/create   Tab windows   Esc close"
               : "←→↑↓ windows   Enter focus   Tab workspaces   Esc close")
-          color: "#686868"
+          color: theme.muted
           font.family: "monospace"
           font.pixelSize: 9
         }
@@ -495,6 +515,12 @@ Item {
         Keys.onPressed: function(event) {
           if (!root.opened)
             return
+
+          if (event.key === Qt.Key_Meta) {
+            root.handoffToOmarchyMenu()
+            event.accepted = true
+            return
+          }
 
           if (event.key === Qt.Key_Escape) {
             root.hideOverview()
