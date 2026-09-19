@@ -9,7 +9,7 @@ Rectangle {
   property bool selected: false
   property bool capturing: true
 
-  signal selected()
+  signal selectionRequested()
   signal activated()
 
   readonly property var waylandToplevel: toplevel ? toplevel.wayland : null
@@ -104,7 +104,7 @@ Rectangle {
   HoverHandler {
     onHoveredChanged: {
       if (hovered)
-        root.selected()
+        root.selectionRequested()
     }
   }
 
