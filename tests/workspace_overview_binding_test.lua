@@ -4,10 +4,12 @@ local overview = require("hypr.workstation.workspace_overview")
 local function fake_hyprland()
   local calls = {
     binds = {},
+    submap_binds = {},
     unbinds = {},
     submaps = {},
   }
 
+  local active_submap = nil
   local hl = { dsp = {} }
 
   function hl.dsp.exec_cmd(command)
@@ -18,11 +20,18 @@ local function fake_hyprland()
   end
 
   function hl.bind(keys, dispatcher, options)
-    calls.binds[#calls.binds + 1] = {
+    local item = {
       keys = keys,
       dispatcher = dispatcher,
       options = options or {},
     }
+
+    if active_submap then
+      item.submap = active_submap
+      calls.submap_binds[#calls.submap_binds + 1] = item
+    else
+      calls.binds[#calls.binds + 1] = item
+    end
   end
 
   function hl.unbind(keys)
@@ -32,7 +41,9 @@ local function fake_hyprland()
   function hl.define_submap(name, callback)
     calls.submaps[#calls.submaps + 1] = name
     if callback then
+      active_submap = name
       callback()
+      active_submap = nil
     end
   end
 
@@ -52,6 +63,11 @@ t.test("workspace UI owns overview and all-monitor switcher bindings when instal
   t.eq(registered, true)
   t.eq(#calls.submaps, 1)
   t.eq(calls.submaps[1], "gendbyte-workspace-overview-modal")
+  t.eq(#calls.submap_binds, 2)
+  t.eq(calls.submap_binds[1].keys, "SUPER + SUPER_L")
+  t.eq(calls.submap_binds[1].options.release, true)
+  t.eq(calls.submap_binds[2].keys, "SUPER + SUPER_R")
+  t.eq(calls.submap_binds[2].options.release, true)
   t.eq(#calls.unbinds, 2)
   t.eq(calls.unbinds[1], "SUPER + TAB")
   t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
@@ -110,6 +126,8 @@ t.test("workspace overview leaves Super Tab untouched before install", function(
   })
 
   t.eq(registered, false)
+  t.eq(#calls.submaps, 0)
+  t.eq(#calls.submap_binds, 0)
   t.eq(#calls.unbinds, 0)
   t.eq(#calls.binds, 0)
 end)
