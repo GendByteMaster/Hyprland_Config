@@ -52,13 +52,16 @@ function M.register(hl, _o, options)
     "All-Monitor Window Switcher"
   )
 
-  -- Windows owns Win+Tab and Ctrl+Alt+Tab before the guest sees them unless
-  -- QEMU has raw keyboard grab. Keep guest-safe fallbacks only in Try Omarchy.
+  -- Try Omarchy may lose host-owned chords before they reach Hyprland.
+  -- Super+Home is the accessibility-oriented alternate requested for the
+  -- persistent task switcher. Windows may also own Win+Home unless QEMU raw
+  -- keyboard grab is active, so this is a convenience fallback, not a
+  -- guaranteed host-bypass shortcut.
   if compat.is_try_omarchy(options) then
     register_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
     register_binding(
       hl,
-      "CTRL + ALT + F9",
+      "SUPER + HOME",
       command .. " task-switcher",
       "All-Monitor Window Switcher (Try Omarchy)"
     )
