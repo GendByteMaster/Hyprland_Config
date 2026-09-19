@@ -26,6 +26,10 @@ FloatingWindow {
   property string repoRoot: String(Quickshell.env("HYPRLAND_WORKSTATION_REPO_ROOT") || "")
   property string backendScript: repoRoot === "" ? "" : repoRoot + "/project-launcher.lua"
 
+  Components.ThemePalette {
+    id: theme
+  }
+
   readonly property var selectedProject:
     selectedProjectIndex >= 0 && selectedProjectIndex < projects.length
       ? projects[selectedProjectIndex] : null
@@ -78,6 +82,7 @@ FloatingWindow {
   }
 
   function showLauncher() {
+    theme.refresh()
     visible = true
     pendingAction = null
     confirmDialog.opened = false
@@ -324,9 +329,9 @@ FloatingWindow {
   Rectangle {
     anchors.fill: parent
     radius: 18
-    color: "#ed111111"
+    color: theme.colorWithAlpha(theme.background, 0.94)
     border.width: 1
-    border.color: "#3b3b3b"
+    border.color: theme.border
 
     ColumnLayout {
       anchors.fill: parent
@@ -336,6 +341,7 @@ FloatingWindow {
       Components.SearchField {
         id: searchField
         Layout.fillWidth: true
+        palette: theme
 
         onQueryChanged: queryTimer.restart()
         onMoveUp: root.moveProject(-1)
@@ -355,9 +361,9 @@ FloatingWindow {
           Layout.fillHeight: true
           Layout.preferredWidth: 1
           radius: 12
-          color: "#151515"
+          color: theme.darkBackground
           border.width: 1
-          border.color: "#282828"
+          border.color: theme.border
 
           ColumnLayout {
             anchors.fill: parent
@@ -371,7 +377,7 @@ FloatingWindow {
 
               Text {
                 text: "Projects"
-                color: "#9a9a9a"
+                color: theme.muted
                 font.family: "monospace"
                 font.pixelSize: 11
                 font.bold: true
@@ -386,9 +392,9 @@ FloatingWindow {
                 Layout.preferredWidth: 104
                 Layout.preferredHeight: 30
                 radius: 8
-                color: addFolderMouse.containsMouse ? "#25201c" : "#1b1b1b"
+                color: addFolderMouse.containsMouse ? theme.selection : theme.lighterBackground
                 border.width: 1
-                border.color: addFolderMouse.containsMouse ? "#ff8a3d" : "#383838"
+                border.color: addFolderMouse.containsMouse ? theme.accent : theme.border
 
                 Row {
                   anchors.centerIn: parent
@@ -396,7 +402,7 @@ FloatingWindow {
 
                   Text {
                     text: "+"
-                    color: "#ff8a3d"
+                    color: theme.accent
                     font.family: "monospace"
                     font.pixelSize: 15
                     font.bold: true
@@ -404,7 +410,7 @@ FloatingWindow {
 
                   Text {
                     text: "Add folder"
-                    color: "#d6d6d6"
+                    color: theme.foreground
                     font.family: "monospace"
                     font.pixelSize: 10
                   }
@@ -428,6 +434,7 @@ FloatingWindow {
                 id: projectList
                 anchors.fill: parent
                 visible: root.projects.length > 0
+                palette: theme
                 projectsModel: root.projects
                 currentIndex: root.selectedProjectIndex
                 onSelected: function(index) { root.selectProject(index) }
@@ -440,9 +447,9 @@ FloatingWindow {
                 height: 190
                 visible: root.projects.length === 0
                 radius: 14
-                color: "#181818"
+                color: theme.darkBackground
                 border.width: 1
-                border.color: "#303030"
+                border.color: theme.border
 
                 Column {
                   anchors.centerIn: parent
@@ -464,9 +471,9 @@ FloatingWindow {
                         width: 18
                         height: 9
                         radius: 3
-                        color: "#30241c"
+                        color: theme.selection
                         border.width: 1
-                        border.color: "#ff8a3d"
+                        border.color: theme.accent
                       }
 
                       Rectangle {
@@ -475,9 +482,9 @@ FloatingWindow {
                         width: 38
                         height: 24
                         radius: 6
-                        color: "#241d18"
+                        color: theme.selection
                         border.width: 1
-                        border.color: "#ff8a3d"
+                        border.color: theme.accent
                       }
                     }
                   }
@@ -485,7 +492,7 @@ FloatingWindow {
                   Text {
                     width: parent.width
                     text: "No project folders yet"
-                    color: "#eeeeee"
+                    color: theme.foreground
                     horizontalAlignment: Text.AlignHCenter
                     font.family: "monospace"
                     font.pixelSize: 13
@@ -495,7 +502,7 @@ FloatingWindow {
                   Text {
                     width: parent.width
                     text: "Choose a folder that contains your Git projects.\nYou can add more folders later."
-                    color: "#777777"
+                    color: theme.muted
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
                     font.family: "monospace"
@@ -513,7 +520,7 @@ FloatingWindow {
                       width: 154
                       height: 34
                       radius: 9
-                      color: selectFolderMouse.containsMouse ? "#ff9857" : "#ff8a3d"
+                      color: theme.accent
 
                       Row {
                         anchors.centerIn: parent
@@ -521,7 +528,7 @@ FloatingWindow {
 
                         Text {
                           text: "+"
-                          color: "#151515"
+                          color: theme.darkBackground
                           font.family: "monospace"
                           font.pixelSize: 14
                           font.bold: true
@@ -529,7 +536,7 @@ FloatingWindow {
 
                         Text {
                           text: "Select folder"
-                          color: "#151515"
+                          color: theme.darkBackground
                           font.family: "monospace"
                           font.pixelSize: 11
                           font.bold: true
@@ -557,9 +564,9 @@ FloatingWindow {
           Layout.fillHeight: true
           Layout.preferredWidth: 1
           radius: 12
-          color: "#151515"
+          color: theme.darkBackground
           border.width: 1
-          border.color: "#282828"
+          border.color: theme.border
 
           ColumnLayout {
             anchors.fill: parent
@@ -577,6 +584,7 @@ FloatingWindow {
             Components.ActionList {
               id: actionList
               Layout.fillWidth: true
+              palette: theme
               Layout.fillHeight: true
               actionsModel: root.actions
               currentIndex: root.selectedActionIndex
@@ -595,6 +603,7 @@ FloatingWindow {
 
       Components.StatusMessage {
         Layout.fillWidth: true
+        palette: theme
         message: root.statusText
         error: root.statusError
       }
@@ -602,7 +611,7 @@ FloatingWindow {
       Text {
         Layout.fillWidth: true
         text: "↑↓ navigate   Tab/→ actions   Enter run   Esc close"
-        color: "#686868"
+        color: theme.muted
         horizontalAlignment: Text.AlignRight
         font.family: "monospace"
         font.pixelSize: 9
@@ -612,6 +621,7 @@ FloatingWindow {
     Components.FolderPicker {
       id: folderPicker
       anchors.fill: parent
+      palette: theme
 
       onBrowseRequested: function(path) {
         root.browseFolder(path)
@@ -629,6 +639,7 @@ FloatingWindow {
     Components.ConfirmDialog {
       id: confirmDialog
       anchors.fill: parent
+      palette: theme
 
       onConfirmed: {
         opened = false
