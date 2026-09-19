@@ -351,7 +351,7 @@ Item {
               selected: index === root.selectedIndex
               capturing: surface.visible
 
-              onSelected: root.selectedIndex = index
+              onSelectionRequested: root.selectedIndex = index
               onActivated: root.activateWindow(modelData)
             }
           }
