@@ -42,6 +42,10 @@ function M.register(hl, _o, options)
   local command = overview_path(options)
   local exists = options.exists or default_exists
 
+  if not exists(command) then
+    return false
+  end
+
   if type(hl.define_submap) == "function" then
     hl.define_submap(MODAL_SUBMAP, function()
       -- Opening the overview with Super+Tab while Super is still held can
@@ -56,10 +60,6 @@ function M.register(hl, _o, options)
         description = "Suppress single-Super menu while Workspace Overview is open",
       })
     end)
-  end
-
-  if not exists(command) then
-    return false
   end
 
   register_binding(hl, "SUPER + TAB", command, "Workspace Overview")
