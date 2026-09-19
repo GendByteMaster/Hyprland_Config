@@ -99,7 +99,7 @@ This deliberately replaces Omarchy's default `Ctrl + Alt + Tab` action (cycle fo
 
 Shows one persistent task switcher on the currently focused physical monitor. Its window list includes windows from every Hyprland workspace that is currently active on any physical monitor, so windows on secondary displays remain available without including hidden/inactive workspaces.
 
-The switcher is MRU ordered from Hyprland `focusHistoryID` (most recent first), shows each window's physical monitor name, and scales its grid against both available width and height.
+The switcher is MRU ordered from Hyprland `focusHistoryID` (most recent first), shows each window's physical monitor name, and scales its grid against both available width and height. Preview sizing is automatic: one window receives a large card, two windows are arranged side by side, 3–4 use medium cards, and denser sets progressively reduce the preview cap.
 
 Keyboard and pointer behavior:
 
@@ -111,7 +111,7 @@ Keyboard and pointer behavior:
 
 In **Try Omarchy for Windows**, `Super + F10` is also registered as the task-switcher fallback. It avoids Omarchy's existing `Super + Home` window-width binding. Windows may still intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
 
-While either Workspace Overview or the task switcher is open, the shell activates a dedicated Hyprland submap. Normal Omarchy global bindings are suspended until the overlay closes. The modal submap also shadows the single-`Super` release binding, so opening the overview with `Super + Tab` does not immediately trigger Omarchy Menu when `Super` is released.
+Opening Workspace Overview with a Super-based shortcut uses a short-lived Hyprland **opening guard**. It consumes only the Super release that belongs to the opening chord and immediately returns to the normal Omarchy keymap. After that, pressing `Super` normally can open Omarchy Menu again. The overview uses on-demand keyboard focus rather than permanent exclusive keyboard ownership, so another Omarchy overlay can take focus when requested.
 
 Live previews use Quickshell's Hyprland/Wayland integration and `ScreencopyView`; the implementation does not use screenshot-file polling or a render-loop `hyprctl` poller.
 
