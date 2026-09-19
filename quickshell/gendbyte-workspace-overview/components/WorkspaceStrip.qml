@@ -11,13 +11,15 @@ Rectangle {
   signal selected(int index)
   signal activated(int index)
 
-  implicitHeight: 94
+  implicitWidth: Math.max(220, workspaceRow.implicitWidth + 28)
+  implicitHeight: 86
   radius: 16
   color: "#e5131313"
   border.width: 1
   border.color: "#303030"
 
   Row {
+    id: workspaceRow
     anchors.centerIn: parent
     spacing: 10
 
@@ -28,8 +30,8 @@ Rectangle {
         required property int index
         required property var modelData
 
-        width: modelData.add ? 116 : 132
-        height: 66
+        width: modelData.add ? 112 : 124
+        height: 58
         radius: 11
         color: {
           if (index === root.selectedIndex)
