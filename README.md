@@ -8,6 +8,7 @@ The project does **not** fork Hyprland or Omarchy and does not edit `/usr/share/
 
 - **v0.1** — Num Lock Mouse Mode
 - **v0.2** — System Monitor topbar + `btop`
+- **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher / Terminal Workflow Layer
 
 The architecture is Hyprland-first. Omarchy-specific pieces are adapters or optional plugins rather than a runtime requirement for the core workstation layer.
@@ -75,6 +76,40 @@ On Omarchy, the optional `gendbyte.system-monitor` plugin adds topbar telemetry 
 Clicking the monitor uses Omarchy's terminal launcher path to open or focus `btop`.
 
 This feature is optional in v0.3. A plain Hyprland installation does not create Omarchy plugin directories and does not require the Omarchy CLI.
+
+## v0.4 — Workspace Overview + All-Monitor Window Switcher
+
+v0.4 adds two related but distinct Quickshell surfaces.
+
+### Workspace Overview
+
+```text
+Super + Tab
+```
+
+Shows the focused Hyprland workspace with live compositor-backed previews and the workspace strip.
+
+### All-Monitor Window Switcher
+
+```text
+Ctrl + Alt + Tab
+```
+
+Shows one persistent task switcher on the currently focused physical monitor. Its window list includes windows from every Hyprland workspace that is currently active on any physical monitor, so windows on secondary displays remain available without including hidden/inactive workspaces.
+
+The switcher is MRU ordered from Hyprland `focusHistoryID` (most recent first), shows each window's physical monitor name, and scales its grid against both available width and height.
+
+Keyboard and pointer behavior:
+
+- `Up/Down/Left/Right` moves the selected window
+- `Enter` focuses the selected window, including windows on another physical monitor
+- pointer hover updates selection
+- click focuses the selected window
+- `Esc` closes the switcher
+
+In **Try Omarchy for Windows**, `Super + Home` is also registered as the task-switcher fallback. Windows itself may intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
+
+Live previews use Quickshell's Hyprland/Wayland integration and `ScreencopyView`; the implementation does not use screenshot-file polling or a render-loop `hyprctl` poller.
 
 ## v0.3 — Project Launcher
 
@@ -381,6 +416,7 @@ verify.lua
 
 - **v0.1** — Num Lock Mouse Mode
 - **v0.2** — System Monitor / `btop` integration
+- **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher + Terminal Workflow Layer
 - **v0.4** — workspace orchestration around projects
 - **v0.5** — unified Command Center and optional custom shell UI
