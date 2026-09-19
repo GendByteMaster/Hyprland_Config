@@ -2,7 +2,7 @@ local compat = require("hypr.workstation.compat")
 
 local M = {}
 
-local MODAL_SUBMAP = "gendbyte-workspace-overview-modal"
+local OPENING_GUARD_SUBMAP = "gendbyte-workspace-overview-opening-guard"
 
 local function overview_path(options)
   if options and type(options.launcher) == "string" and options.launcher ~= "" then
@@ -32,6 +32,27 @@ local function register_binding(hl, keys, command, description)
   })
 end
 
+local function register_super_binding(hl, keys, command, description)
+  if type(hl.unbind) == "function" then
+    hl.unbind(keys)
+  end
+
+  if type(hl.dispatch) == "function" then
+    hl.bind(keys, function()
+      -- Enter the guard before launching the UI so the release event is
+      -- consumed even on a cold Quickshell start.
+      hl.dispatch(hl.dsp.submap(OPENING_GUARD_SUBMAP))
+      hl.dispatch(hl.dsp.exec_cmd(command))
+    end, {
+      description = description,
+    })
+  else
+    hl.bind(keys, hl.dsp.exec_cmd(command), {
+      description = description,
+    })
+  end
+end
+
 function M.register(hl, _o, options)
   options = options or {}
 
@@ -47,22 +68,24 @@ function M.register(hl, _o, options)
   end
 
   if type(hl.define_submap) == "function" then
-    hl.define_submap(MODAL_SUBMAP, function()
-      -- Opening the overview with Super+Tab while Super is still held can
-      -- otherwise trigger Omarchy's single-Super menu when the modifier is
-      -- released. Shadow that release binding only inside the modal submap.
-      hl.bind("SUPER + SUPER_L", function() end, {
+    hl.define_submap(OPENING_GUARD_SUBMAP, function()
+      -- Consume only the Super release that belongs to the opening chord,
+      -- then immediately return to the normal Omarchy keymap.
+      hl.bind("Super_L", hl.dsp.submap("reset"), {
         release = true,
-        description = "Suppress single-Super menu while Workspace Overview is open",
+        description = "Finish Workspace Overview opening guard",
       })
-      hl.bind("SUPER + SUPER_R", function() end, {
+      hl.bind("Super_R", hl.dsp.submap("reset"), {
         release = true,
-        description = "Suppress single-Super menu while Workspace Overview is open",
+        description = "Finish Workspace Overview opening guard",
+      })
+      hl.bind("Escape", hl.dsp.submap("reset"), {
+        description = "Cancel Workspace Overview opening guard",
       })
     end)
   end
 
-  register_binding(hl, "SUPER + TAB", command, "Workspace Overview")
+  register_super_binding(hl, "SUPER + TAB", command, "Workspace Overview")
   register_binding(
     hl,
     "CTRL + ALT + TAB",
@@ -74,8 +97,8 @@ function M.register(hl, _o, options)
   -- Keep two-key accessibility fallbacks that do not collide with documented
   -- Omarchy window-management bindings.
   if compat.is_try_omarchy(options) then
-    register_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
-    register_binding(
+    register_super_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
+    register_super_binding(
       hl,
       "SUPER + F10",
       command .. " task-switcher",
