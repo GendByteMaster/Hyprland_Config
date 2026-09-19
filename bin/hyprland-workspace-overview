@@ -8,6 +8,15 @@ CONFIG_NAME="gendbyte-workspace-overview"
 CONFIG_DIR="$CONFIG_HOME/quickshell/$CONFIG_NAME"
 RUNTIME_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+THEME_COLORS="$STATE_HOME/omarchy/current/theme/colors.toml"
+if [[ ! -f "$THEME_COLORS" ]]; then
+  LEGACY_THEME_COLORS="$CONFIG_HOME/omarchy/current/theme/colors.toml"
+  if [[ -f "$LEGACY_THEME_COLORS" ]]; then
+    THEME_COLORS="$LEGACY_THEME_COLORS"
+  else
+    THEME_COLORS=""
+  fi
+fi
 LOG_DIR="$STATE_HOME/hyprland_config"
 LOG_FILE="$LOG_DIR/workspace-overview.log"
 LOCK_DIR="$RUNTIME_ROOT/gendbyte-workspace-overview-${UID:-$(id -u)}.lock"
@@ -114,6 +123,7 @@ if ipc "$IPC_TOGGLE" >/dev/null 2>&1; then
 fi
 
 export QS_NO_RELOAD_POPUP=1
+export OMARCHY_THEME_COLORS="$THEME_COLORS"
 
 setsid qs "${QS_SELECTOR[@]}" >>"$LOG_FILE" 2>&1 &
 
