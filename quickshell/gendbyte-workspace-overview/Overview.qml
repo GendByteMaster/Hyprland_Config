@@ -8,6 +8,7 @@ Item {
   id: root
 
   property bool opened: false
+  property string viewMode: "overview"
   property int selectedIndex: -1
   property int selectedWorkspaceIndex: -1
   property string navigationZone: "windows"
@@ -56,6 +57,29 @@ Item {
     return entries
   }
 
+  readonly property var switcherWindows: {
+    var values = Hyprland.toplevels ? Hyprland.toplevels.values : []
+    var result = []
+
+    for (var i = 0; i < values.length; ++i) {
+      var toplevel = values[i]
+      if (!toplevel)
+        continue
+
+      var address = root.normalizedAddress(toplevel)
+      if (address === "")
+        continue
+
+      var workspace = toplevel.workspace
+      if (!workspace || !workspace.active)
+        continue
+
+      result.push(toplevel)
+    }
+
+    return result
+  }
+
   readonly property var visibleWindows: {
     var focused = Hyprland.focusedWorkspace
     var values = focused && focused.toplevels
@@ -83,6 +107,10 @@ Item {
 
     return result
   }
+
+  readonly property var windowModel: viewMode === "switcher"
+    ? switcherWindows
+    : visibleWindows
 
   function normalizedAddress(toplevel) {
     var value = String(toplevel && toplevel.address ? toplevel.address : "").trim().toLowerCase()
@@ -118,31 +146,46 @@ Item {
   }
 
   function selectedWindow() {
-    if (selectedIndex < 0 || selectedIndex >= visibleWindows.length)
+    if (selectedIndex < 0 || selectedIndex >= windowModel.length)
       return null
-    return visibleWindows[selectedIndex]
+    return windowModel[selectedIndex]
   }
 
   function reconcileSelection() {
-    if (visibleWindows.length === 0) {
+    if (windowModel.length === 0) {
       selectedIndex = -1
       return
     }
 
     if (selectedIndex < 0)
       selectedIndex = 0
-    if (selectedIndex >= visibleWindows.length)
-      selectedIndex = visibleWindows.length - 1
+    if (selectedIndex >= windowModel.length)
+      selectedIndex = windowModel.length - 1
   }
 
-  function showOverview() {
+  function refreshHyprlandState() {
     Hyprland.refreshMonitors()
     Hyprland.refreshWorkspaces()
     Hyprland.refreshToplevels()
+  }
+
+  function showOverview() {
+    viewMode = "overview"
+    refreshHyprlandState()
     targetScreen = focusedScreen()
     selectedIndex = visibleWindows.length > 0 ? 0 : -1
     selectedWorkspaceIndex = activeWorkspaceIndex()
     navigationZone = visibleWindows.length > 0 ? "windows" : "workspaces"
+    opened = true
+  }
+
+  function showTaskSwitcher() {
+    viewMode = "switcher"
+    refreshHyprlandState()
+    targetScreen = focusedScreen()
+    selectedIndex = switcherWindows.length > 0 ? 0 : -1
+    selectedWorkspaceIndex = -1
+    navigationZone = "windows"
     opened = true
   }
 
@@ -155,10 +198,17 @@ Item {
   }
 
   function toggleOverview() {
-    if (opened)
+    if (opened && viewMode === "overview")
       hideOverview()
     else
       showOverview()
+  }
+
+  function toggleTaskSwitcher() {
+    if (opened && viewMode === "switcher")
+      hideOverview()
+    else
+      showTaskSwitcher()
   }
 
   function activateWindow(toplevel) {
@@ -199,7 +249,7 @@ Item {
     selectedWorkspaceIndex = Math.max(0, Math.min(workspaceEntries.length - 1, current + delta))
   }
 
-  onVisibleWindowsChanged: reconcileSelection()
+  onWindowModelChanged: reconcileSelection()
 
   Variants {
     model: Quickshell.screens
@@ -214,7 +264,7 @@ Item {
         && screen !== null
         && String(screen.name) === String(root.targetScreen.name)
       readonly property int columns: Math.max(1,
-        Math.ceil(Math.sqrt(Math.max(1, root.visibleWindows.length) * width / Math.max(1, height))))
+        Math.ceil(Math.sqrt(Math.max(1, root.windowModel.length) * width / Math.max(1, height))))
       readonly property real previewWidth: Math.max(220,
         Math.min(520, (content.width - Math.max(0, columns - 1) * 16) / columns))
       readonly property real previewHeight: previewWidth * 0.62
@@ -261,7 +311,9 @@ Item {
           id: heading
           anchors.left: parent.left
           anchors.top: parent.top
-          text: "Workspace " + (root.focusedWorkspaceId > 0 ? root.focusedWorkspaceId : "")
+          text: root.viewMode === "switcher"
+            ? "Windows"
+            : "Workspace " + (root.focusedWorkspaceId > 0 ? root.focusedWorkspaceId : "")
           color: "#eeeeee"
           font.family: "monospace"
           font.pixelSize: 18
@@ -272,7 +324,7 @@ Item {
           anchors.left: heading.right
           anchors.leftMargin: 14
           anchors.baseline: heading.baseline
-          text: root.visibleWindows.length + (root.visibleWindows.length === 1 ? " window" : " windows")
+          text: root.windowModel.length + (root.windowModel.length === 1 ? " window" : " windows")
           color: "#777777"
           font.family: "monospace"
           font.pixelSize: 10
@@ -287,7 +339,7 @@ Item {
           spacing: 16
 
           Repeater {
-            model: root.visibleWindows
+            model: root.windowModel
 
             Components.WindowPreview {
               required property int index
@@ -299,6 +351,7 @@ Item {
               selected: index === root.selectedIndex
               capturing: surface.visible
 
+              onSelected: root.selectedIndex = index
               onActivated: root.activateWindow(modelData)
             }
           }
@@ -306,7 +359,7 @@ Item {
 
         Rectangle {
           anchors.centerIn: parent
-          visible: root.visibleWindows.length === 0
+          visible: root.windowModel.length === 0
           width: 320
           height: 130
           radius: 14
@@ -320,7 +373,9 @@ Item {
 
             Text {
               anchors.horizontalCenter: parent.horizontalCenter
-              text: "No windows on this workspace"
+              text: root.viewMode === "switcher"
+                ? "No windows on active monitor workspaces"
+                : "No windows on this workspace"
               color: "#d8d8d8"
               font.family: "monospace"
               font.pixelSize: 12
@@ -343,6 +398,7 @@ Item {
           anchors.right: parent.right
           anchors.bottom: parent.bottom
           height: 94
+          visible: root.viewMode === "overview"
           workspacesModel: root.workspaceEntries
           selectedIndex: root.navigationZone === "workspaces" ? root.selectedWorkspaceIndex : -1
           activeWorkspaceId: root.focusedWorkspaceId
@@ -357,11 +413,13 @@ Item {
 
         Text {
           anchors.right: parent.right
-          anchors.bottom: workspaceStrip.top
-          anchors.bottomMargin: 10
-          text: root.navigationZone === "workspaces"
-            ? "←→ workspace   Enter switch/create   Tab windows   Esc close"
-            : "←→↑↓ windows   Enter focus   Tab workspaces   Esc close"
+          anchors.bottom: root.viewMode === "overview" ? workspaceStrip.top : parent.bottom
+          anchors.bottomMargin: root.viewMode === "overview" ? 10 : 0
+          text: root.viewMode === "switcher"
+            ? "←→↑↓ select   Enter focus   Esc close"
+            : (root.navigationZone === "workspaces"
+              ? "←→ workspace   Enter switch/create   Tab windows   Esc close"
+              : "←→↑↓ windows   Enter focus   Tab workspaces   Esc close")
           color: "#686868"
           font.family: "monospace"
           font.pixelSize: 9
@@ -384,7 +442,7 @@ Item {
             return
           }
 
-          if (event.key === Qt.Key_Tab) {
+          if (event.key === Qt.Key_Tab && root.viewMode === "overview") {
             if (root.navigationZone === "windows") {
               root.navigationZone = "workspaces"
               if (root.selectedWorkspaceIndex < 0)
@@ -396,7 +454,8 @@ Item {
             return
           }
 
-          if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
+          if (root.viewMode === "overview"
+              && event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
             var workspaceId = event.key - Qt.Key_0
             for (var directIndex = 0; directIndex < root.workspaceEntries.length; ++directIndex) {
               if (!root.workspaceEntries[directIndex].add
@@ -409,7 +468,7 @@ Item {
           }
 
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.navigationZone === "workspaces") {
+            if (root.viewMode === "overview" && root.navigationZone === "workspaces") {
               root.activateWorkspace(root.selectedWorkspaceIndex)
             } else {
               var current = root.selectedWindow()
@@ -420,7 +479,7 @@ Item {
             return
           }
 
-          if (root.navigationZone === "workspaces") {
+          if (root.viewMode === "overview" && root.navigationZone === "workspaces") {
             if (event.key === Qt.Key_Left)
               root.moveWorkspaceSelection(-1)
             else if (event.key === Qt.Key_Right)
@@ -431,7 +490,7 @@ Item {
             return
           }
 
-          var count = root.visibleWindows.length
+          var count = root.windowModel.length
           if (count === 0)
             return
 
