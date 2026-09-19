@@ -25,7 +25,7 @@ Item {
     radius: 12
     color: themePalette ? themePalette.darkBackground : "#181818"
     border.width: input.activeFocus ? 1 : 1
-    border.color: themePalette ? (input.activeFocus ? palette.accent : palette.border) : (input.activeFocus ? "#ff8a3d" : "#363636")
+    border.color: themePalette ? (input.activeFocus ? themePalette.accent : themePalette.border) : (input.activeFocus ? "#ff8a3d" : "#363636")
 
     TextField {
       id: input
