@@ -111,7 +111,9 @@ Keyboard and pointer behavior:
 
 In **Try Omarchy for Windows**, `Super + F10` is also registered as the task-switcher fallback. It avoids Omarchy's existing `Super + Home` window-width binding. Windows may still intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
 
-Opening Workspace Overview with a Super-based shortcut uses a short-lived Hyprland **opening guard**. It consumes only the Super release that belongs to the opening chord and immediately returns to the normal Omarchy keymap. After that, pressing `Super` normally can open Omarchy Menu again. The overview uses on-demand keyboard focus rather than permanent exclusive keyboard ownership, so another Omarchy overlay can take focus when requested.
+Workspace Overview uses on-demand keyboard focus rather than permanent exclusive ownership. When Overview is already open, pressing `Super` closes Overview immediately and returns the key to the normal Hyprland/Omarchy flow; the user's existing single-`Super` binding can then open Omarchy Menu on release and take focus. The overview does not duplicate the menu command itself, avoiding double-toggle behavior.
+
+The overview also follows the active Omarchy theme. On startup the wrapper resolves `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` (normally `~/.local/state/omarchy/current/theme/colors.toml`, with the legacy config path as fallback). Each time Overview opens it refreshes `background`, `foreground`, `accent`, `muted`, selection, and surface colors from that palette, so built-in and user-installed Omarchy themes are applied automatically. If no Omarchy palette is available, conservative dark/orange fallback colors are used.
 
 Live previews use Quickshell's Hyprland/Wayland integration and `ScreencopyView`; the implementation does not use screenshot-file polling or a render-loop `hyprctl` poller.
 
