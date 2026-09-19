@@ -53,15 +53,13 @@ function M.register(hl, _o, options)
   )
 
   -- Try Omarchy may lose host-owned chords before they reach Hyprland.
-  -- Super+Home is the accessibility-oriented alternate requested for the
-  -- persistent task switcher. Windows may also own Win+Home unless QEMU raw
-  -- keyboard grab is active, so this is a convenience fallback, not a
-  -- guaranteed host-bypass shortcut.
+  -- Keep two-key accessibility fallbacks that do not collide with documented
+  -- Omarchy window-management bindings.
   if compat.is_try_omarchy(options) then
     register_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
     register_binding(
       hl,
-      "SUPER + HOME",
+      "SUPER + F10",
       command .. " task-switcher",
       "All-Monitor Window Switcher (Try Omarchy)"
     )
