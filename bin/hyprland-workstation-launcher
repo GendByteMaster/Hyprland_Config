@@ -8,6 +8,15 @@ CONFIG_NAME="gendbyte-project-launcher"
 CONFIG_DIR="$CONFIG_HOME/quickshell/$CONFIG_NAME"
 RUNTIME_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+THEME_COLORS="$STATE_HOME/omarchy/current/theme/colors.toml"
+if [[ ! -f "$THEME_COLORS" ]]; then
+  LEGACY_THEME_COLORS="$CONFIG_HOME/omarchy/current/theme/colors.toml"
+  if [[ -f "$LEGACY_THEME_COLORS" ]]; then
+    THEME_COLORS="$LEGACY_THEME_COLORS"
+  else
+    THEME_COLORS=""
+  fi
+fi
 LOG_DIR="$STATE_HOME/hyprland_config"
 LOG_FILE="$LOG_DIR/project-launcher.log"
 LOCK_DIR="$RUNTIME_ROOT/gendbyte-project-launcher-${UID:-$(id -u)}.lock"
@@ -99,6 +108,7 @@ if ipc toggle >/dev/null 2>&1; then
 fi
 
 export HYPRLAND_WORKSTATION_REPO_ROOT="$REPO_ROOT"
+export OMARCHY_THEME_COLORS="$THEME_COLORS"
 export QS_NO_RELOAD_POPUP=1
 
 setsid qs "${QS_SELECTOR[@]}" >>"$LOG_FILE" 2>&1 &
