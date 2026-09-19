@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
-import Quickshell.Io
 import Quickshell.Wayland
 import "components" as Components
 
@@ -17,10 +16,6 @@ Item {
 
   Components.ThemePalette {
     id: theme
-  }
-
-  Process {
-    id: omarchyMenuProcess
   }
 
   readonly property int focusedWorkspaceId: Hyprland.focusedWorkspace
@@ -244,10 +239,10 @@ Item {
   }
 
   function handoffToOmarchyMenu() {
+    // Release the overlay before Super is released. The user's existing
+    // single-Super Omarchy binding then owns the release event and opens
+    // the menu without a duplicate toggle from this process.
     hideOverview()
-    Qt.callLater(function() {
-      omarchyMenuProcess.exec(["omarchy", "menu"])
-    })
   }
 
   function activateWindow(toplevel) {
