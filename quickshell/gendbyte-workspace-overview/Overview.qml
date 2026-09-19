@@ -423,7 +423,7 @@ Item {
               toplevel: modelData
               selected: index === root.selectedIndex
               capturing: surface.visible
-              palette: theme
+              themePalette: theme
 
               onSelectionRequested: root.selectedIndex = index
               onActivated: root.activateWindow(modelData)
@@ -476,7 +476,7 @@ Item {
           workspacesModel: root.workspaceEntries
           selectedIndex: root.navigationZone === "workspaces" ? root.selectedWorkspaceIndex : -1
           activeWorkspaceId: root.focusedWorkspaceId
-          palette: theme
+          themePalette: theme
 
           onSelected: function(index) {
             root.selectWorkspace(index)
