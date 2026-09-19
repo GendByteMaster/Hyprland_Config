@@ -45,11 +45,23 @@ function M.register(hl, _o, options)
   end
 
   register_binding(hl, "SUPER + TAB", command, "Workspace Overview")
+  register_binding(
+    hl,
+    "CTRL + ALT + TAB",
+    command .. " task-switcher",
+    "All-Monitor Window Switcher"
+  )
 
-  -- Windows owns Win+Tab before the guest sees it unless QEMU has raw
-  -- keyboard grab. Keep a two-key fallback only in Try Omarchy.
+  -- Windows owns Win+Tab and Ctrl+Alt+Tab before the guest sees them unless
+  -- QEMU has raw keyboard grab. Keep guest-safe fallbacks only in Try Omarchy.
   if compat.is_try_omarchy(options) then
     register_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
+    register_binding(
+      hl,
+      "CTRL + ALT + F9",
+      command .. " task-switcher",
+      "All-Monitor Window Switcher (Try Omarchy)"
+    )
   end
 
   return true
