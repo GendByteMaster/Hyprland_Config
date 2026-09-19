@@ -9,6 +9,7 @@ Rectangle {
   required property var toplevel
   property bool selected: false
   property bool capturing: true
+  property var palette: null
 
   signal selectionRequested()
   signal activated()
@@ -37,9 +38,9 @@ Rectangle {
   }
 
   radius: 14
-  color: selected ? "#241d18" : "#151515"
+  color: selected && palette ? palette.selection : (palette ? palette.darkBackground : "#151515")
   border.width: selected ? 2 : 1
-  border.color: selected ? "#ff8a3d" : "#383838"
+  border.color: selected && palette ? palette.accent : (palette ? palette.border : "#383838")
   clip: true
 
   Behavior on border.color {
@@ -76,7 +77,7 @@ Rectangle {
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     height: 40
-    color: "#e9141414"
+    color: palette ? palette.colorWithAlpha(palette.background, 0.92) : "#e9141414"
 
     RowLayout {
       anchors.fill: parent
@@ -96,7 +97,7 @@ Rectangle {
       Text {
         Layout.fillWidth: true
         text: root.title
-        color: root.selected ? "#ffffff" : "#c4c4c4"
+        color: root.palette ? root.palette.foreground : (root.selected ? "#ffffff" : "#c4c4c4")
         elide: Text.ElideRight
         textFormat: Text.PlainText
         font.family: "monospace"
@@ -108,15 +109,15 @@ Rectangle {
         Layout.preferredWidth: monitorLabel.implicitWidth + 14
         Layout.preferredHeight: 22
         radius: 7
-        color: "#202020"
+        color: root.palette ? root.palette.lighterBackground : "#202020"
         border.width: 1
-        border.color: root.selected ? "#70472e" : "#343434"
+        border.color: root.palette ? (root.selected ? root.palette.accent : root.palette.border) : (root.selected ? "#70472e" : "#343434")
 
         Text {
           id: monitorLabel
           anchors.centerIn: parent
           text: root.monitorName
-          color: root.selected ? "#ff9a58" : "#858585"
+          color: root.palette ? (root.selected ? root.palette.accent : root.palette.muted) : (root.selected ? "#ff9a58" : "#858585")
           font.family: "monospace"
           font.pixelSize: 8
         }
