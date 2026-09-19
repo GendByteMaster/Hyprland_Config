@@ -95,6 +95,8 @@ Shows the focused Hyprland workspace with live compositor-backed previews and th
 Ctrl + Alt + Tab
 ```
 
+This deliberately replaces Omarchy's default `Ctrl + Alt + Tab` action (cycle focus forward through monitors) with the requested persistent all-monitor task switcher.
+
 Shows one persistent task switcher on the currently focused physical monitor. Its window list includes windows from every Hyprland workspace that is currently active on any physical monitor, so windows on secondary displays remain available without including hidden/inactive workspaces.
 
 The switcher is MRU ordered from Hyprland `focusHistoryID` (most recent first), shows each window's physical monitor name, and scales its grid against both available width and height.
