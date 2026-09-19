@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 
@@ -19,6 +20,11 @@ Rectangle {
   readonly property string appId: waylandToplevel
     ? String(waylandToplevel.appId || "")
     : ""
+  readonly property string monitorName: {
+    var workspace = toplevel ? toplevel.workspace : null
+    var monitor = workspace ? workspace.monitor : null
+    return monitor ? String(monitor.name || "") : ""
+  }
   readonly property var desktopEntry: appId !== ""
     ? DesktopEntries.heuristicLookup(appId)
     : null
@@ -72,16 +78,15 @@ Rectangle {
     height: 40
     color: "#e9141414"
 
-    Row {
+    RowLayout {
       anchors.fill: parent
       anchors.leftMargin: 12
       anchors.rightMargin: 12
       spacing: 8
 
       Image {
-        anchors.verticalCenter: parent.verticalCenter
-        width: 18
-        height: 18
+        Layout.preferredWidth: 18
+        Layout.preferredHeight: 18
         source: root.iconSource
         fillMode: Image.PreserveAspectFit
         asynchronous: true
@@ -89,14 +94,32 @@ Rectangle {
       }
 
       Text {
-        anchors.verticalCenter: parent.verticalCenter
-        width: parent.width - 38
+        Layout.fillWidth: true
         text: root.title
         color: root.selected ? "#ffffff" : "#c4c4c4"
         elide: Text.ElideRight
         textFormat: Text.PlainText
         font.family: "monospace"
         font.pixelSize: 11
+      }
+
+      Rectangle {
+        visible: root.monitorName !== ""
+        Layout.preferredWidth: monitorLabel.implicitWidth + 14
+        Layout.preferredHeight: 22
+        radius: 7
+        color: "#202020"
+        border.width: 1
+        border.color: root.selected ? "#70472e" : "#343434"
+
+        Text {
+          id: monitorLabel
+          anchors.centerIn: parent
+          text: root.monitorName
+          color: root.selected ? "#ff9a58" : "#858585"
+          font.family: "monospace"
+          font.pixelSize: 8
+        }
       }
     }
   }
