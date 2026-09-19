@@ -74,8 +74,29 @@ Item {
       if (!workspace || !workspace.active)
         continue
 
+      var ipc = toplevel.lastIpcObject
+      if (ipc && (ipc.mapped === false || ipc.hidden === true))
+        continue
+
       result.push(toplevel)
     }
+
+    result.sort(function(left, right) {
+      var leftIpc = left ? left.lastIpcObject : null
+      var rightIpc = right ? right.lastIpcObject : null
+      var leftOrder = leftIpc ? Number(leftIpc.focusHistoryID) : Number.POSITIVE_INFINITY
+      var rightOrder = rightIpc ? Number(rightIpc.focusHistoryID) : Number.POSITIVE_INFINITY
+
+      if (!Number.isFinite(leftOrder))
+        leftOrder = Number.POSITIVE_INFINITY
+      if (!Number.isFinite(rightOrder))
+        rightOrder = Number.POSITIVE_INFINITY
+
+      if (leftOrder !== rightOrder)
+        return leftOrder - rightOrder
+
+      return root.normalizedAddress(left).localeCompare(root.normalizedAddress(right))
+    })
 
     return result
   }
@@ -263,10 +284,20 @@ Item {
       readonly property bool targetSurface: root.targetScreen !== null
         && screen !== null
         && String(screen.name) === String(root.targetScreen.name)
-      readonly property int columns: Math.max(1,
-        Math.ceil(Math.sqrt(Math.max(1, root.windowModel.length) * width / Math.max(1, height))))
-      readonly property real previewWidth: Math.max(220,
-        Math.min(520, (content.width - Math.max(0, columns - 1) * 16) / columns))
+      readonly property int windowCount: Math.max(1, root.windowModel.length)
+      readonly property real gridReserve: root.viewMode === "overview" ? 170 : 92
+      readonly property real gridAvailableHeight: Math.max(180, content.height - gridReserve)
+      readonly property int columns: Math.max(1, Math.min(windowCount,
+        Math.ceil(Math.sqrt(windowCount * content.width / Math.max(1, gridAvailableHeight)))))
+      readonly property int rows: Math.max(1, Math.ceil(windowCount / columns))
+      readonly property real widthLimitedPreview: (
+        content.width - Math.max(0, columns - 1) * 16
+      ) / columns
+      readonly property real heightLimitedPreview: (
+        gridAvailableHeight - Math.max(0, rows - 1) * 16
+      ) / rows / 0.62
+      readonly property real previewWidth: Math.max(180,
+        Math.min(520, widthLimitedPreview, heightLimitedPreview))
       readonly property real previewHeight: previewWidth * 0.62
 
       visible: root.opened && targetSurface
@@ -334,7 +365,7 @@ Item {
           id: grid
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: -54
+          anchors.verticalCenterOffset: root.viewMode === "overview" ? -54 : -18
           columns: surface.columns
           spacing: 16
 
