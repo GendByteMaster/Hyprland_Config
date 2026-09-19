@@ -33,11 +33,11 @@ QtObject {
     var lines = String(text || "").split("\n")
 
     for (var i = 0; i < lines.length; ++i) {
-      var line = lines[i].replace(/#.*$/, "").trim()
-      if (line === "")
+      var line = lines[i].trim()
+      if (line === "" || line.indexOf("#") === 0)
         continue
 
-      var match = /^([A-Za-z0-9_]+)\s*=\s*"([^"]*)"\s*$/.exec(line)
+      var match = /^([A-Za-z0-9_]+)\s*=\s*"([^"]*)"\s*(?:#.*)?$/.exec(line)
       if (match)
         result[match[1]] = match[2]
     }
