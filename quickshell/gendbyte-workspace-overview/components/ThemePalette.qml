@@ -29,13 +29,35 @@ Item {
     return Qt.rgba(r, g, b, alpha)
   }
 
+  function toColor(value, fallback) {
+    if (value !== undefined && value !== null
+        && value.r !== undefined && value.g !== undefined && value.b !== undefined)
+      return value
+
+    var text = String(value || "")
+    var match = /^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(text)
+    if (match) {
+      return Qt.rgba(
+        parseInt(match[1], 16) / 255,
+        parseInt(match[2], 16) / 255,
+        parseInt(match[3], 16) / 255,
+        1
+      )
+    }
+
+    return fallback
+  }
+
   function mix(left, right, amount) {
+    var fallback = Qt.rgba(0, 0, 0, 1)
+    var l = toColor(left, fallback)
+    var r = toColor(right, l)
     var t = Math.max(0, Math.min(1, Number(amount)))
     return Qt.rgba(
-      left.r + (right.r - left.r) * t,
-      left.g + (right.g - left.g) * t,
-      left.b + (right.b - left.b) * t,
-      left.a + (right.a - left.a) * t
+      l.r + (r.r - l.r) * t,
+      l.g + (r.g - l.g) * t,
+      l.b + (r.b - l.b) * t,
+      l.a + (r.a - l.a) * t
     )
   }
 
