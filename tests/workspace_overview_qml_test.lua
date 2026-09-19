@@ -124,5 +124,5 @@ t.test("task switcher includes windows from every active monitor workspace only"
   contains(overview, 'visible: root.viewMode === "overview"')
   contains(overview, '"←→↑↓ select   Enter focus   Esc close"')
   contains(preview, "HoverHandler")
-  contains(preview, "root.selected()")
+  contains(preview, "selectionRequested")
 end)
