@@ -12,11 +12,23 @@ local function fake_hyprland()
   local active_submap = nil
   local hl = { dsp = {} }
 
+  function hl.dsp.submap(name)
+    return {
+      kind = "submap",
+      name = name,
+    }
+  end
+
   function hl.dsp.exec_cmd(command)
     return {
       kind = "exec",
       command = command,
     }
+  end
+
+  function hl.dispatch(dispatcher)
+    calls.dispatched = calls.dispatched or {}
+    calls.dispatched[#calls.dispatched + 1] = dispatcher
   end
 
   function hl.bind(keys, dispatcher, options)
@@ -62,12 +74,17 @@ t.test("workspace UI owns overview and all-monitor switcher bindings when instal
 
   t.eq(registered, true)
   t.eq(#calls.submaps, 1)
-  t.eq(calls.submaps[1], "gendbyte-workspace-overview-modal")
-  t.eq(#calls.submap_binds, 2)
-  t.eq(calls.submap_binds[1].keys, "SUPER + SUPER_L")
+  t.eq(calls.submaps[1], "gendbyte-workspace-overview-opening-guard")
+  t.eq(#calls.submap_binds, 3)
+  t.eq(calls.submap_binds[1].keys, "Super_L")
   t.eq(calls.submap_binds[1].options.release, true)
-  t.eq(calls.submap_binds[2].keys, "SUPER + SUPER_R")
+  t.eq(calls.submap_binds[1].dispatcher.kind, "submap")
+  t.eq(calls.submap_binds[1].dispatcher.name, "reset")
+  t.eq(calls.submap_binds[2].keys, "Super_R")
   t.eq(calls.submap_binds[2].options.release, true)
+  t.eq(calls.submap_binds[2].dispatcher.name, "reset")
+  t.eq(calls.submap_binds[3].keys, "Escape")
+  t.eq(calls.submap_binds[3].dispatcher.name, "reset")
   t.eq(#calls.unbinds, 2)
   t.eq(calls.unbinds[1], "SUPER + TAB")
   t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
