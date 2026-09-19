@@ -7,7 +7,7 @@ Rectangle {
   property var workspacesModel: []
   property int selectedIndex: -1
   property int activeWorkspaceId: -1
-  property var palette: null
+  property var themePalette: null
 
   signal selected(int index)
   signal activated(int index)
@@ -15,9 +15,9 @@ Rectangle {
   implicitWidth: Math.max(220, workspaceRow.implicitWidth + 28)
   implicitHeight: 86
   radius: 16
-  color: palette ? palette.colorWithAlpha(palette.background, 0.92) : "#e5131313"
+  color: root.themePalette ? root.themePalette.colorWithAlpha(root.themePalette.background, 0.92) : "#e5131313"
   border.width: 1
-  border.color: palette ? palette.border : "#303030"
+  border.color: root.themePalette ? root.themePalette.border : "#303030"
 
   Row {
     id: workspaceRow
@@ -36,19 +36,19 @@ Rectangle {
         radius: 11
         color: {
           if (index === root.selectedIndex)
-            return palette ? palette.selection : "#2a211b"
+            return root.themePalette ? root.themePalette.selection : "#2a211b"
           if (Number(modelData.id) === root.activeWorkspaceId)
-            return palette ? palette.lighterBackground : "#211b18"
+            return root.themePalette ? root.themePalette.lighterBackground : "#211b18"
           return tileMouse.containsMouse
-            ? (palette ? palette.lighterBackground : "#1d1d1d")
-            : (palette ? palette.darkBackground : "#171717")
+            ? (root.themePalette ? root.themePalette.lighterBackground : "#1d1d1d")
+            : (root.themePalette ? root.themePalette.darkBackground : "#171717")
         }
         border.width: index === root.selectedIndex ? 2 : 1
         border.color: index === root.selectedIndex
-          ? (palette ? palette.accent : "#ff8a3d")
+          ? (root.themePalette ? root.themePalette.accent : "#ff8a3d")
           : (Number(modelData.id) === root.activeWorkspaceId
-            ? (palette ? palette.accent : "#72482f")
-            : (palette ? palette.border : "#343434"))
+            ? (root.themePalette ? root.themePalette.accent : "#72482f")
+            : (root.themePalette ? root.themePalette.border : "#343434"))
 
         Behavior on color {
           ColorAnimation { duration: 80 }
@@ -72,7 +72,7 @@ Rectangle {
             text: modelData.add
               ? "New workspace"
               : String(modelData.count || 0) + ((modelData.count || 0) === 1 ? " window" : " windows")
-            color: palette ? palette.muted : "#777777"
+            color: root.themePalette ? root.themePalette.muted : "#777777"
             font.family: "monospace"
             font.pixelSize: 8
           }
