@@ -66,15 +66,19 @@ Item {
     accent = raw.accent || "#ff8a3d"
 
     var derivedMuted = mix(foreground, background, 0.52)
-    var derivedRaised = mix(background, foreground, mode === "light" ? 0.08 : 0.10)
-    var derivedSelection = mix(background, accent, mode === "light" ? 0.12 : 0.18)
-    var derivedBorder = mix(background, foreground, mode === "light" ? 0.18 : 0.22)
+    var raisedSource = raw.lighter_background || raw.selection || foreground
+    var selectionSource = raw.selection || raw.lighter_background || accent
+    var borderSource = raw.muted || foreground
 
     muted = raw.muted || derivedMuted
     darkBackground = raw.dark_background || background
-    lighterBackground = raw.lighter_background || raw.selection || derivedRaised
-    selection = raw.selection || raw.lighter_background || derivedSelection
-    border = raw.muted || derivedBorder
+
+    // Theme palette values can be intentionally high-contrast. For shell
+    // surfaces keep them near the base background so a bright token cannot
+    // turn cards/title bars into white slabs on an otherwise dark theme.
+    lighterBackground = mix(background, raisedSource, mode === "light" ? 0.20 : 0.34)
+    selection = mix(background, selectionSource, mode === "light" ? 0.30 : 0.46)
+    border = mix(background, borderSource, mode === "light" ? 0.34 : 0.46)
   }
 
   function refresh() {
