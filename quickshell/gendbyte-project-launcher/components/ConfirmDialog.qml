@@ -7,7 +7,7 @@ Item {
 
   property string actionLabel: ""
   property bool opened: false
-  property var palette: null
+  property var themePalette: null
   signal confirmed()
   signal cancelled()
 
@@ -32,16 +32,16 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    color: root.palette ? root.palette.colorWithAlpha(root.palette.background, 0.76) : "#b0000000"
+    color: root.themePalette ? root.themePalette.colorWithAlpha(root.themePalette.background, 0.76) : "#b0000000"
 
     Rectangle {
       anchors.centerIn: parent
       width: 420
       height: 176
       radius: 14
-      color: root.palette ? root.palette.darkBackground : "#181818"
+      color: root.themePalette ? root.themePalette.darkBackground : "#181818"
       border.width: 1
-      border.color: root.palette ? root.palette.accent : "#6b4028"
+      border.color: root.themePalette ? root.themePalette.accent : "#6b4028"
 
       ColumnLayout {
         anchors.fill: parent
@@ -51,7 +51,7 @@ Item {
         Text {
           Layout.fillWidth: true
           text: "Confirm action"
-          color: root.palette ? root.palette.foreground : "#f2f2f2"
+          color: root.themePalette ? root.themePalette.foreground : "#f2f2f2"
           font.family: "monospace"
           font.pixelSize: 17
           font.bold: true
@@ -60,7 +60,7 @@ Item {
         Text {
           Layout.fillWidth: true
           text: root.actionLabel
-          color: root.palette ? root.palette.muted : "#bdbdbd"
+          color: root.themePalette ? root.themePalette.muted : "#bdbdbd"
           wrapMode: Text.Wrap
           font.family: "monospace"
           font.pixelSize: 12
