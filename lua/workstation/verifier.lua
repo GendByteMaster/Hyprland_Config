@@ -120,6 +120,7 @@ function M.verify(options)
     paths.join(source_overview_quickshell, "Overview.qml"),
     paths.join(source_overview_quickshell, "components", "WindowPreview.qml"),
     paths.join(source_overview_quickshell, "components", "WorkspaceStrip.qml"),
+    paths.join(source_overview_quickshell, "components", "ThemePalette.qml"),
     paths.join(repo_root, "lua", "workstation", "overview_model.lua"),
     paths.join(repo_root, "lua", "workstation", "telemetry.lua"),
     paths.join(repo_root, "lua", "workstation", "telemetry_collector.lua"),
