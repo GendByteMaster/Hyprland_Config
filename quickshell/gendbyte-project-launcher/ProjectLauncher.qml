@@ -341,7 +341,7 @@ FloatingWindow {
       Components.SearchField {
         id: searchField
         Layout.fillWidth: true
-        palette: theme
+        themePalette: theme
 
         onQueryChanged: queryTimer.restart()
         onMoveUp: root.moveProject(-1)
@@ -434,7 +434,7 @@ FloatingWindow {
                 id: projectList
                 anchors.fill: parent
                 visible: root.projects.length > 0
-                palette: theme
+                themePalette: theme
                 projectsModel: root.projects
                 currentIndex: root.selectedProjectIndex
                 onSelected: function(index) { root.selectProject(index) }
@@ -584,7 +584,7 @@ FloatingWindow {
             Components.ActionList {
               id: actionList
               Layout.fillWidth: true
-              palette: theme
+              themePalette: theme
               Layout.fillHeight: true
               actionsModel: root.actions
               currentIndex: root.selectedActionIndex
@@ -603,7 +603,7 @@ FloatingWindow {
 
       Components.StatusMessage {
         Layout.fillWidth: true
-        palette: theme
+        themePalette: theme
         message: root.statusText
         error: root.statusError
       }
@@ -621,7 +621,7 @@ FloatingWindow {
     Components.FolderPicker {
       id: folderPicker
       anchors.fill: parent
-      palette: theme
+      themePalette: theme
 
       onBrowseRequested: function(path) {
         root.browseFolder(path)
@@ -639,7 +639,7 @@ FloatingWindow {
     Components.ConfirmDialog {
       id: confirmDialog
       anchors.fill: parent
-      palette: theme
+      themePalette: theme
 
       onConfirmed: {
         opened = false
