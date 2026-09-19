@@ -5,6 +5,7 @@ Item {
   id: root
 
   property alias text: input.text
+  property var palette: null
   signal queryChanged(string query)
   signal moveUp()
   signal moveDown()
@@ -22,9 +23,9 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: 12
-    color: "#181818"
+    color: palette ? palette.darkBackground : "#181818"
     border.width: input.activeFocus ? 1 : 1
-    border.color: input.activeFocus ? "#ff8a3d" : "#363636"
+    border.color: palette ? (input.activeFocus ? palette.accent : palette.border) : (input.activeFocus ? "#ff8a3d" : "#363636")
 
     TextField {
       id: input
@@ -32,10 +33,10 @@ Item {
       anchors.leftMargin: 14
       anchors.rightMargin: 14
       placeholderText: "Search projects..."
-      color: "#f2f2f2"
-      placeholderTextColor: "#787878"
-      selectionColor: "#ff8a3d"
-      selectedTextColor: "#101010"
+      color: palette ? palette.foreground : "#f2f2f2"
+      placeholderTextColor: palette ? palette.muted : "#787878"
+      selectionColor: palette ? palette.accent : "#ff8a3d"
+      selectedTextColor: palette ? palette.background : "#101010"
       background: null
       font.family: "monospace"
       font.pixelSize: 15
