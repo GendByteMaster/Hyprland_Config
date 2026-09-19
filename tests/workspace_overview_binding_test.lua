@@ -5,6 +5,7 @@ local function fake_hyprland()
   local calls = {
     binds = {},
     unbinds = {},
+    submaps = {},
   }
 
   local hl = { dsp = {} }
@@ -28,6 +29,13 @@ local function fake_hyprland()
     calls.unbinds[#calls.unbinds + 1] = keys
   end
 
+  function hl.define_submap(name, callback)
+    calls.submaps[#calls.submaps + 1] = name
+    if callback then
+      callback()
+    end
+  end
+
   return hl, calls
 end
 
@@ -42,6 +50,8 @@ t.test("workspace UI owns overview and all-monitor switcher bindings when instal
   })
 
   t.eq(registered, true)
+  t.eq(#calls.submaps, 1)
+  t.eq(calls.submaps[1], "gendbyte-workspace-overview-modal")
   t.eq(#calls.unbinds, 2)
   t.eq(calls.unbinds[1], "SUPER + TAB")
   t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
