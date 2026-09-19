@@ -14,6 +14,22 @@ LOCK_DIR="$RUNTIME_ROOT/gendbyte-workspace-overview-${UID:-$(id -u)}.lock"
 STARTUP_ATTEMPTS=100
 STARTUP_DELAY=0.05
 
+MODE="${1:-overview}"
+case "$MODE" in
+  overview)
+    IPC_TOGGLE="toggle"
+    IPC_SHOW="show"
+    ;;
+  task-switcher)
+    IPC_TOGGLE="toggleSwitcher"
+    IPC_SHOW="showSwitcher"
+    ;;
+  *)
+    echo "usage: $0 [overview|task-switcher]" >&2
+    exit 2
+    ;;
+esac
+
 if [[ -f "$CONFIG_DIR/shell.qml" ]]; then
   QS_SELECTOR=(-c "$CONFIG_NAME")
 else
@@ -43,7 +59,7 @@ wait_for_ipc() {
   return 1
 }
 
-if ipc toggle >/dev/null 2>&1; then
+if ipc "$IPC_TOGGLE" >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -85,7 +101,7 @@ acquire_start_lock() {
 
 if ! acquire_start_lock; then
   if wait_for_ipc; then
-    ipc toggle
+    ipc "$IPC_TOGGLE"
     exit 0
   fi
 
@@ -93,7 +109,7 @@ if ! acquire_start_lock; then
   exit 1
 fi
 
-if ipc toggle >/dev/null 2>&1; then
+if ipc "$IPC_TOGGLE" >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -102,7 +118,7 @@ export QS_NO_RELOAD_POPUP=1
 setsid qs "${QS_SELECTOR[@]}" >>"$LOG_FILE" 2>&1 &
 
 if wait_for_ipc; then
-  ipc show
+  ipc "$IPC_SHOW"
   exit 0
 fi
 
