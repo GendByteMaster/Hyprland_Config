@@ -113,3 +113,14 @@ t.test("Windows shortcut layer switches existing workspaces on the current monit
   t.eq(calls.binds[6].dispatcher.workspace, "m+1")
   t.eq(calls.binds[6].options.description, "Next Workspace")
 end)
+
+t.test("bindings loads Windows shortcut layer before Workspace Overview", function()
+  local file = assert(io.open("hypr/bindings.lua", "r"))
+  local source = file:read("*a")
+  file:close()
+
+  local windows_index = assert(source:find('require("hypr.workstation.windows_shortcuts")', 1, true))
+  local overview_index = assert(source:find('require("hypr.workstation.workspace_overview")', 1, true))
+
+  t.truthy(windows_index < overview_index)
+end)
