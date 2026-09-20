@@ -7,26 +7,12 @@ local function fake_hyprland()
     unbinds = {},
   }
 
-  local hl = { dsp = { window = {} } }
+  local hl = { dsp = {} }
 
   function hl.dsp.exec_cmd(command)
     return {
       kind = "exec",
       command = command,
-    }
-  end
-
-  function hl.dsp.window.cycle_next(options)
-    return {
-      kind = "cycle_next",
-      next = options == nil or options.next ~= false,
-    }
-  end
-
-  function hl.dsp.window.move(options)
-    return {
-      kind = "window_move",
-      monitor = options and options.monitor or nil,
     }
   end
 
@@ -45,7 +31,7 @@ local function fake_hyprland()
   return hl, calls
 end
 
-t.test("workspace UI owns Windows-style switching bindings when installed", function()
+t.test("workspace UI owns only overview and persistent switcher bindings", function()
   local hl, calls = fake_hyprland()
 
   local registered = overview.register(hl, {}, {
@@ -56,52 +42,36 @@ t.test("workspace UI owns Windows-style switching bindings when installed", func
   })
 
   t.eq(registered, true)
-  t.eq(#calls.unbinds, 7)
+  t.eq(#calls.unbinds, 3)
   t.eq(calls.unbinds[1], "SUPER + TAB")
-  t.eq(calls.unbinds[2], "ALT + TAB")
-  t.eq(calls.unbinds[3], "ALT + SHIFT + TAB")
-  t.eq(calls.unbinds[4], "SUPER + SHIFT + LEFT")
-  t.eq(calls.unbinds[5], "SUPER + SHIFT + RIGHT")
-  t.eq(calls.unbinds[6], "CTRL + ALT + TAB")
-  t.eq(calls.unbinds[7], "SUPER + F10")
+  t.eq(calls.unbinds[2], "CTRL + ALT + TAB")
+  t.eq(calls.unbinds[3], "SUPER + F10")
 
-  t.eq(#calls.binds, 7)
+  t.eq(#calls.binds, 3)
 
   t.eq(calls.binds[1].keys, "SUPER + TAB")
   t.eq(calls.binds[1].dispatcher.kind, "exec")
   t.eq(calls.binds[1].options.description, "Workspace Overview")
-
-  t.eq(calls.binds[2].keys, "ALT + TAB")
-  t.eq(calls.binds[2].dispatcher.kind, "cycle_next")
-  t.eq(calls.binds[2].dispatcher.next, true)
-
-  t.eq(calls.binds[3].keys, "ALT + SHIFT + TAB")
-  t.eq(calls.binds[3].dispatcher.kind, "cycle_next")
-  t.eq(calls.binds[3].dispatcher.next, false)
-
-  t.eq(calls.binds[4].keys, "SUPER + SHIFT + LEFT")
-  t.eq(calls.binds[4].dispatcher.kind, "window_move")
-  t.eq(calls.binds[4].dispatcher.monitor, "l")
-  t.eq(calls.binds[4].options.description, "Move Active Window to Left Monitor")
-
-  t.eq(calls.binds[5].keys, "SUPER + SHIFT + RIGHT")
-  t.eq(calls.binds[5].dispatcher.kind, "window_move")
-  t.eq(calls.binds[5].dispatcher.monitor, "r")
-  t.eq(calls.binds[5].options.description, "Move Active Window to Right Monitor")
-
-  t.eq(calls.binds[6].keys, "CTRL + ALT + TAB")
-  t.eq(calls.binds[6].dispatcher.kind, "exec")
   t.eq(
-    calls.binds[6].dispatcher.command,
-    "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
+    calls.binds[1].dispatcher.command,
+    "/home/test/.local/bin/hyprland-workspace-overview"
   )
 
-  t.eq(calls.binds[7].keys, "SUPER + F10")
-  t.eq(calls.binds[7].dispatcher.kind, "exec")
+  t.eq(calls.binds[2].keys, "CTRL + ALT + TAB")
+  t.eq(calls.binds[2].dispatcher.kind, "exec")
   t.eq(
-    calls.binds[7].dispatcher.command,
+    calls.binds[2].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
   )
+  t.eq(calls.binds[2].options.description, "Persistent Window Switcher")
+
+  t.eq(calls.binds[3].keys, "SUPER + F10")
+  t.eq(calls.binds[3].dispatcher.kind, "exec")
+  t.eq(
+    calls.binds[3].dispatcher.command,
+    "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
+  )
+  t.eq(calls.binds[3].options.description, "All-Monitor Window Switcher")
 end)
 
 t.test("workspace UI adds only the Try Omarchy overview fallback", function()
@@ -114,19 +84,19 @@ t.test("workspace UI adds only the Try Omarchy overview fallback", function()
   })
 
   t.eq(registered, true)
-  t.eq(#calls.unbinds, 8)
-  t.eq(calls.unbinds[8], "SUPER + F9")
+  t.eq(#calls.unbinds, 4)
+  t.eq(calls.unbinds[4], "SUPER + F9")
 
-  t.eq(#calls.binds, 8)
-  t.eq(calls.binds[8].keys, "SUPER + F9")
-  t.eq(calls.binds[8].dispatcher.kind, "exec")
+  t.eq(#calls.binds, 4)
+  t.eq(calls.binds[4].keys, "SUPER + F9")
+  t.eq(calls.binds[4].dispatcher.kind, "exec")
   t.eq(
-    calls.binds[8].dispatcher.command,
+    calls.binds[4].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview"
   )
 end)
 
-t.test("workspace overview leaves Super Tab untouched before install", function()
+t.test("workspace overview leaves bindings untouched before install", function()
   local hl, calls = fake_hyprland()
 
   local registered = overview.register(hl, {}, {
