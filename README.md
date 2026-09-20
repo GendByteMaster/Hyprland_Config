@@ -100,6 +100,10 @@ Ctrl + Alt + Tab
 - `Alt + Tab` focuses the next window using Hyprland's native Lua `window.cycle_next` dispatcher.
 - `Alt + Shift + Tab` focuses the previous window.
 - `Ctrl + Alt + Tab` opens the persistent All-Monitor Window Switcher and leaves it open after the keys are released.
+- `Super + Shift + Left` moves the active window to the physical monitor on the left.
+- `Super + Shift + Right` moves the active window to the physical monitor on the right.
+
+The monitor-transfer shortcuts use Hyprland's native `window.move({ monitor = "l" })` / `window.move({ monitor = "r" })` dispatchers, matching the Windows `Win + Shift + Left/Right` interaction without invoking `hyprctl`.
 
 The direct `Alt + Tab` cycle follows Hyprland's focused-workspace semantics. The persistent `Ctrl + Alt + Tab` switcher is broader: it includes windows from every workspace currently active on a physical monitor.
 
