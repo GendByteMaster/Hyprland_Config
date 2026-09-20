@@ -20,11 +20,11 @@ The generated static site is written to `web/dist/`.
 
 ## Vercel
 
-The repository root now contains `vercel.json`, so the whole repository can be imported directly into Vercel without manually selecting `web` as the Root Directory.
+Use `web` as the Vercel **Root Directory**. The Vercel config is stored inside `web/vercel.json`, so commands run directly from the app root without an extra `cd web`.
 
-The root configuration runs:
+Vercel uses the package scripts automatically:
 
-- Install command: `cd web && npm install`
-- Build command: `cd web && npm run build`
-- Output directory: `web/dist`
+- Install command: `npm install`
+- Build command: `npm run build`
+- Output directory: `dist`
 - Framework: Vite
