@@ -700,7 +700,7 @@ kbd {
 
 .install-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -847,7 +847,7 @@ kbd {
   }
 
   .install-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .vpn-section {
@@ -888,6 +888,10 @@ kbd {
   }
 
   .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .install-grid {
     grid-template-columns: 1fr;
   }
 
