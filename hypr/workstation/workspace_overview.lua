@@ -31,23 +31,13 @@ local function register_binding(hl, keys, command, description)
   })
 end
 
-local function register_dispatcher_binding(hl, keys, dispatcher, description)
-  if type(hl.unbind) == "function" then
-    hl.unbind(keys)
-  end
-
-  hl.bind(keys, dispatcher, {
-    description = description,
-  })
-end
-
 function M.register(hl, _o, options)
   options = options or {}
 
   assert(type(hl) == "table", "Hyprland API is required")
   assert(type(hl.bind) == "function", "Hyprland bind API is required")
   assert(type(hl.dsp) == "table" and type(hl.dsp.exec_cmd) == "function", "Hyprland exec dispatcher is required")
-  assert(type(hl.dsp.focus) == "function", "Hyprland focus dispatcher is required")
+  assert(type(hl.dsp.window) == "table" and type(hl.dsp.window.cycle_next) == "function", "Hyprland window cycle dispatcher is required")
 
   local command = overview_path(options)
   local exists = options.exists or default_exists
@@ -58,22 +48,28 @@ function M.register(hl, _o, options)
 
   register_binding(hl, "SUPER + TAB", command, "Workspace Overview")
 
-  -- Windows-style physical monitor cycling.
-  register_dispatcher_binding(
+  -- Windows-style window switching.
+  if type(hl.unbind) == "function" then
+    hl.unbind("ALT + TAB")
+    hl.unbind("ALT + SHIFT + TAB")
+  end
+  hl.bind("ALT + TAB", hl.dsp.window.cycle_next({ next = true }), {
+    description = "Next Window",
+  })
+  hl.bind("ALT + SHIFT + TAB", hl.dsp.window.cycle_next({ next = false }), {
+    description = "Previous Window",
+  })
+
+  -- Windows Ctrl+Alt+Tab semantics: open a persistent task switcher that
+  -- stays visible after the chord is released.
+  register_binding(
     hl,
     "CTRL + ALT + TAB",
-    hl.dsp.focus({ monitor = "+1" }),
-    "Focus Next Monitor"
-  )
-  register_dispatcher_binding(
-    hl,
-    "CTRL + ALT + SHIFT + TAB",
-    hl.dsp.focus({ monitor = "-1" }),
-    "Focus Previous Monitor"
+    command .. " task-switcher",
+    "Persistent Window Switcher"
   )
 
-  -- Keep the persistent all-monitor task switcher available without
-  -- occupying the monitor-cycling chords.
+  -- Keep the explicit launcher chord as an additional accessibility path.
   register_binding(
     hl,
     "SUPER + F10",
