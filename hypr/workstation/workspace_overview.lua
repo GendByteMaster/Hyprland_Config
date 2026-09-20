@@ -38,6 +38,7 @@ function M.register(hl, _o, options)
   assert(type(hl.bind) == "function", "Hyprland bind API is required")
   assert(type(hl.dsp) == "table" and type(hl.dsp.exec_cmd) == "function", "Hyprland exec dispatcher is required")
   assert(type(hl.dsp.window) == "table" and type(hl.dsp.window.cycle_next) == "function", "Hyprland window cycle dispatcher is required")
+  assert(type(hl.dsp.window.move) == "function", "Hyprland window move dispatcher is required")
 
   local command = overview_path(options)
   local exists = options.exists or default_exists
@@ -58,6 +59,18 @@ function M.register(hl, _o, options)
   })
   hl.bind("ALT + SHIFT + TAB", hl.dsp.window.cycle_next({ next = false }), {
     description = "Previous Window",
+  })
+
+  -- Windows-style monitor transfer for the active window.
+  if type(hl.unbind) == "function" then
+    hl.unbind("SUPER + SHIFT + LEFT")
+    hl.unbind("SUPER + SHIFT + RIGHT")
+  end
+  hl.bind("SUPER + SHIFT + LEFT", hl.dsp.window.move({ monitor = "l" }), {
+    description = "Move Active Window to Left Monitor",
+  })
+  hl.bind("SUPER + SHIFT + RIGHT", hl.dsp.window.move({ monitor = "r" }), {
+    description = "Move Active Window to Right Monitor",
   })
 
   -- Windows Ctrl+Alt+Tab semantics: open a persistent task switcher that
