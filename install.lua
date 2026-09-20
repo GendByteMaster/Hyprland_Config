@@ -10,6 +10,7 @@ local command = require("workstation.command")
 local installer = require("workstation.installer")
 local sound_assets = require("workstation.sound_assets")
 local omarchy_plugins = require("workstation.omarchy_plugins")
+local optional_apps = require("workstation.optional_apps")
 
 local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
 local home = assert(os.getenv("HOME"), "HOME is not set")
@@ -86,4 +87,22 @@ else
     end
     io.stderr:write("Core Hyprland_Config installation remains installed.\n")
   end
+end
+
+local amnezia_result = optional_apps.install_amneziavpn()
+if amnezia_result.ok then
+  if amnezia_result.skipped then
+    print("AmneziaVPN auto-install skipped: " .. tostring(amnezia_result.reason))
+  elseif amnezia_result.changed then
+    print("AmneziaVPN " .. tostring(amnezia_result.version) .. " installed from the official release.")
+  else
+    print("AmneziaVPN is already installed.")
+  end
+else
+  io.stderr:write(
+    "Optional AmneziaVPN installation failed: "
+      .. tostring(amnezia_result.error)
+      .. "\n"
+  )
+  io.stderr:write("Core Hyprland_Config installation remains installed.\n")
 end

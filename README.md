@@ -11,6 +11,7 @@ The project does **not** fork Hyprland or Omarchy and does not edit `/usr/share/
 - **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher / Terminal Workflow Layer
 - **v0.3.1** — Managed external Omarchy plugin integration
+- **v0.3.2** — Omarchy desktop hotkeys + optional AmneziaVPN integration
 
 The architecture is Hyprland-first. Omarchy-specific pieces are adapters or optional plugins rather than a runtime requirement for the core workstation layer.
 
@@ -330,6 +331,33 @@ Pins never follow `main` automatically. Upgrades require reviewing upstream
 changes and changing the exact commit in the manifest. See
 `docs/omarchy-external-plugins.md` for the ownership and security model.
 
+
+## v0.3.2 — Omarchy desktop integrations
+
+When the managed components are available, the workstation layer adds these conditional shortcuts:
+
+| Shortcut | Action |
+| --- | --- |
+| `Alt + Tab` | Orbit window switcher |
+| `Super + V` | Clipboard Manager |
+| `Super + A` | Agent Orchestrator |
+| `Super + Alt + V` | Launch AmneziaVPN |
+
+The Windows-like native `Alt + Tab` cycle remains the fallback. The pinned Orbit `bindings.lua` is loaded only when the managed Orbit plugin exists, so Orbit can replace that fallback without making the core Hyprland configuration depend on the plugin.
+
+Plugin/application hotkeys are registered only when their target is available. Missing optional components therefore do not reserve those key combinations.
+
+On x86_64 Arch/Omarchy, `install.lua` and `reinstall.lua` also try to install AmneziaVPN when it is missing. The installer is pinned to the official stable GitHub release `5.0.1.5`:
+
+```text
+AmneziaVPN_5.0.1.5_linux_x64.run
+sha256: ddb471efbe149232aa98c75534f98d42114b15fdc7976802f8feaeba320bc791
+```
+
+The file is downloaded from the official `amnezia-vpn/amnezia-client` release, verified with SHA-256, and then invoked through the Qt Installer Framework unattended path. The pinned version/checksum are intentionally reviewable rather than following an unpinned package source. Failure to install this optional application is reported but does not roll back or fail the core Hyprland_Config installation. The repository does not own or remove the system AmneziaVPN installation during uninstall.
+
+The AmneziaVPN hotkey launches the client with `QT_QPA_PLATFORM=xcb`, which is the compatibility path for the current Linux client under a Wayland/Hyprland session.
+
 ## Install
 
 Clone the repository and run from the checkout you want to use:
@@ -487,6 +515,7 @@ verify.lua
 - **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher + Terminal Workflow Layer
 - **v0.3.1** — managed external Omarchy plugins
+- **v0.3.2** — Omarchy desktop hotkeys + optional AmneziaVPN integration
 - **v0.4** — workspace orchestration around projects
 - **v0.5** — unified Command Center and optional custom shell UI
 
