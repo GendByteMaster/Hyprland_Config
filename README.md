@@ -89,24 +89,6 @@ Super + Tab
 
 Shows the focused Hyprland workspace with live compositor-backed previews and the workspace strip.
 
-### Windows-style Window Switching
-
-```text
-Alt + Tab
-Alt + Shift + Tab
-Ctrl + Alt + Tab
-```
-
-- `Alt + Tab` focuses the next window using Hyprland's native Lua `window.cycle_next` dispatcher.
-- `Alt + Shift + Tab` focuses the previous window.
-- `Ctrl + Alt + Tab` opens the persistent All-Monitor Window Switcher and leaves it open after the keys are released.
-- `Super + Shift + Left` moves the active window to the physical monitor on the left.
-- `Super + Shift + Right` moves the active window to the physical monitor on the right.
-
-The monitor-transfer shortcuts use Hyprland's native `window.move({ monitor = "l" })` / `window.move({ monitor = "r" })` dispatchers, matching the Windows `Win + Shift + Left/Right` interaction without invoking `hyprctl`.
-
-The direct `Alt + Tab` cycle follows Hyprland's focused-workspace semantics. The persistent `Ctrl + Alt + Tab` switcher is broader: it includes windows from every workspace currently active on a physical monitor.
-
 ### All-Monitor Window Switcher
 
 ```text
@@ -133,6 +115,31 @@ Workspace Overview uses on-demand keyboard focus rather than permanent exclusive
 The overview also follows the active Omarchy theme. On startup the wrapper resolves `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` (normally `~/.local/state/omarchy/current/theme/colors.toml`, with the legacy config path as fallback). Each time Overview opens it refreshes `background`, `foreground`, `accent`, `muted`, selection, and surface colors from that palette, so built-in and user-installed Omarchy themes are applied automatically. If no Omarchy palette is available, conservative dark/orange fallback colors are used.
 
 Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapshots; the implementation does not use screenshot-file polling, continuous live capture, or a render-loop `hyprctl` poller.
+
+## Windows-like Interaction Layer
+
+Tracked separately in **#7**, the Windows-like interaction layer keeps familiar keyboard semantics in a dedicated Hyprland module instead of coupling them to Workspace Overview.
+
+```text
+Alt + Tab                  → next window
+Alt + Shift + Tab          → previous window
+
+Super + Shift + Left       → move active window to monitor on the left
+Super + Shift + Right      → move active window to monitor on the right
+
+Ctrl + Super + Left        → previous existing workspace on current monitor
+Ctrl + Super + Right       → next existing workspace on current monitor
+```
+
+The implementation uses native Hyprland Lua dispatchers:
+
+- `hl.dsp.window.cycle_next(...)` for forward/reverse window cycling;
+- `hl.dsp.window.move({ monitor = "l"|"r" })` for physical-monitor transfer;
+- `hl.dsp.focus({ workspace = "m-1"|"m+1" })` for existing-workspace navigation on the current monitor.
+
+The layer intentionally does **not** override `Super + Left/Right`, `Super + Up/Down`, `Super + D`, or `Super + M` yet, because those keys can conflict with useful Hyprland/Omarchy layout semantics.
+
+`Ctrl + Alt + Tab` remains part of Workspace Overview because it directly opens the persistent All-Monitor Window Switcher surface.
 
 ## v0.3 — Project Launcher
 
