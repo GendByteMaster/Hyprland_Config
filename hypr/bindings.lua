@@ -10,4 +10,5 @@ end
 require("hypr.workstation.compat").apply(hl)
 require("hypr.workstation.mouse").register(hl, o)
 require("hypr.workstation.project_launcher").register(hl, o)
+require("hypr.workstation.windows_shortcuts").register(hl, o)
 require("hypr.workstation.workspace_overview").register(hl, o)
