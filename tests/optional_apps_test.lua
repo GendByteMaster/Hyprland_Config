@@ -75,6 +75,7 @@ local function ready_state(extra)
     mktemp = true,
     chmod = true,
     sudo = true,
+    uname = true,
   }
   for key, value in pairs(extra or {}) do
     state[key] = value
