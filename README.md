@@ -89,21 +89,24 @@ Super + Tab
 
 Shows the focused Hyprland workspace with live compositor-backed previews and the workspace strip.
 
-### Physical Monitor Cycling
+### Windows-style Window Switching
 
 ```text
+Alt + Tab
+Alt + Shift + Tab
 Ctrl + Alt + Tab
-Ctrl + Alt + Shift + Tab
 ```
 
-- `Ctrl + Alt + Tab` focuses the next physical monitor.
-- `Ctrl + Alt + Shift + Tab` focuses the previous physical monitor.
+- `Alt + Tab` focuses the next window using Hyprland's native Lua `window.cycle_next` dispatcher.
+- `Alt + Shift + Tab` focuses the previous window.
+- `Ctrl + Alt + Tab` opens the persistent All-Monitor Window Switcher and leaves it open after the keys are released.
 
-The implementation uses Hyprland's native relative monitor focus (`+1` / `-1`) rather than shelling out to `hyprctl`.
+The direct `Alt + Tab` cycle follows Hyprland's focused-workspace semantics. The persistent `Ctrl + Alt + Tab` switcher is broader: it includes windows from every workspace currently active on a physical monitor.
 
 ### All-Monitor Window Switcher
 
 ```text
+Ctrl + Alt + Tab
 Super + F10
 ```
 
