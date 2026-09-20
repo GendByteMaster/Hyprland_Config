@@ -11,6 +11,7 @@ The project does **not** fork Hyprland or Omarchy and does not edit `/usr/share/
 - **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher / Terminal Workflow Layer
 - **v0.3.1** — Managed external Omarchy plugin integration
+- **v0.3.2** — Omarchy desktop hotkeys + optional AmneziaVPN integration
 
 The architecture is Hyprland-first. Omarchy-specific pieces are adapters or optional plugins rather than a runtime requirement for the core workstation layer.
 
@@ -330,6 +331,30 @@ Pins never follow `main` automatically. Upgrades require reviewing upstream
 changes and changing the exact commit in the manifest. See
 `docs/omarchy-external-plugins.md` for the ownership and security model.
 
+
+## v0.3.2 — Omarchy desktop integrations
+
+When the managed components are available, the workstation layer adds these conditional shortcuts:
+
+| Shortcut | Action |
+| --- | --- |
+| `Alt + Tab` | Orbit window switcher |
+| `Super + V` | Clipboard Manager |
+| `Super + A` | Agent Orchestrator |
+| `Super + Alt + V` | Launch AmneziaVPN |
+
+The Windows-like native `Alt + Tab` cycle remains the fallback. The pinned Orbit `bindings.lua` is loaded only when the managed Orbit plugin exists, so Orbit can replace that fallback without making the core Hyprland configuration depend on the plugin.
+
+Plugin/application hotkeys are registered only when their target is available. Missing optional components therefore do not reserve those key combinations.
+
+On Arch/Omarchy, `install.lua` and `reinstall.lua` also try to install AmneziaVPN when it is missing. The integration prefers `yay`, falls back to `paru`, and explicitly installs:
+
+```text
+aur/amneziavpn-bin
+```
+
+with `--needed --noconfirm`. Failure to install this optional system package is reported but does not roll back or fail the core Hyprland_Config installation. The repository does not own or remove the system AmneziaVPN package during uninstall.
+
 ## Install
 
 Clone the repository and run from the checkout you want to use:
@@ -487,6 +512,7 @@ verify.lua
 - **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher + Terminal Workflow Layer
 - **v0.3.1** — managed external Omarchy plugins
+- **v0.3.2** — Omarchy desktop hotkeys + optional AmneziaVPN integration
 - **v0.4** — workspace orchestration around projects
 - **v0.5** — unified Command Center and optional custom shell UI
 
