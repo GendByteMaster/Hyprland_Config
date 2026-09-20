@@ -3,6 +3,7 @@ local M = {}
 local ORBIT_ID = "io.github.rohan-patnaik.window-switcher"
 local CLIPBOARD_ID = "io.github.vuhuy.clipboard-manager"
 local AGENT_ID = "meviusisback.agent-orchestr"
+local AMNEZIA_FALLBACK_PATH = "/opt/AmneziaVPN/client/AmneziaVPN.sh"
 
 local function default_file_exists(path)
   local file = io.open(path, "r")
@@ -81,11 +82,18 @@ function M.register(hl, _o, options)
     result.agent_orchestrator = true
   end
 
+  local amnezia_command
   if command_exists("AmneziaVPN") then
+    amnezia_command = "env QT_QPA_PLATFORM=xcb AmneziaVPN"
+  elseif file_exists(AMNEZIA_FALLBACK_PATH) then
+    amnezia_command = "env QT_QPA_PLATFORM=xcb " .. AMNEZIA_FALLBACK_PATH
+  end
+
+  if amnezia_command then
     register_exec(
       hl,
       "SUPER + ALT + V",
-      "AmneziaVPN",
+      amnezia_command,
       "AmneziaVPN"
     )
     result.amneziavpn = true
