@@ -347,13 +347,16 @@ The Windows-like native `Alt + Tab` cycle remains the fallback. The pinned Orbit
 
 Plugin/application hotkeys are registered only when their target is available. Missing optional components therefore do not reserve those key combinations.
 
-On Arch/Omarchy, `install.lua` and `reinstall.lua` also try to install AmneziaVPN when it is missing. The integration prefers `yay`, falls back to `paru`, and explicitly installs:
+On x86_64 Arch/Omarchy, `install.lua` and `reinstall.lua` also try to install AmneziaVPN when it is missing. The installer is pinned to the official stable GitHub release `5.0.1.5`:
 
 ```text
-aur/amneziavpn-bin
+AmneziaVPN_5.0.1.5_linux_x64.run
+sha256: ddb471efbe149232aa98c75534f98d42114b15fdc7976802f8feaeba320bc791
 ```
 
-with `--needed --noconfirm`. Failure to install this optional system package is reported but does not roll back or fail the core Hyprland_Config installation. The repository does not own or remove the system AmneziaVPN package during uninstall.
+The file is downloaded from the official `amnezia-vpn/amnezia-client` release, verified with SHA-256, and then invoked through the Qt Installer Framework unattended path. The pinned version/checksum are intentionally reviewable rather than following an unpinned package source. Failure to install this optional application is reported but does not roll back or fail the core Hyprland_Config installation. The repository does not own or remove the system AmneziaVPN installation during uninstall.
+
+The AmneziaVPN hotkey launches the client with `QT_QPA_PLATFORM=xcb`, which is the compatibility path for the current Linux client under a Wayland/Hyprland session.
 
 ## Install
 
