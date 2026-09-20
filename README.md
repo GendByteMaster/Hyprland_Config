@@ -1,32 +1,107 @@
 # Hyprland_Config
 
-A Lua-first workstation layer for **Hyprland** with optional Omarchy integration.
+A Lua-first workstation layer for **Hyprland** with optional **Omarchy** integration.
 
-The project does **not** fork Hyprland or Omarchy and does not edit `/usr/share/omarchy`. It owns a small set of user-level configuration links, launcher files, state, and optional Omarchy plugins.
+`Hyprland_Config` adds keyboard-first window/workspace controls, Num Lock mouse control, Quickshell productivity surfaces, Omarchy status plugins, pinned third-party plugins, and optional desktop integrations without forking Hyprland or Omarchy and without modifying `/usr/share/omarchy`.
 
-## Current scope
+The design is intentionally modular:
 
-- **v0.1** — Num Lock Mouse Mode
-- **v0.2** — System Monitor topbar + `btop`
-- **v0.4** — Workspace Overview + All-Monitor Window Switcher
-- **v0.3** — Project Launcher / Terminal Workflow Layer
-- **v0.3.1** — Managed external Omarchy plugin integration
-- **v0.3.2** — Omarchy desktop hotkeys + optional AmneziaVPN integration
+- **Hyprland-first** - core workstation behavior does not require Omarchy.
+- **User-level ownership** - managed targets are symlinked from this repository and backed up before replacement.
+- **Optional integrations stay optional** - network/plugin/application failures do not corrupt the core workstation installation.
 
-The architecture is Hyprland-first. Omarchy-specific pieces are adapters or optional plugins rather than a runtime requirement for the core workstation layer.
+## Status
+
+| Version | Implemented feature |
+| --- | --- |
+| **v0.1** | Num Lock Mouse Mode |
+| **v0.2** | Omarchy System Monitor + `btop` integration |
+| **v0.3** | Project Launcher / terminal workflow layer |
+| **v0.3.1** | Managed external Omarchy plugins |
+| **v0.3.2** | Desktop integration hotkeys + optional AmneziaVPN |
+| **v0.4** | Workspace Overview + All-Monitor Window Switcher |
+| - | Windows-like Hyprland interaction layer |
 
 ## Requirements
 
-Core v0.3 / v0.3.1:
+Core workstation layer:
 
 - Hyprland 0.55+
 - Lua 5.1
 - `luac5.1`
 - Quickshell with the `qs` CLI
 
-Optional capabilities are detected at runtime. Depending on which project actions you use, tools such as Git, Cargo, npm/pnpm/yarn/bun, pytest, Docker, `wl-copy`, an editor, or a file manager may also be used.
+Omarchy is optional. When present, the installer can additionally manage repository-owned Omarchy plugins, pinned third-party plugins, desktop integration hotkeys, and the optional AmneziaVPN installation path.
 
-Omarchy is optional. When present, the installer can also manage the Mouse Mode HUD and System Monitor plugins. v0.3.1 additionally manages explicitly pinned third-party Omarchy plugins without making them a core runtime dependency.
+Project Launcher actions are capability-driven. Depending on the selected project, optional tools can include Git, Cargo, npm/pnpm/yarn/bun, pytest, Docker Compose, `wl-copy`, an editor, a file manager, and a supported terminal emulator.
+
+## Quick start
+
+Clone and install:
+
+```bash
+git clone https://github.com/GendByteMaster/Hyprland_Config.git ~/Hyprland_Config
+cd ~/Hyprland_Config
+lua5.1 install.lua
+```
+
+Update an existing installation:
+
+```bash
+cd ~/Hyprland_Config
+git switch master
+git pull --ff-only origin master
+lua5.1 reinstall.lua
+```
+
+Verify:
+
+```bash
+lua5.1 verify.lua
+```
+
+## Keyboard map
+
+### Desktop and window shortcuts
+
+| Shortcut | Action | Availability |
+| --- | --- | --- |
+| `Alt + Tab` | Orbit window switcher | Orbit installed |
+| `Alt + Tab` | Native next-window cycle | fallback when Orbit is unavailable |
+| `Alt + Shift + Tab` | Orbit/native previous-window cycle | Orbit or fallback |
+| `Super + Shift + Left` | Move active window to physical monitor on the left | core |
+| `Super + Shift + Right` | Move active window to physical monitor on the right | core |
+| `Ctrl + Super + Left` | Previous existing workspace on current monitor | core |
+| `Ctrl + Super + Right` | Next existing workspace on current monitor | core |
+| `Super + Tab` | Workspace Overview | core |
+| `Ctrl + Alt + Tab` | Persistent All-Monitor Window Switcher | core |
+| `Super + F10` | All-Monitor Window Switcher | core |
+| `Super + F9` | Workspace Overview fallback | Try Omarchy only |
+| `Super + F8` | Project Launcher | core |
+| `Super + V` | Clipboard Manager | managed plugin installed |
+| `Super + A` | Agent Orchestrator | managed plugin installed |
+| `Super + Alt + V` | AmneziaVPN | application installed |
+
+When Orbit is available, its pinned bindings also provide:
+
+| Shortcut | Orbit action |
+| --- | --- |
+| `Super + Z` | Snap Layouts |
+| `Super + Shift + Z` | Window mode picker |
+| `Super + Q` | Direct next-window cycle |
+| `Super + Shift + Q` | Direct previous-window cycle |
+
+Optional shortcuts are registered only when their target exists. Missing plugins/applications therefore do not reserve their key combinations.
+
+### Try Omarchy on Windows
+
+Windows can intercept Win/Super chords before they reach Hyprland. If that happens, focus the Try Omarchy window and toggle QEMU raw keyboard grab with:
+
+```text
+Ctrl + Alt + G
+```
+
+`Super + F9` is kept as an additional Workspace Overview path for Try Omarchy.
 
 ## v0.1 — Mouse Mode
 
@@ -78,70 +153,6 @@ On Omarchy, the optional `gendbyte.system-monitor` plugin adds topbar telemetry 
 Clicking the monitor uses Omarchy's terminal launcher path to open or focus `btop`.
 
 This feature is optional in v0.3. A plain Hyprland installation does not create Omarchy plugin directories and does not require the Omarchy CLI.
-
-## v0.4 — Workspace Overview + All-Monitor Window Switcher
-
-v0.4 adds two related but distinct Quickshell surfaces.
-
-### Workspace Overview
-
-```text
-Super + Tab
-```
-
-Shows the focused Hyprland workspace with live compositor-backed previews and the workspace strip.
-
-### All-Monitor Window Switcher
-
-```text
-Ctrl + Alt + Tab
-Super + F10
-```
-
-Shows one persistent task switcher on the currently focused physical monitor. Its window list includes windows from every Hyprland workspace that is currently active on any physical monitor, so windows on secondary displays remain available without including hidden/inactive workspaces.
-
-The switcher is MRU ordered from Hyprland `focusHistoryID` (most recent first), shows each window's physical monitor name, and scales its grid against both available width and height. Preview sizing is automatic: one window receives a large card, two windows are arranged side by side, 3–4 use medium cards, and denser sets progressively reduce the preview cap.
-
-Keyboard and pointer behavior:
-
-- `Up/Down/Left/Right` moves the selected window
-- `Enter` focuses the selected window, including windows on another physical monitor
-- pointer hover updates selection
-- click focuses the selected window
-- `Esc` closes the switcher
-
-`Super + F10` remains the persistent all-monitor task switcher. In **Try Omarchy for Windows**, `Super + F9` remains the Workspace Overview fallback. Windows may intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
-
-Workspace Overview uses on-demand keyboard focus rather than permanent exclusive ownership. When Overview is already open, pressing `Super` closes Overview immediately and returns the key to the normal Hyprland/Omarchy flow; the user's existing single-`Super` binding can then open Omarchy Menu on release and take focus. The overview does not duplicate the menu command itself, avoiding double-toggle behavior.
-
-The overview also follows the active Omarchy theme. On startup the wrapper resolves `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` (normally `~/.local/state/omarchy/current/theme/colors.toml`, with the legacy config path as fallback). Each time Overview opens it refreshes `background`, `foreground`, `accent`, `muted`, selection, and surface colors from that palette, so built-in and user-installed Omarchy themes are applied automatically. If no Omarchy palette is available, conservative dark/orange fallback colors are used.
-
-Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapshots; the implementation does not use screenshot-file polling, continuous live capture, or a render-loop `hyprctl` poller.
-
-## Windows-like Interaction Layer
-
-Tracked separately in **#7**, the Windows-like interaction layer keeps familiar keyboard semantics in a dedicated Hyprland module instead of coupling them to Workspace Overview.
-
-```text
-Alt + Tab                  → next window
-Alt + Shift + Tab          → previous window
-
-Super + Shift + Left       → move active window to monitor on the left
-Super + Shift + Right      → move active window to monitor on the right
-
-Ctrl + Super + Left        → previous existing workspace on current monitor
-Ctrl + Super + Right       → next existing workspace on current monitor
-```
-
-The implementation uses native Hyprland Lua dispatchers:
-
-- `hl.dsp.window.cycle_next(...)` for forward/reverse window cycling;
-- `hl.dsp.window.move({ monitor = "l"|"r" })` for physical-monitor transfer;
-- `hl.dsp.focus({ workspace = "m-1"|"m+1" })` for existing-workspace navigation on the current monitor.
-
-The layer intentionally does **not** override `Super + Left/Right`, `Super + Up/Down`, `Super + D`, or `Super + M` yet, because those keys can conflict with useful Hyprland/Omarchy layout semantics.
-
-`Ctrl + Alt + Tab` remains part of Workspace Overview because it directly opens the persistent All-Monitor Window Switcher surface.
 
 ## v0.3 — Project Launcher
 
@@ -331,7 +342,6 @@ Pins never follow `main` automatically. Upgrades require reviewing upstream
 changes and changing the exact commit in the manifest. See
 `docs/omarchy-external-plugins.md` for the ownership and security model.
 
-
 ## v0.3.2 — Omarchy desktop integrations
 
 When the managed components are available, the workstation layer adds these conditional shortcuts:
@@ -358,85 +368,155 @@ The file is downloaded from the official `amnezia-vpn/amnezia-client` release, v
 
 The AmneziaVPN hotkey launches the client with `QT_QPA_PLATFORM=xcb`, which is the compatibility path for the current Linux client under a Wayland/Hyprland session.
 
-## Install
+## v0.4 — Workspace Overview + All-Monitor Window Switcher
 
-Clone the repository and run from the checkout you want to use:
+v0.4 adds two related but distinct Quickshell surfaces.
+
+### Workspace Overview
+
+```text
+Super + Tab
+```
+
+Shows the focused Hyprland workspace with live compositor-backed previews and the workspace strip.
+
+### All-Monitor Window Switcher
+
+```text
+Ctrl + Alt + Tab
+Super + F10
+```
+
+Shows one persistent task switcher on the currently focused physical monitor. Its window list includes windows from every Hyprland workspace that is currently active on any physical monitor, so windows on secondary displays remain available without including hidden/inactive workspaces.
+
+The switcher is MRU ordered from Hyprland `focusHistoryID` (most recent first), shows each window's physical monitor name, and scales its grid against both available width and height. Preview sizing is automatic: one window receives a large card, two windows are arranged side by side, 3–4 use medium cards, and denser sets progressively reduce the preview cap.
+
+Keyboard and pointer behavior:
+
+- `Up/Down/Left/Right` moves the selected window
+- `Enter` focuses the selected window, including windows on another physical monitor
+- pointer hover updates selection
+- click focuses the selected window
+- `Esc` closes the switcher
+
+`Super + F10` remains the persistent all-monitor task switcher. In **Try Omarchy for Windows**, `Super + F9` remains the Workspace Overview fallback. Windows may intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
+
+Workspace Overview uses on-demand keyboard focus rather than permanent exclusive ownership. When Overview is already open, pressing `Super` closes Overview immediately and returns the key to the normal Hyprland/Omarchy flow; the user's existing single-`Super` binding can then open Omarchy Menu on release and take focus. The overview does not duplicate the menu command itself, avoiding double-toggle behavior.
+
+The overview also follows the active Omarchy theme. On startup the wrapper resolves `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` (normally `~/.local/state/omarchy/current/theme/colors.toml`, with the legacy config path as fallback). Each time Overview opens it refreshes `background`, `foreground`, `accent`, `muted`, selection, and surface colors from that palette, so built-in and user-installed Omarchy themes are applied automatically. If no Omarchy palette is available, conservative dark/orange fallback colors are used.
+
+Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapshots; the implementation does not use screenshot-file polling, continuous live capture, or a render-loop `hyprctl` poller.
+
+## Windows-like Interaction Layer
+
+Tracked separately in **#7**, the Windows-like interaction layer keeps familiar keyboard semantics in a dedicated Hyprland module instead of coupling them to Workspace Overview.
+
+```text
+Alt + Tab                  → next window
+Alt + Shift + Tab          → previous window
+
+Super + Shift + Left       → move active window to monitor on the left
+Super + Shift + Right      → move active window to monitor on the right
+
+Ctrl + Super + Left        → previous existing workspace on current monitor
+Ctrl + Super + Right       → next existing workspace on current monitor
+```
+
+The implementation uses native Hyprland Lua dispatchers:
+
+- `hl.dsp.window.cycle_next(...)` for forward/reverse window cycling;
+- `hl.dsp.window.move({ monitor = "l"|"r" })` for physical-monitor transfer;
+- `hl.dsp.focus({ workspace = "m-1"|"m+1" })` for existing-workspace navigation on the current monitor.
+
+The layer intentionally does **not** override `Super + Left/Right`, `Super + Up/Down`, `Super + D`, or `Super + M` yet, because those keys can conflict with useful Hyprland/Omarchy layout semantics.
+
+`Ctrl + Alt + Tab` remains part of Workspace Overview because it directly opens the persistent All-Monitor Window Switcher surface.
+
+## Install and ownership model
+
+The installer manages explicit symlinks from the checked-out repository rather than copying an opaque generated configuration into your home directory.
+
+Run:
 
 ```bash
 lua5.1 install.lua
 ```
 
-v0.3 requires Quickshell's `qs` CLI before the installer changes managed targets.
-
-The core installation manages:
+Core managed targets:
 
 ```text
 ~/.config/hypr/bindings.lua
 ~/.config/hypr/workstation
 ~/.local/bin/hyprland-workstation-launcher
 ~/.config/quickshell/gendbyte-project-launcher
+~/.local/bin/hyprland-workspace-overview
+~/.config/quickshell/gendbyte-workspace-overview
 ```
 
-On Omarchy, it can additionally manage:
+On Omarchy, repository-owned plugins can also be linked at:
 
 ```text
 ~/.config/omarchy/plugins/gendbyte.mouse-hud
 ~/.config/omarchy/plugins/gendbyte.system-monitor
 ```
 
-Existing Hyprland files are preserved under:
+Pinned third-party plugins are stored under:
+
+```text
+~/.local/share/hyprland_config/external-plugins/<plugin-id>
+```
+
+and exposed to Omarchy through owned symlinks under `~/.config/omarchy/plugins/`.
+
+### Existing configuration and backups
+
+Existing Hyprland configuration is preserved under:
 
 ```text
 ~/.local/state/hyprland_config/backups/<timestamp>/
 ```
 
-Install ownership is recorded in a versioned state file so uninstall/verify know which optional components belong to this installation.
+Install ownership is tracked in:
 
-After installation:
-
-```bash
-hyprctl reload
-hyprctl configerrors
+```text
+~/.local/state/hyprland_config/active.state
 ```
 
-### Reinstall / update
+If an active managed target is replaced or redirected outside this repository, reinstall/uninstall refuses to silently overwrite or delete it.
 
-For an existing installation:
+### Update / reconcile
 
 ```bash
+cd ~/Hyprland_Config
+git switch master
+git pull --ff-only origin master
 lua5.1 reinstall.lua
 ```
 
-Reinstall is **reconciliation**, not uninstall-then-install. Existing managed links are checked in place, missing components are added, install state is migrated when necessary, verification runs, and Hyprland is reloaded only after verification succeeds.
+`reinstall.lua` is reconciliation, not uninstall-then-install. It checks managed links, adds newly introduced components, reconciles repository-owned Omarchy plugins, syncs pinned external plugins, attempts the optional AmneziaVPN install when applicable, verifies the result, and reloads Hyprland only after verification passes.
 
-## Verify
+## Verify and test
+
+Runtime installation verification:
 
 ```bash
 lua5.1 verify.lua
 ```
 
-Verification checks:
+Verification covers repository safety, Lua availability, required repository files, install state, managed Hyprland links, Project Launcher/Workspace Overview links, Quickshell availability, preserved configuration, repository-owned Omarchy plugin links, Omarchy plugin validation where applicable, and Lua syntax.
 
-- repository safety
-- Lua runtime/compiler
-- required repository files
-- install state
-- managed Hyprland links
-- Project Launcher links
-- Quickshell availability when the launcher is installed
-- preserved bindings
-- optional Omarchy links/validation when those components are managed
-- Lua syntax
+Generic Hyprland installations skip Omarchy-only runtime checks successfully.
 
-Omarchy checks are skipped successfully for a generic Hyprland-only installation.
-
-Run the complete automated suite from the repository root with:
+Full development suite:
 
 ```bash
 lua5.1 tests/run.lua
 find . -name '*.lua' -type f -print0 | xargs -0 -r -n1 luac5.1 -p
 bash -n bin/hyprland-workstation-launcher
+bash -n bin/hyprland-workspace-overview
 ```
+
+GitHub Actions runs the same test/syntax gates for feature pushes and pull requests.
 
 ## Uninstall
 
@@ -444,79 +524,160 @@ bash -n bin/hyprland-workstation-launcher
 lua5.1 uninstall.lua
 ```
 
-The uninstaller refuses to delete a managed target that no longer points to this repository. Only components recorded as owned by the active installation are removed.
+The uninstaller:
 
-A generic Hyprland installation therefore uninstalls without requiring Omarchy. An Omarchy installation disables the managed System Monitor plugin before deleting its link.
+- verifies that managed targets still point to this repository;
+- disables/removes repository-owned Omarchy integration when owned;
+- removes only owned external plugin sources/symlinks;
+- preserves conflicting user-managed plugin paths instead of deleting them;
+- restores preserved Hyprland configuration from the recorded backup;
+- removes active install state.
 
-Previously preserved Hyprland configuration is restored from the recorded backup.
+The system AmneziaVPN installation is intentionally **not** removed.
 
-Reload afterwards:
+Reload Hyprland afterwards if required:
 
 ```bash
 hyprctl reload
 ```
 
+## Troubleshooting
+
+### Check the whole installation
+
+```bash
+cd ~/Hyprland_Config
+lua5.1 verify.lua
+```
+
+### Hyprland configuration errors
+
+```bash
+hyprctl reload
+hyprctl configerrors
+```
+
+### Super shortcuts do not work in Try Omarchy on Windows
+
+Toggle raw keyboard grab:
+
+```text
+Ctrl + Alt + G
+```
+
+### External Omarchy plugins are missing
+
+```bash
+cd ~/Hyprland_Config
+lua5.1 omarchy-plugins.lua sync
+omarchy plugin list
+```
+
+Low-level shell rescan:
+
+```bash
+omarchy-shell shell rescanPlugins
+```
+
+### Check AmneziaVPN
+
+```bash
+command -v AmneziaVPN || test -x /opt/AmneziaVPN/client/AmneziaVPN.sh
+```
+
+Manual Hyprland/Wayland-compatible launch:
+
+```bash
+QT_QPA_PLATFORM=xcb AmneziaVPN
+```
+
+Fallback path:
+
+```bash
+QT_QPA_PLATFORM=xcb /opt/AmneziaVPN/client/AmneziaVPN.sh
+```
+
 ## Repository layout
 
 ```text
-hypr/
-  bindings.lua
-  workstation/
-    mouse.lua
-    project_launcher.lua
-    ...
-
-quickshell/
-  gendbyte-project-launcher/
-    shell.qml
-    ProjectLauncher.qml
-    components/
-
-lua/workstation/
-  action_executor.lua
-  adapters/
-  project_actions.lua
-  project_cache.lua
-  project_config.lua
-  project_discovery.lua
-  project_launcher_cli.lua
-  project_model.lua
-  project_search.lua
-  project_state.lua
-  project_types.lua
-  launcher_protocol.lua
-  installer.lua
-  omarchy_plugins.lua
-  uninstaller.lua
-  verifier.lua
-  ...
-
-omarchy/
-  external-plugins.lua
-  plugins/
-    gendbyte.mouse-hud/
-    gendbyte.system-monitor/
-
-bin/
-  hyprland-workstation-launcher
-
-project-launcher.lua
-omarchy-plugins.lua
-install.lua
-reinstall.lua
-uninstall.lua
-verify.lua
+.
+|-- hypr/
+|   |-- bindings.lua
+|   `-- workstation/
+|       |-- compat.lua
+|       |-- desktop_integrations.lua
+|       |-- hud.lua
+|       |-- mouse.lua
+|       |-- project_launcher.lua
+|       |-- windows_shortcuts.lua
+|       `-- workspace_overview.lua
+|-- lua/workstation/
+|   |-- adapters/
+|   |-- installer.lua
+|   |-- omarchy_plugins.lua
+|   |-- optional_apps.lua
+|   |-- overview_model.lua
+|   |-- project_*.lua
+|   |-- telemetry*.lua
+|   |-- uninstaller.lua
+|   `-- verifier.lua
+|-- quickshell/
+|   |-- gendbyte-project-launcher/
+|   `-- gendbyte-workspace-overview/
+|-- omarchy/
+|   |-- external-plugins.lua
+|   `-- plugins/
+|       |-- gendbyte.mouse-hud/
+|       `-- gendbyte.system-monitor/
+|-- bin/
+|   |-- hyprland-workspace-overview
+|   `-- hyprland-workstation-launcher
+|-- docs/
+|-- tests/
+|-- install.lua
+|-- reinstall.lua
+|-- uninstall.lua
+|-- verify.lua
+|-- omarchy-plugins.lua
+|-- project-launcher.lua
+`-- telemetry-collector.lua
 ```
+
+## Design and safety notes
+
+### No Omarchy fork
+
+The project does not patch `/usr/share/omarchy` and does not require a custom Omarchy build.
+
+### Explicit ownership
+
+Managed targets are checked before replacement or deletion. An unrelated file occupying a managed path causes an error instead of being overwritten.
+
+### Restorable configuration
+
+Existing Hyprland configuration is preserved before first install and can be restored during uninstall.
+
+### Pinned third-party code
+
+External Omarchy plugins are pinned to exact Git commits rather than floating branches. Because Omarchy plugins execute as the current user, pin updates should be treated as code-review changes.
+
+### Pinned optional installer
+
+AmneziaVPN is pinned to an exact official release asset and SHA-256 before execution.
+
+### Failure boundaries
+
+Optional external-plugin or VPN failures are reported separately from the core Hyprland workstation installation.
 
 ## Roadmap
 
-- **v0.1** — Num Lock Mouse Mode
-- **v0.2** — System Monitor / `btop` integration
-- **v0.4** — Workspace Overview + All-Monitor Window Switcher
-- **v0.3** — Project Launcher + Terminal Workflow Layer
-- **v0.3.1** — managed external Omarchy plugins
-- **v0.3.2** — Omarchy desktop hotkeys + optional AmneziaVPN integration
-- **v0.4** — workspace orchestration around projects
-- **v0.5** — unified Command Center and optional custom shell UI
+Implemented milestones are documented above.
 
-v0.3 intentionally stops short of full workspace orchestration. It provides project discovery, search, actions, and terminal/application launch primitives; v0.4 owns broader workspace lifecycle behavior.
+Next directions:
+
+- project-aware workspace orchestration;
+- tighter Project Launcher <-> workspace lifecycle integration;
+- unified **v0.5 Command Center**;
+- optional custom shell UI where it adds value without unnecessarily replacing Omarchy.
+
+The project remains intentionally modular: keyboard semantics, project workflow, workspace UI, Omarchy plugins, and optional applications should stay independently replaceable.
