@@ -31,12 +31,23 @@ local function register_binding(hl, keys, command, description)
   })
 end
 
+local function register_dispatcher_binding(hl, keys, dispatcher, description)
+  if type(hl.unbind) == "function" then
+    hl.unbind(keys)
+  end
+
+  hl.bind(keys, dispatcher, {
+    description = description,
+  })
+end
+
 function M.register(hl, _o, options)
   options = options or {}
 
   assert(type(hl) == "table", "Hyprland API is required")
   assert(type(hl.bind) == "function", "Hyprland bind API is required")
   assert(type(hl.dsp) == "table" and type(hl.dsp.exec_cmd) == "function", "Hyprland exec dispatcher is required")
+  assert(type(hl.dsp.focus) == "function", "Hyprland focus dispatcher is required")
 
   local command = overview_path(options)
   local exists = options.exists or default_exists
@@ -46,24 +57,33 @@ function M.register(hl, _o, options)
   end
 
   register_binding(hl, "SUPER + TAB", command, "Workspace Overview")
-  register_binding(
+
+  -- Windows-style physical monitor cycling.
+  register_dispatcher_binding(
     hl,
     "CTRL + ALT + TAB",
+    hl.dsp.focus({ monitor = "+1" }),
+    "Focus Next Monitor"
+  )
+  register_dispatcher_binding(
+    hl,
+    "CTRL + ALT + SHIFT + TAB",
+    hl.dsp.focus({ monitor = "-1" }),
+    "Focus Previous Monitor"
+  )
+
+  -- Keep the persistent all-monitor task switcher available without
+  -- occupying the monitor-cycling chords.
+  register_binding(
+    hl,
+    "SUPER + F10",
     command .. " task-switcher",
     "All-Monitor Window Switcher"
   )
 
   -- Try Omarchy may lose host-owned chords before they reach Hyprland.
-  -- Keep two-key accessibility fallbacks that do not collide with documented
-  -- Omarchy window-management bindings.
   if compat.is_try_omarchy(options) then
     register_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
-    register_binding(
-      hl,
-      "SUPER + F10",
-      command .. " task-switcher",
-      "All-Monitor Window Switcher (Try Omarchy)"
-    )
   end
 
   return true
