@@ -300,16 +300,21 @@ function App() {
         <div className="install-grid">
           <article>
             <span className="step">01</span>
+            <h3>Clone</h3>
+            <CopyCommand command="git clone https://github.com/GendByteMaster/Hyprland_Config.git ~/Hyprland_Config && cd ~/Hyprland_Config" />
+          </article>
+          <article>
+            <span className="step">02</span>
             <h3>Install</h3>
             <CopyCommand command="lua5.1 install.lua" />
           </article>
           <article>
-            <span className="step">02</span>
+            <span className="step">03</span>
             <h3>Verify</h3>
             <CopyCommand command="lua5.1 verify.lua" />
           </article>
           <article>
-            <span className="step">03</span>
+            <span className="step">04</span>
             <h3>Update</h3>
             <CopyCommand command="git pull --ff-only origin master && lua5.1 reinstall.lua" />
           </article>
