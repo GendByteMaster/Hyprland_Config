@@ -82,8 +82,28 @@ t.test("desktop integrations load Orbit and register managed plugin and VPN shor
   t.eq(calls.binds[2].options.description, "Agent Orchestrator")
 
   t.eq(calls.binds[3].keys, "SUPER + ALT + V")
-  t.eq(calls.binds[3].dispatcher.command, "AmneziaVPN")
+  t.eq(calls.binds[3].dispatcher.command, "env QT_QPA_PLATFORM=xcb AmneziaVPN")
   t.eq(calls.binds[3].options.description, "AmneziaVPN")
+end)
+
+t.test("AmneziaVPN shortcut falls back to the official install path when no PATH entry exists", function()
+  local hl, calls = fake_hyprland()
+
+  local result = integrations.register(hl, {}, {
+    home = "/home/test",
+    file_exists = function(path)
+      return path == "/opt/AmneziaVPN/client/AmneziaVPN.sh"
+    end,
+    command_exists = function() return false end,
+  })
+
+  t.eq(result.amneziavpn, true)
+  t.eq(#calls.binds, 1)
+  t.eq(calls.binds[1].keys, "SUPER + ALT + V")
+  t.eq(
+    calls.binds[1].dispatcher.command,
+    "env QT_QPA_PLATFORM=xcb /opt/AmneziaVPN/client/AmneziaVPN.sh"
+  )
 end)
 
 t.test("Orbit loader failure is reported without blocking other desktop integrations", function()
