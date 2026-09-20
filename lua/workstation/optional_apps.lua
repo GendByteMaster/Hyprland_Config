@@ -64,7 +64,7 @@ function M.install_amneziavpn(options)
     }
   end
 
-  local required = { "curl", "sha256sum", "mktemp", "chmod", "sudo" }
+  local required = { "curl", "sha256sum", "mktemp", "chmod", "sudo", "uname" }
   for _, name in ipairs(required) do
     if not runtime.command_exists(name) then
       return {
