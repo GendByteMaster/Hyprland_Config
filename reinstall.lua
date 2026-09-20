@@ -86,7 +86,7 @@ if amnezia_result.ok then
   if amnezia_result.skipped then
     print("AmneziaVPN auto-install skipped: " .. tostring(amnezia_result.reason))
   elseif amnezia_result.changed then
-    print("AmneziaVPN installed through " .. tostring(amnezia_result.helper) .. ".")
+    print("AmneziaVPN " .. tostring(amnezia_result.version) .. " installed from the official release.")
   else
     print("AmneziaVPN is already installed.")
   end
