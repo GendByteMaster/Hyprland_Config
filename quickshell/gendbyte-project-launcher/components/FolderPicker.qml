@@ -11,6 +11,7 @@ Item {
   property int currentIndex: -1
   property string errorText: ""
   property bool loading: false
+  property var themePalette: null
 
   signal browseRequested(string path)
   signal accepted(string path)
@@ -98,7 +99,7 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    color: "#dc090909"
+    color: root.themePalette ? root.themePalette.colorWithAlpha(root.themePalette.background, 0.86) : "#dc090909"
 
     MouseArea {
       anchors.fill: parent
@@ -111,9 +112,9 @@ Item {
     width: Math.min(parent.width - 48, 620)
     height: Math.min(parent.height - 48, 410)
     radius: 16
-    color: "#151515"
+    color: root.themePalette ? root.themePalette.darkBackground : "#151515"
     border.width: 1
-    border.color: "#4a3a30"
+    border.color: root.themePalette ? root.themePalette.accent : "#4a3a30"
 
     ColumnLayout {
       anchors.fill: parent
@@ -127,7 +128,7 @@ Item {
 
         Text {
           text: "Select project folder"
-          color: "#f0f0f0"
+          color: root.themePalette ? root.themePalette.foreground : "#f0f0f0"
           font.family: "monospace"
           font.pixelSize: 13
           font.bold: true
@@ -139,14 +140,16 @@ Item {
           Layout.preferredWidth: 30
           Layout.preferredHeight: 30
           radius: 8
-          color: closeMouse.containsMouse ? "#292929" : "#1c1c1c"
+          color: root.themePalette
+            ? (closeMouse.containsMouse ? root.themePalette.selection : root.themePalette.lighterBackground)
+            : (closeMouse.containsMouse ? "#292929" : "#1c1c1c")
           border.width: 1
-          border.color: "#363636"
+          border.color: root.themePalette ? root.themePalette.border : "#363636"
 
           Text {
             anchors.centerIn: parent
             text: "×"
-            color: "#bdbdbd"
+            color: root.themePalette ? root.themePalette.foreground : "#bdbdbd"
             font.pixelSize: 16
           }
 
@@ -164,9 +167,9 @@ Item {
         Layout.fillWidth: true
         Layout.preferredHeight: 38
         radius: 9
-        color: "#1a1a1a"
+        color: root.themePalette ? root.themePalette.lighterBackground : "#1a1a1a"
         border.width: 1
-        border.color: "#303030"
+        border.color: root.themePalette ? root.themePalette.border : "#303030"
 
         RowLayout {
           anchors.fill: parent
@@ -178,13 +181,17 @@ Item {
             Layout.preferredWidth: 30
             Layout.preferredHeight: 26
             radius: 7
-            color: upMouse.containsMouse && root.parentPath !== "" ? "#29231f" : "#202020"
+            color: root.themePalette
+              ? (upMouse.containsMouse && root.parentPath !== "" ? root.themePalette.selection : root.themePalette.lighterBackground)
+              : (upMouse.containsMouse && root.parentPath !== "" ? "#29231f" : "#202020")
             opacity: root.parentPath !== "" ? 1.0 : 0.4
 
             Text {
               anchors.centerIn: parent
               text: "‹"
-              color: root.parentPath !== "" ? "#ff8a3d" : "#777777"
+              color: root.themePalette
+                ? (root.parentPath !== "" ? root.themePalette.accent : root.themePalette.muted)
+                : (root.parentPath !== "" ? "#ff8a3d" : "#777777")
               font.pixelSize: 20
             }
 
@@ -201,7 +208,9 @@ Item {
           Text {
             Layout.fillWidth: true
             text: root.currentPath === "" ? "Loading…" : root.currentPath
-            color: root.currentPath === "" ? "#6f6f6f" : "#bdbdbd"
+            color: root.themePalette
+              ? (root.currentPath === "" ? root.themePalette.muted : root.themePalette.foreground)
+              : (root.currentPath === "" ? "#6f6f6f" : "#bdbdbd")
             elide: Text.ElideMiddle
             font.family: "monospace"
             font.pixelSize: 10
@@ -213,9 +222,9 @@ Item {
         Layout.fillWidth: true
         Layout.fillHeight: true
         radius: 10
-        color: "#111111"
+        color: root.themePalette ? root.themePalette.background : "#111111"
         border.width: 1
-        border.color: "#292929"
+        border.color: root.themePalette ? root.themePalette.border : "#292929"
 
         ListView {
           id: folderList
@@ -235,10 +244,12 @@ Item {
             height: 38
             radius: 8
             color: index === root.currentIndex
-              ? "#2a211b"
-              : (rowMouse.containsMouse ? "#1c1c1c" : "transparent")
+              ? (root.themePalette ? root.themePalette.selection : "#2a211b")
+              : (rowMouse.containsMouse
+                ? (root.themePalette ? root.themePalette.lighterBackground : "#1c1c1c")
+                : "transparent")
             border.width: index === root.currentIndex ? 1 : 0
-            border.color: "#70472e"
+            border.color: root.themePalette ? root.themePalette.accent : "#70472e"
 
             Row {
               anchors.fill: parent
@@ -261,9 +272,9 @@ Item {
                     width: 9
                     height: 5
                     radius: 2
-                    color: "#30241c"
+                    color: root.themePalette ? root.themePalette.selection : "#30241c"
                     border.width: 1
-                    border.color: "#ff8a3d"
+                    border.color: root.themePalette ? root.themePalette.accent : "#ff8a3d"
                   }
 
                   Rectangle {
@@ -272,9 +283,9 @@ Item {
                     width: 20
                     height: 11
                     radius: 3
-                    color: "#241d18"
+                    color: root.themePalette ? root.themePalette.selection : "#241d18"
                     border.width: 1
-                    border.color: "#ff8a3d"
+                    border.color: root.themePalette ? root.themePalette.accent : "#ff8a3d"
                   }
                 }
               }
@@ -283,7 +294,9 @@ Item {
                 width: parent.width - 42
                 height: parent.height
                 text: modelData.name
-                color: index === root.currentIndex ? "#f0f0f0" : "#b7b7b7"
+                color: root.themePalette
+                  ? (index === root.currentIndex ? root.themePalette.foreground : root.themePalette.muted)
+                  : (index === root.currentIndex ? "#f0f0f0" : "#b7b7b7")
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
                 font.family: "monospace"
@@ -312,7 +325,7 @@ Item {
           anchors.centerIn: parent
           visible: root.loading
           text: "Loading folders…"
-          color: "#777777"
+          color: root.themePalette ? root.themePalette.muted : "#777777"
           font.family: "monospace"
           font.pixelSize: 11
         }
@@ -325,7 +338,7 @@ Item {
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: "No subfolders"
-            color: "#a8a8a8"
+            color: root.themePalette ? root.themePalette.foreground : "#a8a8a8"
             font.family: "monospace"
             font.pixelSize: 11
             font.bold: true
@@ -334,7 +347,7 @@ Item {
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: "You can still use this folder as a project root."
-            color: "#626262"
+            color: root.themePalette ? root.themePalette.muted : "#626262"
             font.family: "monospace"
             font.pixelSize: 9
           }
@@ -364,7 +377,7 @@ Item {
             Layout.fillWidth: true
             visible: root.errorText === ""
             text: "↑↓ select   Enter open   Backspace/← up"
-            color: "#626262"
+            color: root.themePalette ? root.themePalette.muted : "#626262"
             font.family: "monospace"
             font.pixelSize: 9
           }
@@ -374,14 +387,16 @@ Item {
           Layout.preferredWidth: 78
           Layout.preferredHeight: 34
           radius: 9
-          color: cancelMouse.containsMouse ? "#262626" : "#1c1c1c"
+          color: root.themePalette
+            ? (cancelMouse.containsMouse ? root.themePalette.selection : root.themePalette.lighterBackground)
+            : (cancelMouse.containsMouse ? "#262626" : "#1c1c1c")
           border.width: 1
-          border.color: "#383838"
+          border.color: root.themePalette ? root.themePalette.border : "#383838"
 
           Text {
             anchors.centerIn: parent
             text: "Cancel"
-            color: "#bdbdbd"
+            color: root.themePalette ? root.themePalette.foreground : "#bdbdbd"
             font.family: "monospace"
             font.pixelSize: 10
           }
@@ -399,14 +414,13 @@ Item {
           Layout.preferredWidth: 148
           Layout.preferredHeight: 34
           radius: 9
-          color: useMouse.containsMouse && root.currentPath !== "" && !root.loading
-            ? "#ff9857" : "#ff8a3d"
+          color: root.themePalette ? root.themePalette.accent : "#ff8a3d"
           opacity: root.currentPath !== "" && !root.loading ? 1.0 : 0.45
 
           Text {
             anchors.centerIn: parent
             text: "Use this folder"
-            color: "#151515"
+            color: root.themePalette ? root.themePalette.background : "#151515"
             font.family: "monospace"
             font.pixelSize: 10
             font.bold: true

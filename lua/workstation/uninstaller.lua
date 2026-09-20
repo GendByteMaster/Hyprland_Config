@@ -57,6 +57,8 @@ function M.uninstall(options)
   local source_workstation = paths.join(repo_root, "hypr", "workstation")
   local source_launcher = paths.join(repo_root, "bin", "hyprland-workstation-launcher")
   local source_quickshell = paths.join(repo_root, "quickshell", "gendbyte-project-launcher")
+  local source_overview_launcher = paths.join(repo_root, "bin", "hyprland-workspace-overview")
+  local source_overview_quickshell = paths.join(repo_root, "quickshell", "gendbyte-workspace-overview")
   local source_hud = paths.join(repo_root, "omarchy", "plugins", HUD_PLUGIN_ID)
   local source_system_monitor = paths.join(repo_root, "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
 
@@ -64,6 +66,8 @@ function M.uninstall(options)
   local target_workstation = paths.join(home, ".config", "hypr", "workstation")
   local target_launcher = paths.join(home, ".local", "bin", "hyprland-workstation-launcher")
   local target_quickshell = paths.join(home, ".config", "quickshell", "gendbyte-project-launcher")
+  local target_overview_launcher = paths.join(home, ".local", "bin", "hyprland-workspace-overview")
+  local target_overview_quickshell = paths.join(home, ".config", "quickshell", "gendbyte-workspace-overview")
   local target_hud = paths.join(home, ".config", "omarchy", "plugins", HUD_PLUGIN_ID)
   local target_system_monitor = paths.join(home, ".config", "omarchy", "plugins", SYSTEM_MONITOR_PLUGIN_ID)
 
@@ -92,6 +96,20 @@ function M.uninstall(options)
       target_quickshell,
       source_quickshell,
       "managed Project Launcher Quickshell config was modified; refusing to remove it"
+    )
+  end
+
+  local overview_owned = state.version >= 3 and state.workspace_overview == true
+  if overview_owned then
+    require_owned(
+      target_overview_launcher,
+      source_overview_launcher,
+      "managed Workspace Overview wrapper was modified; refusing to remove it"
+    )
+    require_owned(
+      target_overview_quickshell,
+      source_overview_quickshell,
+      "managed Workspace Overview Quickshell config was modified; refusing to remove it"
     )
   end
 
@@ -154,6 +172,14 @@ function M.uninstall(options)
   if launcher_owned then
     assert(command.remove(target_launcher), "failed to remove Project Launcher wrapper")
     assert(command.remove(target_quickshell), "failed to remove Project Launcher Quickshell config")
+  end
+
+  if overview_owned then
+    assert(command.remove(target_overview_launcher), "failed to remove Workspace Overview wrapper")
+    assert(
+      command.remove(target_overview_quickshell),
+      "failed to remove Workspace Overview Quickshell config"
+    )
   end
 
   if hud_owned then

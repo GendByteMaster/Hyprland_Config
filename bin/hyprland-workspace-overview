@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd -- "$(dirname -- "$SCRIPT_PATH")/.." && pwd -P)"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-CONFIG_NAME="gendbyte-project-launcher"
+CONFIG_NAME="gendbyte-workspace-overview"
 CONFIG_DIR="$CONFIG_HOME/quickshell/$CONFIG_NAME"
 RUNTIME_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
@@ -18,15 +18,31 @@ if [[ ! -f "$THEME_COLORS" ]]; then
   fi
 fi
 LOG_DIR="$STATE_HOME/hyprland_config"
-LOG_FILE="$LOG_DIR/project-launcher.log"
-LOCK_DIR="$RUNTIME_ROOT/gendbyte-project-launcher-${UID:-$(id -u)}.lock"
+LOG_FILE="$LOG_DIR/workspace-overview.log"
+LOCK_DIR="$RUNTIME_ROOT/gendbyte-workspace-overview-${UID:-$(id -u)}.lock"
 STARTUP_ATTEMPTS=100
 STARTUP_DELAY=0.05
+
+MODE="${1:-overview}"
+case "$MODE" in
+  overview)
+    IPC_TOGGLE="toggle"
+    IPC_SHOW="show"
+    ;;
+  task-switcher)
+    IPC_TOGGLE="toggleSwitcher"
+    IPC_SHOW="showSwitcher"
+    ;;
+  *)
+    echo "usage: $0 [overview|task-switcher]" >&2
+    exit 2
+    ;;
+esac
 
 if [[ -f "$CONFIG_DIR/shell.qml" ]]; then
   QS_SELECTOR=(-c "$CONFIG_NAME")
 else
-  CONFIG_DIR="$REPO_ROOT/quickshell/gendbyte-project-launcher"
+  CONFIG_DIR="$REPO_ROOT/quickshell/gendbyte-workspace-overview"
   QS_SELECTOR=(-p "$CONFIG_DIR")
 fi
 
@@ -37,7 +53,7 @@ qs_config() {
 }
 
 ipc() {
-  qs_config ipc call gendbyte-project-launcher "$1"
+  qs_config ipc call gendbyte-workspace-overview "$1"
 }
 
 wait_for_ipc() {
@@ -52,7 +68,7 @@ wait_for_ipc() {
   return 1
 }
 
-if ipc toggle >/dev/null 2>&1; then
+if ipc "$IPC_TOGGLE" >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -94,31 +110,29 @@ acquire_start_lock() {
 
 if ! acquire_start_lock; then
   if wait_for_ipc; then
-    ipc toggle
+    ipc "$IPC_TOGGLE"
     exit 0
   fi
 
-  echo "Project Launcher startup is busy but IPC did not become ready" >&2
+  echo "Workspace Overview startup is busy but IPC did not become ready" >&2
   exit 1
 fi
 
-# A launcher may have become ready between the first IPC check and lock acquisition.
-if ipc toggle >/dev/null 2>&1; then
+if ipc "$IPC_TOGGLE" >/dev/null 2>&1; then
   exit 0
 fi
 
-export HYPRLAND_WORKSTATION_REPO_ROOT="$REPO_ROOT"
-export OMARCHY_THEME_COLORS="$THEME_COLORS"
 export QS_NO_RELOAD_POPUP=1
+export OMARCHY_THEME_COLORS="$THEME_COLORS"
 
 setsid qs "${QS_SELECTOR[@]}" >>"$LOG_FILE" 2>&1 &
 
 if wait_for_ipc; then
-  ipc show
+  ipc "$IPC_SHOW"
   exit 0
 fi
 
-printf '%s Project Launcher failed to become IPC-ready after 5s\n' \
+printf '%s Workspace Overview failed to become IPC-ready after 5s\n' \
   "$(date --iso-8601=seconds 2>/dev/null || date)" >>"$LOG_FILE"
-echo "Project Launcher failed to start; see $LOG_FILE" >&2
+echo "Workspace Overview failed to start; see $LOG_FILE" >&2
 exit 1

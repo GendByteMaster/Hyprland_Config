@@ -6,6 +6,7 @@ Item {
 
   property var projectsModel: []
   property int currentIndex: -1
+  property var themePalette: null
   signal selected(int index)
 
   ListView {
@@ -23,9 +24,11 @@ Item {
       width: ListView.view.width
       height: 42
       radius: 9
-      color: index === root.currentIndex ? "#2a211c" : (hover.hovered ? "#1d1d1d" : "transparent")
+      color: index === root.currentIndex
+        ? (root.themePalette ? root.themePalette.selection : "#2a211c")
+        : (hover.hovered ? (root.themePalette ? root.themePalette.lighterBackground : "#1d1d1d") : "transparent")
       border.width: index === root.currentIndex ? 1 : 0
-      border.color: "#6b4028"
+      border.color: root.themePalette ? root.themePalette.accent : "#6b4028"
 
       HoverHandler {
         id: hover
@@ -44,7 +47,7 @@ Item {
         Text {
           anchors.verticalCenter: parent.verticalCenter
           text: modelData.favorite === true ? "★" : " "
-          color: "#ff8a3d"
+          color: root.themePalette ? root.themePalette.accent : "#ff8a3d"
           font.pixelSize: 14
         }
 
@@ -56,7 +59,7 @@ Item {
           Text {
             width: parent.width
             text: modelData.name || modelData.path
-            color: "#eeeeee"
+            color: root.themePalette ? root.themePalette.foreground : "#eeeeee"
             elide: Text.ElideRight
             font.family: "monospace"
             font.pixelSize: 14
@@ -65,7 +68,7 @@ Item {
           Text {
             width: parent.width
             text: modelData.path || ""
-            color: "#777777"
+            color: root.themePalette ? root.themePalette.muted : "#777777"
             elide: Text.ElideMiddle
             font.family: "monospace"
             font.pixelSize: 10

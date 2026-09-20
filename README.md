@@ -8,6 +8,7 @@ The project does **not** fork Hyprland or Omarchy and does not edit `/usr/share/
 
 - **v0.1** — Num Lock Mouse Mode
 - **v0.2** — System Monitor topbar + `btop`
+- **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher / Terminal Workflow Layer
 - **v0.3.1** — Managed external Omarchy plugin integration
 
@@ -76,6 +77,70 @@ On Omarchy, the optional `gendbyte.system-monitor` plugin adds topbar telemetry 
 Clicking the monitor uses Omarchy's terminal launcher path to open or focus `btop`.
 
 This feature is optional in v0.3. A plain Hyprland installation does not create Omarchy plugin directories and does not require the Omarchy CLI.
+
+## v0.4 — Workspace Overview + All-Monitor Window Switcher
+
+v0.4 adds two related but distinct Quickshell surfaces.
+
+### Workspace Overview
+
+```text
+Super + Tab
+```
+
+Shows the focused Hyprland workspace with live compositor-backed previews and the workspace strip.
+
+### All-Monitor Window Switcher
+
+```text
+Ctrl + Alt + Tab
+Super + F10
+```
+
+Shows one persistent task switcher on the currently focused physical monitor. Its window list includes windows from every Hyprland workspace that is currently active on any physical monitor, so windows on secondary displays remain available without including hidden/inactive workspaces.
+
+The switcher is MRU ordered from Hyprland `focusHistoryID` (most recent first), shows each window's physical monitor name, and scales its grid against both available width and height. Preview sizing is automatic: one window receives a large card, two windows are arranged side by side, 3–4 use medium cards, and denser sets progressively reduce the preview cap.
+
+Keyboard and pointer behavior:
+
+- `Up/Down/Left/Right` moves the selected window
+- `Enter` focuses the selected window, including windows on another physical monitor
+- pointer hover updates selection
+- click focuses the selected window
+- `Esc` closes the switcher
+
+`Super + F10` remains the persistent all-monitor task switcher. In **Try Omarchy for Windows**, `Super + F9` remains the Workspace Overview fallback. Windows may intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
+
+Workspace Overview uses on-demand keyboard focus rather than permanent exclusive ownership. When Overview is already open, pressing `Super` closes Overview immediately and returns the key to the normal Hyprland/Omarchy flow; the user's existing single-`Super` binding can then open Omarchy Menu on release and take focus. The overview does not duplicate the menu command itself, avoiding double-toggle behavior.
+
+The overview also follows the active Omarchy theme. On startup the wrapper resolves `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` (normally `~/.local/state/omarchy/current/theme/colors.toml`, with the legacy config path as fallback). Each time Overview opens it refreshes `background`, `foreground`, `accent`, `muted`, selection, and surface colors from that palette, so built-in and user-installed Omarchy themes are applied automatically. If no Omarchy palette is available, conservative dark/orange fallback colors are used.
+
+Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapshots; the implementation does not use screenshot-file polling, continuous live capture, or a render-loop `hyprctl` poller.
+
+## Windows-like Interaction Layer
+
+Tracked separately in **#7**, the Windows-like interaction layer keeps familiar keyboard semantics in a dedicated Hyprland module instead of coupling them to Workspace Overview.
+
+```text
+Alt + Tab                  → next window
+Alt + Shift + Tab          → previous window
+
+Super + Shift + Left       → move active window to monitor on the left
+Super + Shift + Right      → move active window to monitor on the right
+
+Ctrl + Super + Left        → previous existing workspace on current monitor
+Ctrl + Super + Right       → next existing workspace on current monitor
+```
+
+The implementation uses native Hyprland Lua dispatchers:
+
+- `hl.dsp.window.cycle_next(...)` for forward/reverse window cycling;
+- `hl.dsp.window.move({ monitor = "l"|"r" })` for physical-monitor transfer;
+- `hl.dsp.focus({ workspace = "m-1"|"m+1" })` for existing-workspace navigation on the current monitor.
+
+The layer intentionally does **not** override `Super + Left/Right`, `Super + Up/Down`, `Super + D`, or `Super + M` yet, because those keys can conflict with useful Hyprland/Omarchy layout semantics.
+
+`Ctrl + Alt + Tab` remains part of Workspace Overview because it directly opens the persistent All-Monitor Window Switcher surface.
 
 ## v0.3 — Project Launcher
 
@@ -419,6 +484,7 @@ verify.lua
 
 - **v0.1** — Num Lock Mouse Mode
 - **v0.2** — System Monitor / `btop` integration
+- **v0.4** — Workspace Overview + All-Monitor Window Switcher
 - **v0.3** — Project Launcher + Terminal Workflow Layer
 - **v0.3.1** — managed external Omarchy plugins
 - **v0.4** — workspace orchestration around projects
