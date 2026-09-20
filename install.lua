@@ -9,6 +9,7 @@ package.path = script_dir .. "/lua/?.lua;" .. script_dir .. "/lua/?/init.lua;" .
 local command = require("workstation.command")
 local installer = require("workstation.installer")
 local sound_assets = require("workstation.sound_assets")
+local omarchy_plugins = require("workstation.omarchy_plugins")
 
 local HUD_PLUGIN_ID = "gendbyte.mouse-hud"
 local home = assert(os.getenv("HOME"), "HOME is not set")
@@ -47,4 +48,42 @@ else
   print("Run after Omarchy Shell is available:")
   print("  omarchy-shell shell rescanPlugins")
   print("  omarchy-shell shell setPluginEnabled " .. HUD_PLUGIN_ID .. " true")
+end
+
+local external_manifest, external_manifest_error = omarchy_plugins.load_manifest(
+  repo_root .. "/omarchy/external-plugins.lua"
+)
+if not external_manifest then
+  io.stderr:write(
+    "External Omarchy plugins were not synced: "
+      .. tostring(external_manifest_error)
+      .. "\n"
+  )
+else
+  local external_result = omarchy_plugins.sync({
+    home = home,
+    manifest = external_manifest,
+  })
+  if external_result.skipped then
+    print("External Omarchy plugins skipped: " .. tostring(external_result.reason))
+  elseif external_result.ok then
+    print(
+      external_result.changed
+        and "External Omarchy plugins reconciled."
+        or "External Omarchy plugins are already pinned and up to date."
+    )
+  else
+    io.stderr:write("External Omarchy plugin sync completed with errors.\n")
+    for _, item in ipairs(external_result.results or {}) do
+      if not item.ok then
+        io.stderr:write(
+          "  " .. tostring(item.name) .. ": " .. tostring(item.error) .. "\n"
+        )
+      end
+    end
+    if external_result.error then
+      io.stderr:write("  " .. tostring(external_result.error) .. "\n")
+    end
+    io.stderr:write("Core Hyprland_Config installation remains installed.\n")
+  end
 end

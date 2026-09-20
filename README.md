@@ -9,12 +9,13 @@ The project does **not** fork Hyprland or Omarchy and does not edit `/usr/share/
 - **v0.1** — Num Lock Mouse Mode
 - **v0.2** — System Monitor topbar + `btop`
 - **v0.3** — Project Launcher / Terminal Workflow Layer
+- **v0.3.1** — Managed external Omarchy plugin integration
 
 The architecture is Hyprland-first. Omarchy-specific pieces are adapters or optional plugins rather than a runtime requirement for the core workstation layer.
 
 ## Requirements
 
-Core v0.3:
+Core v0.3 / v0.3.1:
 
 - Hyprland 0.55+
 - Lua 5.1
@@ -23,7 +24,7 @@ Core v0.3:
 
 Optional capabilities are detected at runtime. Depending on which project actions you use, tools such as Git, Cargo, npm/pnpm/yarn/bun, pytest, Docker, `wl-copy`, an editor, or a file manager may also be used.
 
-Omarchy is optional. When present, the installer can also manage the Mouse Mode HUD and System Monitor plugins.
+Omarchy is optional. When present, the installer can also manage the Mouse Mode HUD and System Monitor plugins. v0.3.1 additionally manages explicitly pinned third-party Omarchy plugins without making them a core runtime dependency.
 
 ## v0.1 — Mouse Mode
 
@@ -231,6 +232,39 @@ On Omarchy, v0.3 still uses the generic explicit-cwd terminal path so project ac
 
 All action arguments are handled as argv data. Project paths and action arguments are not concatenated into an unquoted command string.
 
+## v0.3.1 — Managed external Omarchy plugins
+
+Third-party Omarchy plugins are declared in `omarchy/external-plugins.lua` and pinned to exact Git commits. Their source is stored under:
+
+```text
+~/.local/share/hyprland_config/external-plugins/
+```
+
+Omarchy sees each managed plugin through an owned symlink under
+`~/.config/omarchy/plugins/`. Existing user-managed plugin paths are never
+silently replaced.
+
+The initial managed set is:
+
+- Orbit
+- Clipboard Manager
+- Agent Orchestrator
+
+On Omarchy, `install.lua` and `reinstall.lua` reconcile these plugins after
+the core workstation layer is installed. External network/plugin failures are
+reported but do not roll back or corrupt the core Hyprland_Config installation.
+
+Manual lifecycle commands are also available:
+
+```bash
+lua5.1 omarchy-plugins.lua sync
+lua5.1 omarchy-plugins.lua remove
+```
+
+Pins never follow `main` automatically. Upgrades require reviewing upstream
+changes and changing the exact commit in the manifest. See
+`docs/omarchy-external-plugins.md` for the ownership and security model.
+
 ## Install
 
 Clone the repository and run from the checkout you want to use:
@@ -359,18 +393,22 @@ lua/workstation/
   project_types.lua
   launcher_protocol.lua
   installer.lua
+  omarchy_plugins.lua
   uninstaller.lua
   verifier.lua
   ...
 
-omarchy/plugins/
-  gendbyte.mouse-hud/
-  gendbyte.system-monitor/
+omarchy/
+  external-plugins.lua
+  plugins/
+    gendbyte.mouse-hud/
+    gendbyte.system-monitor/
 
 bin/
   hyprland-workstation-launcher
 
 project-launcher.lua
+omarchy-plugins.lua
 install.lua
 reinstall.lua
 uninstall.lua
@@ -382,6 +420,7 @@ verify.lua
 - **v0.1** — Num Lock Mouse Mode
 - **v0.2** — System Monitor / `btop` integration
 - **v0.3** — Project Launcher + Terminal Workflow Layer
+- **v0.3.1** — managed external Omarchy plugins
 - **v0.4** — workspace orchestration around projects
 - **v0.5** — unified Command Center and optional custom shell UI
 
