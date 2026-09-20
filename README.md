@@ -89,13 +89,23 @@ Super + Tab
 
 Shows the focused Hyprland workspace with live compositor-backed previews and the workspace strip.
 
-### All-Monitor Window Switcher
+### Physical Monitor Cycling
 
 ```text
 Ctrl + Alt + Tab
+Ctrl + Alt + Shift + Tab
 ```
 
-This deliberately replaces Omarchy's default `Ctrl + Alt + Tab` action (cycle focus forward through monitors) with the requested persistent all-monitor task switcher.
+- `Ctrl + Alt + Tab` focuses the next physical monitor.
+- `Ctrl + Alt + Shift + Tab` focuses the previous physical monitor.
+
+The implementation uses Hyprland's native relative monitor focus (`+1` / `-1`) rather than shelling out to `hyprctl`.
+
+### All-Monitor Window Switcher
+
+```text
+Super + F10
+```
 
 Shows one persistent task switcher on the currently focused physical monitor. Its window list includes windows from every Hyprland workspace that is currently active on any physical monitor, so windows on secondary displays remain available without including hidden/inactive workspaces.
 
@@ -109,13 +119,13 @@ Keyboard and pointer behavior:
 - click focuses the selected window
 - `Esc` closes the switcher
 
-In **Try Omarchy for Windows**, `Super + F10` is also registered as the task-switcher fallback. It avoids Omarchy's existing `Super + Home` window-width binding. Windows may still intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
+`Super + F10` remains the persistent all-monitor task switcher. In **Try Omarchy for Windows**, `Super + F9` remains the Workspace Overview fallback. Windows may intercept Win/Super shortcuts unless QEMU raw keyboard grab is active, so use `Ctrl + Alt + G` if the host consumes the chord.
 
 Workspace Overview uses on-demand keyboard focus rather than permanent exclusive ownership. When Overview is already open, pressing `Super` closes Overview immediately and returns the key to the normal Hyprland/Omarchy flow; the user's existing single-`Super` binding can then open Omarchy Menu on release and take focus. The overview does not duplicate the menu command itself, avoiding double-toggle behavior.
 
 The overview also follows the active Omarchy theme. On startup the wrapper resolves `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` (normally `~/.local/state/omarchy/current/theme/colors.toml`, with the legacy config path as fallback). Each time Overview opens it refreshes `background`, `foreground`, `accent`, `muted`, selection, and surface colors from that palette, so built-in and user-installed Omarchy themes are applied automatically. If no Omarchy palette is available, conservative dark/orange fallback colors are used.
 
-Live previews use Quickshell's Hyprland/Wayland integration and `ScreencopyView`; the implementation does not use screenshot-file polling or a render-loop `hyprctl` poller.
+Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapshots; the implementation does not use screenshot-file polling, continuous live capture, or a render-loop `hyprctl` poller.
 
 ## v0.3 — Project Launcher
 
