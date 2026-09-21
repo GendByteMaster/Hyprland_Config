@@ -20,6 +20,7 @@ local project_search = require("workstation.project_search")
 local project_state = require("workstation.project_state")
 local project_types = require("workstation.project_types")
 local protocol = require("workstation.launcher_protocol")
+local workspace_orchestrator = require("workstation.workspace_orchestrator")
 
 local home = assert(os.getenv("HOME"), "HOME is not set")
 
@@ -144,6 +145,11 @@ end
 function context.execute(project, action, confirmed)
   local config = current_config()
   local adapter = select_adapter(config)
+
+  if action.operation == "workspace" then
+    return workspace_orchestrator.run(project, config, adapter)
+  end
+
   return action_executor.run(project, action, adapter, nil, {
     confirmed = confirmed,
   })
