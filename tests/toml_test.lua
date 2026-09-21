@@ -3,7 +3,7 @@ local test = testlib.test
 local toml = require("workstation.toml")
 
 test("toml decodes project config tables and arrays of tables", function()
-  local value, err = toml.decode([[
+  local value, err = toml.decode([=[
 roots = [
   "~/Repository",
   "~/Projects",
@@ -38,7 +38,7 @@ singleton = true
 wait_ms = 900
 match.class = "Code"
 match.title = "Demo"
-]])
+]=])
 
   testlib.eq(err, nil)
   testlib.eq(value.roots[1], "~/Repository")
