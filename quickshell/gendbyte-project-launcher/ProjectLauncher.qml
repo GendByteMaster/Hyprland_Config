@@ -201,23 +201,31 @@ FloatingWindow {
     var started = Number(execution.started || 0)
     var failed = Number(execution.failed || 0)
     var skipped = Number(execution.skipped || 0)
+    var degraded = Number(execution.degraded || 0)
     var summary = "Workspace: " + started + " started"
 
     if (failed > 0)
       summary += ", " + failed + " failed"
+    if (degraded > 0)
+      summary += ", " + degraded + " degraded"
     if (skipped > 0)
       summary += ", " + skipped + " skipped"
 
-    var failures = []
+    var problems = []
     var results = Array.isArray(execution.results) ? execution.results : []
     for (var index = 0; index < results.length; ++index) {
       var item = results[index]
-      if (item && item.status === "failed")
-        failures.push(String(item.target || "target") + ": " + String(item.error || "failed"))
+      if (!item)
+        continue
+
+      if (item.status === "failed")
+        problems.push(String(item.target || "target") + ": " + String(item.error || "failed"))
+      else if (item.degraded === true)
+        problems.push(String(item.target || "target") + ": " + String(item.warning || "placement degraded"))
     }
 
-    if (failures.length > 0)
-      summary += " · " + failures.join(" · ")
+    if (problems.length > 0)
+      summary += " · " + problems.join(" · ")
 
     return summary
   }
