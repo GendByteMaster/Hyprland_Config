@@ -27,9 +27,9 @@ test("valid project config expands roots and preserves explicit projects", funct
   local module = require("workstation.project_config")
   local config, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
-      exists = function(path) return path == "/tmp/projects.lua" end,
+      exists = function(path) return path == "/tmp/projects.toml" end,
       load_config = function()
         return {
           roots = { "~/Repository", "~/Projects" },
@@ -67,7 +67,7 @@ test("malformed project config falls back without rewriting it", function()
   local writes = 0
   local config, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
@@ -92,7 +92,7 @@ test("project config loader errors fall back to defaults", function()
   local module = require("workstation.project_config")
   local config, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
@@ -109,7 +109,7 @@ test("project config accepts validated workspace targets", function()
   local module = require("workstation.project_config")
   local config, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
@@ -157,7 +157,7 @@ test("project config rejects malformed workspace target", function()
   local module = require("workstation.project_config")
   local config, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
@@ -191,7 +191,7 @@ test("project config rejects shell workspace targets", function()
   local module = require("workstation.project_config")
   local _, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
@@ -222,7 +222,7 @@ test("project config accepts singleton match and monitor aliases", function()
   local module = require("workstation.project_config")
   local config, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
@@ -269,7 +269,7 @@ test("project config rejects singleton without match selectors", function()
   local module = require("workstation.project_config")
   local _, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
@@ -300,7 +300,7 @@ test("project config rejects excessive workspace wait", function()
   local module = require("workstation.project_config")
   local _, err = module.load({
     home = "/home/test",
-    config_path = "/tmp/projects.lua",
+    config_path = "/tmp/projects.toml",
     runtime = {
       exists = function() return true end,
       load_config = function()
