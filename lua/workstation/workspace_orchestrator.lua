@@ -257,7 +257,7 @@ local function default_runtime()
     realpath = command.realpath,
     command_exists = command.command_exists,
     spawn_argv = command.spawn_argv,
-    run_argv = command.run_argv,
+    run_argv_silent = command.run_argv_silent,
     clients = hyprland_state.clients,
     monitors = hyprland_state.monitors,
     find_match = hyprland_state.find_match,
@@ -503,7 +503,7 @@ local function execute_target(target, plan, runtime)
       }
     end
 
-    if not runtime.run_argv(hyprland_exec_argv(target.argv, target.workspace, resolved_monitor)) then
+    if not runtime.run_argv_silent(hyprland_exec_argv(target.argv, target.workspace, resolved_monitor)) then
       return {
         target = target.name,
         status = "failed",
