@@ -177,3 +177,26 @@ test("omarchy adapter is selected only when omarchy exists", function()
   testlib.eq(argv[1], "xdg-terminal-exec")
   testlib.eq(argv[2], "--dir=/repo/a")
 end)
+
+test("generic URL opener preserves URL as one argv element", function()
+  local generic = require("workstation.adapters.generic")
+  local adapter = generic.detect({ apps = { terminal = "auto" } }, runtime({
+    ["xdg-open"] = true,
+  }))
+
+  local argv = assert(adapter.url_argv("https://example.com/a?x=1&y=two;safe"))
+  testlib.eq(#argv, 2)
+  testlib.eq(argv[1], "xdg-open")
+  testlib.eq(argv[2], "https://example.com/a?x=1&y=two;safe")
+  testlib.eq(adapter.capabilities().url, true)
+end)
+
+test("generic URL opener reports unavailable without xdg-open", function()
+  local generic = require("workstation.adapters.generic")
+  local adapter = generic.detect({ apps = { terminal = "auto" } }, runtime({}))
+
+  local argv, reason = adapter.url_argv("https://example.com")
+  testlib.eq(argv, nil)
+  testlib.truthy(reason:match("URL"))
+  testlib.eq(adapter.capabilities().url, false)
+end)
