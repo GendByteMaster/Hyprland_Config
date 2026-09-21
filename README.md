@@ -245,6 +245,23 @@ The TOML parser is intentionally strict and data-only: it does not use `dofile`,
 
 A malformed TOML config is ignored with a warning rather than rewritten. Configuration is still trusted local policy: explicit `argv` entries intentionally launch the programs you configure, so do not install unreviewed project configuration files.
 
+A ready-to-copy example for the current development repositories lives at:
+
+```text
+examples/projects.toml
+```
+
+It configures `Voxelyra_Nexus`, `VoxClip`, `ForgeGuard`, `NumFlow`, `Veridyn`, `submart_backend`, and `Hyprland_Config` with a conservative first workspace layout: editor on workspace 1 and an interactive project shell on workspace 2.
+
+Install it from the repository root:
+
+```bash
+mkdir -p ~/.config/hyprland-workstation
+cp examples/projects.toml ~/.config/hyprland-workstation/projects.toml
+```
+
+The example deliberately does not enable singleton class/title matching yet. Capture the real compositor metadata with `hyprctl clients -j` first, then add `match` only for verified application identities.
+
 ### Favorites, recent projects, and cache
 
 Favorites and recent-project ordering are stored as data under the XDG state directory. Recent history is bounded.
