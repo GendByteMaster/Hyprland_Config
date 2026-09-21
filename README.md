@@ -407,6 +407,71 @@ The overview also follows the active Omarchy theme. On startup the wrapper resol
 
 Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapshots; the implementation does not use screenshot-file polling, continuous live capture, or a render-loop `hyprctl` poller.
 
+## v0.5 — Workspace Orchestrator (in development)
+
+v0.5 extends the Project Launcher from running one project action at a time to opening a declarative development workspace.
+
+Workspace orchestration is configured per project under `overrides.<project>.workspace.targets`:
+
+```lua
+overrides = {
+  ["~/Repository/Voxelyra"] = {
+    workspace = {
+      targets = {
+        {
+          name = "editor",
+          workspace = 1,
+          operation = "editor",
+        },
+        {
+          name = "backend",
+          workspace = 2,
+          terminal = true,
+          argv = { "uv", "run", "fastapi", "dev" },
+        },
+        {
+          name = "frontend",
+          workspace = 3,
+          terminal = true,
+          argv = { "pnpm", "dev" },
+        },
+        {
+          name = "browser",
+          workspace = 4,
+          operation = "url",
+          url = "http://localhost:3000",
+        },
+      },
+    },
+  },
+}
+```
+
+When a project has at least one validated workspace target, Project Launcher adds:
+
+```text
+Open Workspace
+```
+
+Supported first-slice targets:
+
+- `operation = "editor"` — uses the configured/resolved editor adapter;
+- `terminal = true` + `argv` — opens a project-root terminal and runs the argv command;
+- direct `argv` — launches a process without a terminal;
+- `operation = "url"` + `url` — opens through `xdg-open`;
+- optional `workspace` — applies a Hyprland workspace exec rule;
+- optional `monitor` — applies a Hyprland monitor exec rule.
+
+Workspace targets intentionally do **not** support raw `shell = true`. Arguments remain structured data and are quoted before entering Hyprland's command-string dispatcher.
+
+Targets are independent. If one launch fails while others start successfully, the launcher remains open and reports a partial result such as:
+
+```text
+Workspace: 2 started, 1 failed · backend: terminal unavailable
+```
+
+The first v0.5 slice uses Hyprland exec rules for initial placement. Some applications fork or reuse an existing process and may therefore need the later bounded window-matching/post-launch placement phase tracked in #22.
+
 ## Windows-like Interaction Layer
 
 Tracked separately in **#7**, the Windows-like interaction layer keeps familiar keyboard semantics in a dedicated Hyprland module instead of coupling them to Workspace Overview.
