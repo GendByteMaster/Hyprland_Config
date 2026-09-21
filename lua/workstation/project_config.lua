@@ -50,6 +50,102 @@ local function string_array(value)
   end)
 end
 
+local function contains_nul(value)
+  return type(value) == "string" and value:find(string.char(0), 1, true) ~= nil
+end
+
+local function safe_string(value)
+  return type(value) == "string" and value ~= "" and not contains_nul(value)
+end
+
+local function safe_string_array(value)
+  return is_dense_array(value, function(item)
+    return safe_string(item)
+  end)
+end
+
+local function valid_workspace_selector(value)
+  if type(value) == "number" then
+    return value % 1 == 0 and value >= 1 and value <= 2147483647
+  end
+  return safe_string(value)
+end
+
+local function validate_workspace_target(target)
+  if type(target) ~= "table" then
+    return nil, "workspace targets must be tables"
+  end
+  if not safe_string(target.name) then
+    return nil, "workspace target name must be a non-empty string"
+  end
+  if target.workspace ~= nil and not valid_workspace_selector(target.workspace) then
+    return nil, "workspace target workspace must be a positive id or non-empty selector"
+  end
+  if target.monitor ~= nil and not safe_string(target.monitor) then
+    return nil, "workspace target monitor must be a non-empty string"
+  end
+  if target.terminal ~= nil and type(target.terminal) ~= "boolean" then
+    return nil, "workspace target terminal must be boolean"
+  end
+  if target.shell ~= nil then
+    return nil, "workspace targets do not support shell execution"
+  end
+
+  local has_argv = target.argv ~= nil
+  local has_url = target.url ~= nil
+  local is_editor = target.operation == "editor"
+  local is_url = target.operation == "url" or has_url
+
+  if target.operation ~= nil
+    and target.operation ~= "editor"
+    and target.operation ~= "url" then
+    return nil, "unsupported workspace target operation"
+  end
+
+  if is_editor then
+    if has_argv or has_url or target.terminal == true then
+      return nil, "editor workspace target cannot define argv, url, or terminal"
+    end
+    return true
+  end
+
+  if is_url then
+    if not safe_string(target.url) then
+      return nil, "URL workspace target requires a non-empty url"
+    end
+    if has_argv or target.terminal == true then
+      return nil, "URL workspace target cannot define argv or terminal"
+    end
+    return true
+  end
+
+  if not has_argv or not safe_string_array(target.argv) or #target.argv == 0 then
+    return nil, "workspace target requires a non-empty argv array"
+  end
+
+  return true
+end
+
+local function validate_workspace(workspace)
+  if type(workspace) ~= "table" then
+    return nil, "workspace override must be a table"
+  end
+  if not is_dense_array(workspace.targets, function(item)
+    return type(item) == "table"
+  end) or #workspace.targets == 0 then
+    return nil, "workspace.targets must be a non-empty array"
+  end
+
+  for _, target in ipairs(workspace.targets) do
+    local ok, err = validate_workspace_target(target)
+    if not ok then
+      return nil, err
+    end
+  end
+
+  return true
+end
+
 local function expand(path, home)
   return project_model.expand_path(path, home)
 end
@@ -144,6 +240,12 @@ local function validate(raw, home)
       end
       if value.actions ~= nil and type(value.actions) ~= "table" then
         return nil, "override actions must be a table"
+      end
+      if value.workspace ~= nil then
+        local workspace_ok, workspace_error = validate_workspace(value.workspace)
+        if not workspace_ok then
+          return nil, workspace_error
+        end
       end
       config.overrides[expand(key, home)] = value
     end
