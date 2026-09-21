@@ -7,6 +7,7 @@ Item {
   property var projectsModel: []
   property int currentIndex: -1
   property var themePalette: null
+  property bool active: false
   signal selected(int index)
 
   ListView {
@@ -25,9 +26,11 @@ Item {
       height: 42
       radius: 9
       color: index === root.currentIndex
-        ? (root.themePalette ? root.themePalette.selection : "#2a211c")
+        ? (root.themePalette
+            ? (root.active ? root.themePalette.selection : root.themePalette.lighterBackground)
+            : (root.active ? "#2a211c" : "#1d1d1d"))
         : (hover.hovered ? (root.themePalette ? root.themePalette.lighterBackground : "#1d1d1d") : "transparent")
-      border.width: index === root.currentIndex ? 1 : 0
+      border.width: index === root.currentIndex && root.active ? 1 : 0
       border.color: root.themePalette ? root.themePalette.accent : "#6b4028"
 
       HoverHandler {
