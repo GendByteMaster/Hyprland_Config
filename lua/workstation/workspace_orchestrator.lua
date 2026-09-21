@@ -434,6 +434,8 @@ local function execute_target(target, plan, runtime)
 
   local before_clients = {}
   local before_set = {}
+  local snapshot_available = true
+  local snapshot_error
   if type(target.match) == "table" then
     local clients, clients_error = runtime.clients()
     if not clients then
@@ -445,6 +447,8 @@ local function execute_target(target, plan, runtime)
         }
       end
       before_clients = {}
+      snapshot_available = false
+      snapshot_error = clients_error or "pre-launch Hyprland client snapshot is unavailable"
     else
       before_clients = clients
       before_set = runtime.address_set(clients)
@@ -500,6 +504,13 @@ local function execute_target(target, plan, runtime)
   end
 
   if type(target.match) ~= "table" then
+    return started
+  end
+
+  if not snapshot_available then
+    started.degraded = true
+    started.warning = snapshot_error
+      .. "; new matching window cannot be identified safely"
     return started
   end
 
