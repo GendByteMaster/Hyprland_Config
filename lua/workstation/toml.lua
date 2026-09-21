@@ -26,7 +26,7 @@ local function strip_comment(line)
     if quote == '"' then
       if escaped then
         escaped = false
-      elseif char == "\" then
+      elseif char == "\\" then
         escaped = true
       elseif char == '"' then
         quote = nil
@@ -56,7 +56,7 @@ local function scan_balance(text)
     if quote == '"' then
       if escaped then
         escaped = false
-      elseif char == "\" then
+      elseif char == "\\" then
         escaped = true
       elseif char == '"' then
         quote = nil
@@ -187,7 +187,7 @@ local function parse_key_path(raw, line)
     elseif quote == '"' then
       if escaped then
         escaped = false
-      elseif char == "\" then
+      elseif char == "\\" then
         escaped = true
       elseif char == '"' then
         quote = nil
@@ -233,7 +233,7 @@ local function split_array(raw, line)
     elseif quote == '"' then
       if escaped then
         escaped = false
-      elseif char == "\" then
+      elseif char == "\\" then
         escaped = true
       elseif char == '"' then
         quote = nil
@@ -353,7 +353,7 @@ local function find_assignment(text, line)
     if quote == '"' then
       if escaped then
         escaped = false
-      elseif char == "\" then
+      elseif char == "\\" then
         escaped = true
       elseif char == '"' then
         quote = nil
