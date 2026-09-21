@@ -27,6 +27,7 @@ end
 
 local function write_atomic(path, content)
   return atomic_write.write(path, content)
+end
 
 local function default_runtime()
   return {
