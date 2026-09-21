@@ -84,7 +84,7 @@ local function runtime(options)
       end
       return true
     end,
-    run_argv = function(argv)
+    run_argv_silent = function(argv)
       calls.run[#calls.run + 1] = argv
       if options.fail_run_at and #calls.run == options.fail_run_at then
         return false
