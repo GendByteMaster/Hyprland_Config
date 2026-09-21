@@ -654,7 +654,7 @@ FloatingWindow {
 
       Text {
         Layout.fillWidth: true
-        text: "↑↓ navigate   Tab/→ actions   Enter run   Esc close"
+        text: "↑↓ project   Enter open project   Tab/→ actions   Esc close"
         color: theme.muted
         horizontalAlignment: Text.AlignRight
         font.family: "monospace"
