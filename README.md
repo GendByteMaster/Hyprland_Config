@@ -411,6 +411,17 @@ Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapsh
 
 v0.5 extends the Project Launcher from running one project action at a time to opening a declarative development workspace.
 
+Optional logical monitor aliases can be defined at the top level:
+
+```lua
+monitors = {
+  primary = "DP-1",
+  secondary = "HDMI-A-1",
+}
+```
+
+When an alias is not configured, `primary`, `secondary`, and `tertiary` resolve from the current Hyprland monitor set: the focused monitor is first, then the remaining monitors are ordered deterministically by geometry. If a configured/direct monitor is unavailable, the orchestrator falls back deterministically and reports the target as degraded instead of silently pretending the requested placement succeeded.
+
 Workspace orchestration is configured per project under `overrides.<project>.workspace.targets`:
 
 ```lua
@@ -421,7 +432,19 @@ overrides = {
         {
           name = "editor",
           workspace = 1,
+          monitor = "primary",
           operation = "editor",
+
+          -- Prevent duplicate editor windows on repeated Open Workspace.
+          singleton = true,
+
+          -- Exact, case-insensitive Hyprland client matching.
+          match = {
+            class = "Code",
+          },
+
+          -- Bounded post-launch wait; allowed range is 0..5000 ms.
+          wait_ms = 1200,
         },
         {
           name = "backend",
@@ -453,24 +476,37 @@ When a project has at least one validated workspace target, Project Launcher add
 Open Workspace
 ```
 
-Supported first-slice targets:
+Supported targets:
 
 - `operation = "editor"` — uses the configured/resolved editor adapter;
 - `terminal = true` + `argv` — opens a project-root terminal and runs the argv command;
 - direct `argv` — launches a process without a terminal;
 - `operation = "url"` + `url` — opens through `xdg-open`;
 - optional `workspace` — applies a Hyprland workspace exec rule;
-- optional `monitor` — applies a Hyprland monitor exec rule.
+- optional `monitor` — accepts a direct monitor name or logical role;
+- optional `match` — matches Hyprland clients by `class`, `initial_class`, `title`, and/or `initial_title`;
+- optional `singleton = true` — skips launch when a matching mapped window already exists;
+- optional `wait_ms` — bounds post-launch matching instead of polling indefinitely.
 
 Workspace targets intentionally do **not** support raw `shell = true`. Arguments remain structured data and are quoted before entering Hyprland's command-string dispatcher.
 
-Targets are independent. If one launch fails while others start successfully, the launcher remains open and reports a partial result such as:
+For targets with matching metadata, the orchestrator snapshots Hyprland clients before launch and only treats a later **new** matching address as the launched window. If the pre-launch snapshot is unavailable, it refuses to guess and reports degraded placement.
+
+Initial placement uses Hyprland `exec_cmd(..., rules)`. When an application forks or reuses a process and the new window appears on the wrong location, v0.5 can safely correct a single placement dimension:
+
+- workspace-only target → move the matched window to the requested workspace;
+- monitor-only target → move the matched window to the requested monitor.
+
+A target that requests both workspace and monitor is verified after launch, but ambiguous combined correction is deliberately not forced because moving an existing window and workspace between monitors can affect compositor state beyond that one target. A mismatch is surfaced as **degraded**.
+
+Targets are independent. Failed or degraded targets do not hide successfully started targets. Examples:
 
 ```text
 Workspace: 2 started, 1 failed · backend: terminal unavailable
+Workspace: 3 started, 1 degraded · editor: combined workspace+monitor placement could not be verified safely
 ```
 
-The first v0.5 slice uses Hyprland exec rules for initial placement. Some applications fork or reuse an existing process and may therefore need the later bounded window-matching/post-launch placement phase tracked in #22.
+Repeated `Open Workspace` is idempotent for targets configured with `singleton = true`: an already-running matching client is reported as skipped instead of spawning another instance.
 
 ## Windows-like Interaction Layer
 
