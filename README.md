@@ -191,7 +191,8 @@ Keyboard behavior:
 - `Up/Down` moves through projects or actions
 - `Tab` / `Right` enters the Actions pane
 - `Left` returns from Actions
-- `Enter` runs the selected action
+- `Enter` on the Projects pane runs the primary **Open Project** action immediately
+- `Enter` in the Actions pane runs the selected secondary action
 - `Esc` closes the launcher
 
 Queries are debounced. Project detection and action logic stay in Lua; QML only renders the UI and talks to the versioned JSON backend.
@@ -245,22 +246,14 @@ The TOML parser is intentionally strict and data-only: it does not use `dofile`,
 
 A malformed TOML config is ignored with a warning rather than rewritten. Configuration is still trusted local policy: explicit `argv` entries intentionally launch the programs you configure, so do not install unreviewed project configuration files.
 
-A ready-to-copy example for the current development repositories lives at:
+Basic project opening requires **no TOML file at all**. Every discovered project automatically gets a primary **Open Project** action. With no project-specific workspace override, the launcher builds a safe default workspace in memory:
 
 ```text
-examples/projects.toml
+workspace 1 -> resolved editor
+workspace 2 -> terminal in the project root
 ```
 
-It configures `Voxelyra_Nexus`, `VoxClip`, `ForgeGuard`, `NumFlow`, `Veridyn`, `submart_backend`, and `Hyprland_Config` with a conservative first workspace layout: editor on workspace 1 and an interactive project shell on workspace 2.
-
-Install it from the repository root:
-
-```bash
-mkdir -p ~/.config/hyprland-workstation
-cp examples/projects.toml ~/.config/hyprland-workstation/projects.toml
-```
-
-The example deliberately does not enable singleton class/title matching yet. Capture the real compositor metadata with `hyprctl clients -j` first, then add `match` only for verified application identities.
+This is the first action in the Actions pane, so selecting a project and pressing `Enter` immediately opens the project. `projects.toml` is only needed for advanced customization such as additional dev processes, browser targets, monitor placement, custom application preferences, or verified singleton matching.
 
 ### Favorites, recent projects, and cache
 
@@ -274,6 +267,7 @@ With an empty search query, favorites are shown first, then recent projects, the
 
 Universal actions include:
 
+- Open Project — primary automatic workspace action
 - Open Shell
 - Open Editor
 - Open File Manager
@@ -413,7 +407,7 @@ Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapsh
 
 ## v0.5 — Workspace Orchestrator (in development)
 
-v0.5 extends the Project Launcher from running one project action at a time to opening a declarative development workspace.
+v0.5 extends the Project Launcher from running one project action at a time to opening an automatic development workspace. The default path requires no configuration: **Open Project** opens the resolved editor on workspace 1 and a project-root terminal on workspace 2. TOML overrides replace these defaults when advanced orchestration is needed.
 
 Optional logical monitor aliases can be defined at the top level:
 
@@ -425,7 +419,7 @@ secondary = "HDMI-A-1"
 
 When an alias is not configured, `primary`, `secondary`, and `tertiary` resolve from the current Hyprland monitor set: the focused monitor is first, then the remaining monitors are ordered deterministically by geometry. If a configured/direct monitor is unavailable, the orchestrator falls back deterministically and reports the target as degraded instead of silently pretending the requested placement succeeded.
 
-Workspace orchestration is configured per project under `overrides.<project>.workspace.targets`:
+Optional workspace customization is configured per project under `overrides.<project>.workspace.targets`. When these targets are absent, the automatic editor + shell layout is used:
 
 ```toml
 [[overrides."~/Repository/Voxelyra".workspace.targets]]
@@ -456,11 +450,13 @@ operation = "url"
 url = "http://localhost:3000"
 ```
 
-When a project has at least one validated workspace target, Project Launcher adds:
+Every discovered project exposes the primary action:
 
 ```text
-Open Workspace
+Open Project
 ```
+
+Configured workspace targets replace the automatic defaults for that project.
 
 Supported targets:
 
@@ -494,7 +490,7 @@ Workspace: 2 started, 1 failed · backend: terminal unavailable
 Workspace: 3 started, 1 degraded · editor: combined workspace+monitor placement could not be verified safely
 ```
 
-Repeated `Open Workspace` is idempotent for targets configured with `singleton = true`: an already-running matching client is reported as skipped instead of spawning another instance.
+Repeated `Open Project` is idempotent for targets configured with `singleton = true`: an already-running matching client is reported as skipped instead of spawning another instance.
 
 ## Windows-like Interaction Layer
 
