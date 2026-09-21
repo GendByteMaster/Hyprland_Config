@@ -327,3 +327,172 @@ test("project config rejects excessive workspace wait", function()
   testlib.truthy(err)
   testlib.truthy(err:match("wait_ms"))
 end)
+
+test("project config default loader reads TOML without executing Lua", function()
+  local module = require("workstation.project_config")
+  local path = os.tmpname()
+  local marker = path .. ".executed"
+  os.remove(marker)
+
+  local file = assert(io.open(path, "wb"))
+  file:write([[
+roots = ["~/Repository", "~/Projects"]
+max_depth = 3
+payload = os.execute("touch ]] .. marker .. [[")
+]])
+  file:close()
+
+  local config, err = module.load({
+    home = "/home/test",
+    config_path = path,
+  })
+
+  os.remove(path)
+
+  testlib.truthy(err)
+  testlib.eq(config.roots[1], "/home/test/Repository")
+  local marker_file = io.open(marker, "rb")
+  if marker_file then
+    marker_file:close()
+    os.remove(marker)
+    error("TOML config unexpectedly executed code")
+  end
+end)
+
+test("project config default path is projects.toml and legacy Lua is ignored", function()
+  local module = require("workstation.project_config")
+  local seen = {}
+  local config, err = module.load({
+    home = "/home/test",
+    runtime = {
+      exists = function(path)
+        seen[#seen + 1] = path
+        return path == "/home/test/.config/hyprland-workstation/projects.lua"
+      end,
+      load_config = function()
+        error("legacy Lua must never be loaded")
+      end,
+    },
+  })
+
+  testlib.eq(config.roots[1], "/home/test/Repository")
+  testlib.truthy(err:match("legacy projects.lua is ignored"))
+  testlib.eq(seen[1], "/home/test/.config/hyprland-workstation/projects.toml")
+  testlib.eq(seen[2], "/home/test/.config/hyprland-workstation/projects.lua")
+end)
+
+test("project config rejects non HTTP URL targets", function()
+  local module = require("workstation.project_config")
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.toml",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["/home/test/Repository/demo"] = {
+              workspace = {
+                targets = {
+                  {
+                    name = "unsafe-url",
+                    operation = "url",
+                    url = "file:///etc/passwd",
+                  },
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("http:// or https://"))
+end)
+
+test("project config limits workspace target count", function()
+  local module = require("workstation.project_config")
+  local targets = {}
+  for index = 1, 33 do
+    targets[index] = {
+      name = "target-" .. tostring(index),
+      argv = { "true" },
+    }
+  end
+
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.toml",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["/home/test/Repository/demo"] = {
+              workspace = { targets = targets },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("limit of 32"))
+end)
+
+test("project config limits total workspace matching wait budget", function()
+  local module = require("workstation.project_config")
+  local targets = {}
+  for index = 1, 9 do
+    targets[index] = {
+      name = "target-" .. tostring(index),
+      argv = { "true" },
+      match = { class = "App" .. tostring(index) },
+    }
+  end
+
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.toml",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["/home/test/Repository/demo"] = {
+              workspace = { targets = targets },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("wait budget"))
+end)
+
+test("project config limits monitor alias count", function()
+  local module = require("workstation.project_config")
+  local monitors = {}
+  for index = 1, 17 do
+    monitors["role" .. tostring(index)] = "DP-" .. tostring(index)
+  end
+
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.toml",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return { monitors = monitors }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("limit of 16"))
+end)
