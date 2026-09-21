@@ -230,3 +230,26 @@ test("workspace planner rejects missing workspace configuration", function()
   testlib.eq(plan, nil)
   testlib.truthy(err:match("not configured"))
 end)
+
+test("workspace planner isolates malformed target instead of crashing", function()
+  local orchestrator = require("workstation.workspace_orchestrator")
+  local plan = assert(orchestrator.plan(project, {
+    overrides = {
+      [project.path] = {
+        workspace = {
+          targets = {
+            "not-a-table",
+            {
+              name = "valid",
+              argv = { "worker" },
+            },
+          },
+        },
+      },
+    },
+  }, adapter()))
+
+  testlib.eq(plan.targets[1].enabled, false)
+  testlib.truthy(plan.targets[1].reason:match("table"))
+  testlib.eq(plan.targets[2].enabled, true)
+end)
