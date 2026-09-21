@@ -313,7 +313,7 @@ function M.resolve_monitor(requested, aliases, monitors)
     return desired, false, nil
   end
 
-  local role_index = LOGICAL_MONITOR_INDEX[requested]
+  local role_index = aliased and nil or LOGICAL_MONITOR_INDEX[requested]
   local ordered = ordered_monitors(monitors)
   if role_index and ordered[role_index] then
     return ordered[role_index].name, false, nil
