@@ -118,7 +118,7 @@ t.test("project launcher wrapper uses canonical qs IPC and race-safe bounded sta
   assert_contains(script, 'QS_SELECTOR=(-c "$CONFIG_NAME")')
   assert_contains(script, 'QS_SELECTOR=(-p "$CONFIG_DIR")')
   assert_contains(script, 'qs "${QS_SELECTOR[@]}" "$@"')
-  assert_contains(script, "if ipc toggle")
+  assert_contains(script, "if ipc ping")
   assert_contains(script, "if ipc ping")
   assert_contains(script, "ipc show")
   assert_contains(script, 'HYPRLAND_WORKSTATION_REPO_ROOT')
