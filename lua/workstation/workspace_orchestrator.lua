@@ -46,6 +46,22 @@ local function project_override(project, config)
   return overrides[project.path] or overrides[project.id]
 end
 
+local function default_targets()
+  return {
+    {
+      name = "editor",
+      workspace = 1,
+      operation = "editor",
+    },
+    {
+      name = "shell",
+      workspace = 2,
+      terminal = true,
+      argv = { "bash" },
+    },
+  }
+end
+
 local function normalize_workspace(value)
   if type(value) == "number" then
     if value % 1 ~= 0 or value < 1 or value > MAX_WORKSPACE_ID then
@@ -182,15 +198,18 @@ function M.plan(project, config, adapter)
   local override = project_override(project, config or {})
   local workspace = override and override.workspace
   local targets = workspace and workspace.targets
+  local automatic = false
 
   if type(targets) ~= "table" or #targets == 0 then
-    return nil, "workspace is not configured for project"
+    targets = default_targets()
+    automatic = true
   end
 
   local plan = {
     project_id = project.id,
     project_path = project.path,
     monitor_aliases = copy_map(config and config.monitors or {}),
+    automatic = automatic,
     targets = {},
   }
 
