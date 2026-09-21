@@ -83,8 +83,25 @@ local function target_argv(project, target, adapter)
 end
 
 local function normalize_target(project, target, adapter, index)
+  if type(target) ~= "table" then
+    return {
+      name = "target-" .. tostring(index),
+      enabled = false,
+      reason = "workspace target must be a table",
+    }
+  end
+
+  local name = target.name
+  if type(name) ~= "string" or name == "" or name:find(string.char(0), 1, true) then
+    return {
+      name = "target-" .. tostring(index),
+      enabled = false,
+      reason = "workspace target name must be a non-empty string",
+    }
+  end
+
   local normalized = {
-    name = target.name or ("target-" .. tostring(index)),
+    name = name,
     enabled = true,
   }
 
