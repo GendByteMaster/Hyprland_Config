@@ -78,6 +78,21 @@ local function universal_actions(capabilities)
   return result
 end
 
+local function workspace_action(project, config)
+  local overrides = config.overrides or {}
+  local override = overrides[project.path] or overrides[project.id]
+  local workspace = override and override.workspace
+  if type(workspace) ~= "table"
+    or type(workspace.targets) ~= "table"
+    or #workspace.targets == 0 then
+    return nil
+  end
+
+  return action("open-workspace", "Open Workspace", nil, false, {
+    operation = "workspace",
+  })
+end
+
 local function add_command_action(result, value, capabilities, executable)
   if not command_available(capabilities, executable) then
     disable(value, executable .. " is unavailable")
@@ -255,6 +270,12 @@ function M.resolve(project, types, config, capabilities)
   capabilities = capabilities or {}
 
   local actions = universal_actions(capabilities)
+
+  local workspace = workspace_action(project, config)
+  if workspace then
+    actions[#actions + 1] = workspace
+  end
+
   local detected = auto_actions(types, capabilities)
   for _, value in ipairs(detected) do
     actions[#actions + 1] = value
