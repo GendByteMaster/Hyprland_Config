@@ -175,3 +175,41 @@ test("custom shell action is marked explicitly", function()
   testlib.eq(action.confirm, true)
   testlib.eq(action.enabled, true)
 end)
+
+test("Open Workspace appears only for configured project workspace", function()
+  local resolver = require("workstation.project_actions")
+  local actions = resolver.resolve(project, {}, {
+    overrides = {
+      [project.path] = {
+        workspace = {
+          targets = {
+            {
+              name = "editor",
+              workspace = 1,
+              operation = "editor",
+            },
+          },
+        },
+      },
+    },
+  }, capabilities())
+
+  local workspace = find_action(actions, "open-workspace")
+  testlib.truthy(workspace)
+  testlib.eq(workspace.label, "Open Workspace")
+  testlib.eq(workspace.operation, "workspace")
+  testlib.eq(workspace.terminal, false)
+end)
+
+test("Open Workspace is absent without workspace targets", function()
+  local resolver = require("workstation.project_actions")
+  local actions = resolver.resolve(project, {}, {
+    overrides = {
+      [project.path] = {
+        actions = {},
+      },
+    },
+  }, capabilities())
+
+  assert_no_action(actions, "open-workspace")
+end)
