@@ -44,10 +44,10 @@ function context.load_config()
 
   local selected_roots = state and state.roots or {}
   if #selected_roots > 0 then
-    local user_config_path = home .. "/.config/hyprland-workstation/projects.lua"
+    local user_config_path = home .. "/.config/hyprland-workstation/projects.toml"
 
     -- UI-selected roots replace the implicit ~/Repository fallback, but never
-    -- replace roots from an explicit projects.lua.
+    -- replace roots from an explicit projects.toml.
     if not command.exists(user_config_path) then
       config.roots = {}
     end
