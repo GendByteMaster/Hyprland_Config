@@ -313,7 +313,10 @@ function M.resolve_monitor(requested, aliases, monitors)
     return desired, false, nil
   end
 
-  local role_index = aliased and nil or LOGICAL_MONITOR_INDEX[requested]
+  local role_index
+  if not aliased then
+    role_index = LOGICAL_MONITOR_INDEX[requested]
+  end
   local ordered = ordered_monitors(monitors)
   if role_index and ordered[role_index] then
     return ordered[role_index].name, false, nil
@@ -448,7 +451,10 @@ local function execute_target(target, plan, runtime)
       end
       before_clients = {}
       snapshot_available = false
-      snapshot_error = clients_error or "pre-launch Hyprland client snapshot is unavailable"
+      snapshot_error = "pre-launch Hyprland client snapshot is unavailable"
+      if clients_error then
+        snapshot_error = snapshot_error .. ": " .. tostring(clients_error)
+      end
     else
       before_clients = clients
       before_set = runtime.address_set(clients)
