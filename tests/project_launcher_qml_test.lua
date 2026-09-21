@@ -198,3 +198,10 @@ t.test("project launcher exposes zero-config Open Project keyboard navigation", 
   assert_contains(launcher, "selectedActionIndex = 0")
   assert_contains(launcher, "Enter open project")
 end)
+
+t.test("project launcher closes after successful Open Project protocol response", function()
+  local launcher = must_read("quickshell/gendbyte-project-launcher/ProjectLauncher.qml")
+  assert_contains(launcher, "if (payload.data.dispatched === true)")
+  assert_contains(launcher, "closeLauncher()")
+  assert_contains(launcher, "var payload = parseEnvelope(text)")
+end)
