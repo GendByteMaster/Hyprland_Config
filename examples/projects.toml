@@ -1,0 +1,96 @@
+# Hyprland Workstation — personal project workspace template
+#
+# Copy to:
+#   ~/.config/hyprland-workstation/projects.toml
+#
+# The launcher discovers Git repositories under ~/Repository automatically.
+# These overrides add a conservative Open Workspace layout:
+#   workspace 1 -> resolved editor
+#   workspace 2 -> interactive project shell
+#
+# No application class/title matching is enabled here because real Hyprland
+# classes differ between Code, VSCodium, Zed, Cursor, browsers, and versions.
+# Add singleton/match only after checking live `hyprctl clients -j` output.
+
+roots = ["~/Repository"]
+max_depth = 4
+
+[apps]
+terminal = "auto"
+
+[[overrides."~/Repository/Voxelyra_Nexus".workspace.targets]]
+name = "editor"
+workspace = 1
+operation = "editor"
+
+[[overrides."~/Repository/Voxelyra_Nexus".workspace.targets]]
+name = "shell"
+workspace = 2
+terminal = true
+argv = ["bash"]
+
+[[overrides."~/Repository/VoxClip".workspace.targets]]
+name = "editor"
+workspace = 1
+operation = "editor"
+
+[[overrides."~/Repository/VoxClip".workspace.targets]]
+name = "shell"
+workspace = 2
+terminal = true
+argv = ["bash"]
+
+[[overrides."~/Repository/ForgeGuard".workspace.targets]]
+name = "editor"
+workspace = 1
+operation = "editor"
+
+[[overrides."~/Repository/ForgeGuard".workspace.targets]]
+name = "shell"
+workspace = 2
+terminal = true
+argv = ["bash"]
+
+[[overrides."~/Repository/NumFlow".workspace.targets]]
+name = "editor"
+workspace = 1
+operation = "editor"
+
+[[overrides."~/Repository/NumFlow".workspace.targets]]
+name = "shell"
+workspace = 2
+terminal = true
+argv = ["bash"]
+
+[[overrides."~/Repository/Veridyn".workspace.targets]]
+name = "editor"
+workspace = 1
+operation = "editor"
+
+[[overrides."~/Repository/Veridyn".workspace.targets]]
+name = "shell"
+workspace = 2
+terminal = true
+argv = ["bash"]
+
+[[overrides."~/Repository/submart_backend".workspace.targets]]
+name = "editor"
+workspace = 1
+operation = "editor"
+
+[[overrides."~/Repository/submart_backend".workspace.targets]]
+name = "shell"
+workspace = 2
+terminal = true
+argv = ["bash"]
+
+[[overrides."~/Repository/Hyprland_Config".workspace.targets]]
+name = "editor"
+workspace = 1
+operation = "editor"
+
+[[overrides."~/Repository/Hyprland_Config".workspace.targets]]
+name = "shell"
+workspace = 2
+terminal = true
+argv = ["bash"]
