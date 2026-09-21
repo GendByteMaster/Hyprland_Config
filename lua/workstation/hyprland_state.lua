@@ -29,7 +29,7 @@ end
 local function default_runtime()
   return {
     capture_argv = command.capture_argv,
-    run_argv = command.run_argv,
+    run_argv_silent = command.run_argv_silent,
   }
 end
 
@@ -174,7 +174,7 @@ local function lua_quote(value)
 end
 
 local function dispatch(runtime, expression)
-  return runtime.run_argv({ "hyprctl", "dispatch", expression })
+  return runtime.run_argv_silent({ "hyprctl", "dispatch", expression })
 end
 
 function M.place_client(address, workspace, monitor, runtime)
