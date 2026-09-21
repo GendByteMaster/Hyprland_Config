@@ -488,3 +488,40 @@ test("workspace planner isolates malformed target instead of crashing", function
   testlib.truthy(plan.targets[1].reason:match("table"))
   testlib.eq(plan.targets[2].enabled, true)
 end)
+
+test("disconnected configured monitor alias falls back with degraded reason", function()
+  local orchestrator = require("workstation.workspace_orchestrator")
+  local resolved, degraded, reason = orchestrator.resolve_monitor("primary", {
+    primary = "MISSING",
+  }, {
+    { id = 0, name = "CENTER", focused = true, x = 0, y = 0 },
+    { id = 1, name = "RIGHT", focused = false, x = 1920, y = 0 },
+  })
+
+  testlib.eq(resolved, "CENTER")
+  testlib.eq(degraded, true)
+  testlib.truthy(reason:match("unavailable"))
+end)
+
+test("failed prelaunch client snapshot degrades instead of matching an old window", function()
+  local orchestrator = require("workstation.workspace_orchestrator")
+  local rt = runtime({
+    clients_error = "clients unavailable",
+  })
+
+  local result = orchestrator.run(project, config({
+    {
+      name = "editor",
+      operation = "editor",
+      workspace = 2,
+      wait_ms = 100,
+      match = { class = "code" },
+    },
+  }), adapter(), rt)
+
+  testlib.eq(result.ok, false)
+  testlib.eq(result.started, 1)
+  testlib.eq(result.degraded, 1)
+  testlib.truthy(result.results[1].warning:match("snapshot"))
+  testlib.eq(#rt.calls.place, 0)
+end)
