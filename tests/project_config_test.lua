@@ -496,3 +496,69 @@ test("project config limits monitor alias count", function()
   testlib.truthy(err)
   testlib.truthy(err:match("limit of 16"))
 end)
+
+test("project config rejects unknown top level keys", function()
+  local module = require("workstation.project_config")
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.toml",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          roots = { "~/Repository" },
+          typo_option = true,
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("unsupported key"))
+end)
+
+test("project config rejects shell fields in action overrides", function()
+  local module = require("workstation.project_config")
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.toml",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["/home/test/Repository/demo"] = {
+              actions = {
+                {
+                  id = "unsafe",
+                  argv = { "bash", "-lc", "echo ok" },
+                  shell = true,
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("unsupported key: shell"))
+end)
+
+test("project config bounds discovery depth", function()
+  local module = require("workstation.project_config")
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.toml",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return { max_depth = 1000 }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("between 1 and 16"))
+end)
