@@ -194,6 +194,34 @@ FloatingWindow {
     showWarnings(payload.data)
   }
 
+  function formatExecutionSummary(execution) {
+    if (!execution)
+      return "Workspace partially started"
+
+    var started = Number(execution.started || 0)
+    var failed = Number(execution.failed || 0)
+    var skipped = Number(execution.skipped || 0)
+    var summary = "Workspace: " + started + " started"
+
+    if (failed > 0)
+      summary += ", " + failed + " failed"
+    if (skipped > 0)
+      summary += ", " + skipped + " skipped"
+
+    var failures = []
+    var results = Array.isArray(execution.results) ? execution.results : []
+    for (var index = 0; index < results.length; ++index) {
+      var item = results[index]
+      if (item && item.status === "failed")
+        failures.push(String(item.target || "target") + ": " + String(item.error || "failed"))
+    }
+
+    if (failures.length > 0)
+      summary += " · " + failures.join(" · ")
+
+    return summary
+  }
+
   function handleRunResponse(text) {
     var payload = parseEnvelope(text)
     if (!payload)
@@ -212,6 +240,14 @@ FloatingWindow {
     }
 
     if (payload.data.dispatched === true) {
+      if (payload.data.partial === true) {
+        pendingAction = null
+        confirmDialog.opened = false
+        statusError = true
+        statusText = formatExecutionSummary(payload.data.execution)
+        return
+      }
+
       closeLauncher()
       return
     }
