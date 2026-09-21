@@ -409,7 +409,7 @@ test("partial workspace run marks recent and preserves structured failure summar
     action_list = {
       {
         id = "open-workspace",
-        label = "Open Workspace",
+        label = "Open Project",
         operation = "workspace",
         enabled = true,
       },
@@ -448,7 +448,7 @@ test("workspace run with no successful targets remains a protocol failure", func
     action_list = {
       {
         id = "open-workspace",
-        label = "Open Workspace",
+        label = "Open Project",
         operation = "workspace",
         enabled = true,
       },
