@@ -176,7 +176,7 @@ FloatingWindow {
     selectedProjectIndex = projects.length > 0 ? 0 : -1
     showWarnings(payload.data)
     requestActions()
-    searchField.focusInput()
+    focusProjects()
   }
 
   function handleActionResponse(text) {
@@ -728,7 +728,7 @@ FloatingWindow {
       }
       onCancelled: {
         closePicker()
-        searchField.focusInput()
+        root.focusProjects()
       }
     }
 
