@@ -52,7 +52,8 @@ wait_for_ipc() {
   return 1
 }
 
-if ipc toggle >/dev/null 2>&1; then
+if ipc ping >/dev/null 2>&1; then
+  ipc toggle >/dev/null 2>&1
   exit 0
 fi
 
@@ -93,8 +94,10 @@ acquire_start_lock() {
 }
 
 if ! acquire_start_lock; then
+  # Another wrapper owns the cold start. This invocation must converge on
+  # "visible" instead of toggling whatever state the starter just produced.
   if wait_for_ipc; then
-    ipc toggle
+    ipc show >/dev/null 2>&1
     exit 0
   fi
 
@@ -102,8 +105,10 @@ if ! acquire_start_lock; then
   exit 1
 fi
 
-# A launcher may have become ready between the first IPC check and lock acquisition.
-if ipc toggle >/dev/null 2>&1; then
+# A launcher may have become ready between the first readiness check and lock
+# acquisition. Cold-start intent is always "show", never "toggle".
+if ipc ping >/dev/null 2>&1; then
+  ipc show >/dev/null 2>&1
   exit 0
 fi
 
@@ -114,7 +119,7 @@ export QS_NO_RELOAD_POPUP=1
 setsid qs "${QS_SELECTOR[@]}" >>"$LOG_FILE" 2>&1 &
 
 if wait_for_ipc; then
-  ipc show
+  ipc show >/dev/null 2>&1
   exit 0
 fi
 
