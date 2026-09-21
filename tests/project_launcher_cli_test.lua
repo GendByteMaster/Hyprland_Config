@@ -399,3 +399,75 @@ test("missing launcher command returns usage failure", function()
   testlib.eq(result.ok, false)
   testlib.truthy(result.error:match("usage"))
 end)
+
+test("partial workspace run marks recent and preserves structured failure summary", function()
+  local cli = require("workstation.project_launcher_cli")
+  local ctx = fake_context({
+    cache_projects = {
+      project("/repo/a", "A"),
+    },
+    action_list = {
+      {
+        id = "open-workspace",
+        label = "Open Project",
+        operation = "workspace",
+        enabled = true,
+      },
+    },
+    execute_result = {
+      ok = false,
+      started = 2,
+      skipped = 0,
+      failed = 1,
+      results = {
+        { target = "editor", status = "started" },
+        { target = "frontend", status = "started" },
+        { target = "backend", status = "failed", error = "terminal unavailable" },
+      },
+    },
+    now_value = 4321,
+  })
+
+  local result = cli.run({ "run", "/repo/a", "open-workspace" }, ctx)
+  testlib.eq(result.ok, true)
+  testlib.eq(result.data.dispatched, true)
+  testlib.eq(result.data.partial, true)
+  testlib.eq(result.data.execution.started, 2)
+  testlib.eq(result.data.execution.failed, 1)
+  testlib.eq(ctx.state.recent[1].id, "/repo/a")
+  testlib.eq(ctx.state.recent[1].used_at, 4321)
+  testlib.eq(ctx.state_saves, 1)
+end)
+
+test("workspace run with no successful targets remains a protocol failure", function()
+  local cli = require("workstation.project_launcher_cli")
+  local ctx = fake_context({
+    cache_projects = {
+      project("/repo/a", "A"),
+    },
+    action_list = {
+      {
+        id = "open-workspace",
+        label = "Open Project",
+        operation = "workspace",
+        enabled = true,
+      },
+    },
+    execute_result = {
+      ok = false,
+      started = 0,
+      skipped = 0,
+      failed = 1,
+      error = "workspace launch failed",
+      results = {
+        { target = "backend", status = "failed", error = "workspace launch failed" },
+      },
+    },
+  })
+
+  local result = cli.run({ "run", "/repo/a", "open-workspace" }, ctx)
+  testlib.eq(result.ok, false)
+  testlib.truthy(result.error:match("workspace"))
+  testlib.eq(result.data.execution.started, 0)
+  testlib.eq(ctx.state_saves, 0)
+end)

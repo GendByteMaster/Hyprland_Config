@@ -31,6 +31,13 @@ function M.run_argv(args)
   return M.run(M.argv(args))
 end
 
+function M.run_argv_silent(args)
+  if type(args) ~= "table" or #args == 0 then
+    return false
+  end
+  return M.run(M.argv(args) .. " >/dev/null 2>&1")
+end
+
 function M.spawn_argv(args)
   if type(args) ~= "table" or #args == 0 then
     return false

@@ -39,7 +39,11 @@ local function disable(value, reason)
 end
 
 local function universal_actions(capabilities)
-  local result = {}
+  local result = {
+    action("open-workspace", "Open Project", nil, false, {
+      operation = "workspace",
+    }),
+  }
 
   local shell = action("open-shell", "Open Shell", {}, true, { operation = "terminal" })
   if capabilities.terminal == false then
@@ -255,6 +259,7 @@ function M.resolve(project, types, config, capabilities)
   capabilities = capabilities or {}
 
   local actions = universal_actions(capabilities)
+
   local detected = auto_actions(types, capabilities)
   for _, value in ipairs(detected) do
     actions[#actions + 1] = value

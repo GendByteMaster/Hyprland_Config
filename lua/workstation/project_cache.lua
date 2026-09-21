@@ -1,4 +1,5 @@
 local command = require("workstation.command")
+local atomic_write = require("workstation.atomic_write")
 local json = require("workstation.json")
 local paths = require("workstation.paths")
 
@@ -25,26 +26,7 @@ local function read_file(path)
 end
 
 local function write_atomic(path, content)
-  if not command.mkdir_p(paths.dirname(path)) then
-    return nil, "failed to create cache directory"
-  end
-
-  local temp = path .. ".tmp"
-  local file = io.open(temp, "wb")
-  if not file then
-    return nil, "failed to open temporary cache file"
-  end
-  local ok, write_error = file:write(content)
-  file:close()
-  if not ok then
-    os.remove(temp)
-    return nil, tostring(write_error or "failed to write cache")
-  end
-  if not os.rename(temp, path) then
-    os.remove(temp)
-    return nil, "failed to replace cache file"
-  end
-  return true
+  return atomic_write.write(path, content)
 end
 
 local function default_runtime()

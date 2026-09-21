@@ -30,10 +30,13 @@ local project = {
   name = "app",
 }
 
-test("universal actions expose quick and terminal behavior", function()
+test("universal actions expose Open Project as the primary action", function()
   local resolver = require("workstation.project_actions")
   local actions = resolver.resolve(project, {}, { overrides = {} }, capabilities())
 
+  testlib.eq(actions[1].id, "open-workspace")
+  testlib.eq(actions[1].label, "Open Project")
+  testlib.eq(actions[1].operation, "workspace")
   testlib.eq(find_action(actions, "open-shell").terminal, true)
   testlib.eq(find_action(actions, "open-editor").terminal, false)
   testlib.eq(find_action(actions, "open-file-manager").terminal, false)
@@ -174,4 +177,40 @@ test("custom shell action is marked explicitly", function()
   testlib.eq(action.shell, true)
   testlib.eq(action.confirm, true)
   testlib.eq(action.enabled, true)
+end)
+
+test("Open Project stays available with explicit workspace overrides", function()
+  local resolver = require("workstation.project_actions")
+  local actions = resolver.resolve(project, {}, {
+    overrides = {
+      [project.path] = {
+        workspace = {
+          targets = {
+            {
+              name = "editor",
+              workspace = 1,
+              operation = "editor",
+            },
+          },
+        },
+      },
+    },
+  }, capabilities())
+
+  local workspace = find_action(actions, "open-workspace")
+  testlib.truthy(workspace)
+  testlib.eq(workspace.label, "Open Project")
+  testlib.eq(workspace.operation, "workspace")
+  testlib.eq(workspace.terminal, false)
+end)
+
+test("Open Project is available without projects TOML workspace overrides", function()
+  local resolver = require("workstation.project_actions")
+  local actions = resolver.resolve(project, {}, {
+    overrides = {},
+  }, capabilities())
+
+  local workspace = find_action(actions, "open-workspace")
+  testlib.truthy(workspace)
+  testlib.eq(actions[1].id, "open-workspace")
 end)

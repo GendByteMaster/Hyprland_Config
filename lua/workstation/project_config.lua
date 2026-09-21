@@ -1,8 +1,19 @@
 local command = require("workstation.command")
 local paths = require("workstation.paths")
 local project_model = require("workstation.project_model")
+local toml = require("workstation.toml")
 
 local M = {}
+
+local MAX_WORKSPACE_TARGETS = 32
+local DEFAULT_WORKSPACE_WAIT_MS = 1200
+local MAX_WORKSPACE_WAIT_BUDGET_MS = 10000
+local MAX_MONITOR_ALIASES = 16
+local MAX_ROOTS = 32
+local MAX_PROJECTS = 256
+local MAX_HIDDEN = 512
+local MAX_ACTION_OVERRIDES = 64
+local MAX_DISCOVERY_DEPTH = 16
 
 local function clone_defaults(home)
   return {
@@ -13,6 +24,7 @@ local function clone_defaults(home)
       terminal = "auto",
     },
     overrides = {},
+    monitors = {},
     max_depth = 4,
   }
 end
@@ -50,6 +62,241 @@ local function string_array(value)
   end)
 end
 
+local function contains_nul(value)
+  return type(value) == "string" and value:find(string.char(0), 1, true) ~= nil
+end
+
+local function safe_string(value)
+  return type(value) == "string" and value ~= "" and not contains_nul(value)
+end
+
+local function safe_string_array(value)
+  return is_dense_array(value, function(item)
+    return safe_string(item)
+  end)
+end
+
+local function reject_unknown_keys(value, allowed, label)
+  for key in pairs(value or {}) do
+    if allowed[key] ~= true then
+      return nil, tostring(label) .. " contains unsupported key: " .. tostring(key)
+    end
+  end
+  return true
+end
+
+local function bounded_array(value, limit, label)
+  if #value > limit then
+    return nil, tostring(label) .. " exceeds limit of " .. tostring(limit)
+  end
+  return true
+end
+
+local function validate_action_override(action)
+  if type(action) ~= "table" then
+    return nil, "action overrides must be tables"
+  end
+
+  local ok, err = reject_unknown_keys(action, {
+    id = true,
+    label = true,
+    argv = true,
+    terminal = true,
+    confirm = true,
+    visible = true,
+  }, "action override")
+  if not ok then
+    return nil, err
+  end
+
+  if not safe_string(action.id) then
+    return nil, "action override id must be a non-empty string"
+  end
+  if action.label ~= nil and not safe_string(action.label) then
+    return nil, "action override label must be a non-empty string"
+  end
+  if action.argv ~= nil and (not safe_string_array(action.argv) or #action.argv == 0) then
+    return nil, "action override argv must be a non-empty string array"
+  end
+  if action.terminal ~= nil and type(action.terminal) ~= "boolean" then
+    return nil, "action override terminal must be boolean"
+  end
+  if action.confirm ~= nil and type(action.confirm) ~= "boolean" then
+    return nil, "action override confirm must be boolean"
+  end
+  if action.visible ~= nil and type(action.visible) ~= "boolean" then
+    return nil, "action override visible must be boolean"
+  end
+
+  return true
+end
+
+local function valid_workspace_selector(value)
+  if type(value) == "number" then
+    return value % 1 == 0 and value >= 1 and value <= 2147483647
+  end
+  return safe_string(value)
+end
+
+local function validate_workspace_target(target)
+  if type(target) ~= "table" then
+    return nil, "workspace targets must be tables"
+  end
+
+  local keys_ok, keys_error = reject_unknown_keys(target, {
+    name = true,
+    workspace = true,
+    monitor = true,
+    terminal = true,
+    singleton = true,
+    wait_ms = true,
+    match = true,
+    operation = true,
+    argv = true,
+    url = true,
+  }, "workspace target")
+  if not keys_ok then
+    return nil, keys_error
+  end
+  if not safe_string(target.name) then
+    return nil, "workspace target name must be a non-empty string"
+  end
+  if target.workspace ~= nil and not valid_workspace_selector(target.workspace) then
+    return nil, "workspace target workspace must be a positive id or non-empty selector"
+  end
+  if target.monitor ~= nil and not safe_string(target.monitor) then
+    return nil, "workspace target monitor must be a non-empty string"
+  end
+  if target.terminal ~= nil and type(target.terminal) ~= "boolean" then
+    return nil, "workspace target terminal must be boolean"
+  end
+  if target.shell ~= nil then
+    return nil, "workspace targets do not support shell execution"
+  end
+  if target.singleton ~= nil and type(target.singleton) ~= "boolean" then
+    return nil, "workspace target singleton must be boolean"
+  end
+  if target.wait_ms ~= nil then
+    if type(target.wait_ms) ~= "number"
+      or target.wait_ms % 1 ~= 0
+      or target.wait_ms < 0
+      or target.wait_ms > 5000 then
+      return nil, "workspace target wait_ms must be an integer between 0 and 5000"
+    end
+  end
+
+  if target.match ~= nil then
+    if type(target.match) ~= "table" then
+      return nil, "workspace target match must be a table"
+    end
+
+    local match_keys_ok, match_keys_error = reject_unknown_keys(target.match, {
+      class = true,
+      initial_class = true,
+      title = true,
+      initial_title = true,
+    }, "workspace target match")
+    if not match_keys_ok then
+      return nil, match_keys_error
+    end
+
+    local match_fields = {
+      "class",
+      "initial_class",
+      "title",
+      "initial_title",
+    }
+    local matched = 0
+    for _, field in ipairs(match_fields) do
+      local value = target.match[field]
+      if value ~= nil then
+        if not safe_string(value) then
+          return nil, "workspace target match fields must be non-empty strings"
+        end
+        matched = matched + 1
+      end
+    end
+
+    if matched == 0 then
+      return nil, "workspace target match requires at least one selector"
+    end
+  elseif target.singleton == true or target.wait_ms ~= nil then
+    return nil, "workspace target singleton/wait_ms requires match selectors"
+  end
+
+  local has_argv = target.argv ~= nil
+  local has_url = target.url ~= nil
+  local is_editor = target.operation == "editor"
+  local is_url = target.operation == "url" or has_url
+
+  if target.operation ~= nil
+    and target.operation ~= "editor"
+    and target.operation ~= "url" then
+    return nil, "unsupported workspace target operation"
+  end
+
+  if is_editor then
+    if has_argv or has_url or target.terminal == true then
+      return nil, "editor workspace target cannot define argv, url, or terminal"
+    end
+    return true
+  end
+
+  if is_url then
+    if not safe_string(target.url) then
+      return nil, "URL workspace target requires a non-empty url"
+    end
+    local lower_url = target.url:lower()
+    if not lower_url:match("^https?://") then
+      return nil, "URL workspace target only supports http:// or https://"
+    end
+    if has_argv or target.terminal == true then
+      return nil, "URL workspace target cannot define argv or terminal"
+    end
+    return true
+  end
+
+  if not has_argv or not safe_string_array(target.argv) or #target.argv == 0 then
+    return nil, "workspace target requires a non-empty argv array"
+  end
+
+  return true
+end
+
+local function validate_workspace(workspace)
+  if type(workspace) ~= "table" then
+    return nil, "workspace override must be a table"
+  end
+  if not is_dense_array(workspace.targets, function(item)
+    return type(item) == "table"
+  end) or #workspace.targets == 0 then
+    return nil, "workspace.targets must be a non-empty array"
+  end
+  if #workspace.targets > MAX_WORKSPACE_TARGETS then
+    return nil, "workspace.targets exceeds limit of " .. tostring(MAX_WORKSPACE_TARGETS)
+  end
+
+  local wait_budget = 0
+  for _, target in ipairs(workspace.targets) do
+    local ok, err = validate_workspace_target(target)
+    if not ok then
+      return nil, err
+    end
+
+    if target.match ~= nil then
+      wait_budget = wait_budget + (target.wait_ms == nil
+        and DEFAULT_WORKSPACE_WAIT_MS
+        or target.wait_ms)
+      if wait_budget > MAX_WORKSPACE_WAIT_BUDGET_MS then
+        return nil, "workspace matching wait budget exceeds "
+          .. tostring(MAX_WORKSPACE_WAIT_BUDGET_MS) .. "ms"
+      end
+    end
+  end
+
+  return true
+end
+
 local function expand(path, home)
   return project_model.expand_path(path, home)
 end
@@ -59,11 +306,28 @@ local function validate(raw, home)
     return nil, "project config must return a table"
   end
 
+  local top_ok, top_error = reject_unknown_keys(raw, {
+    roots = true,
+    projects = true,
+    hidden = true,
+    apps = true,
+    overrides = true,
+    monitors = true,
+    max_depth = true,
+  }, "project config")
+  if not top_ok then
+    return nil, top_error
+  end
+
   local config = clone_defaults(home)
 
   if raw.roots ~= nil then
     if not string_array(raw.roots) then
       return nil, "roots must be an array of non-empty strings"
+    end
+    local roots_ok, roots_error = bounded_array(raw.roots, MAX_ROOTS, "roots")
+    if not roots_ok then
+      return nil, roots_error
     end
     if #raw.roots > 0 then
       config.roots = {}
@@ -75,12 +339,22 @@ local function validate(raw, home)
 
   if raw.projects ~= nil then
     if not is_dense_array(raw.projects, function(item)
-      return type(item) == "table"
-        and type(item.path) == "string"
-        and item.path ~= ""
-        and (item.name == nil or type(item.name) == "string")
+      if type(item) ~= "table" then
+        return false
+      end
+      local keys_ok = reject_unknown_keys(item, {
+        path = true,
+        name = true,
+      }, "project")
+      return keys_ok == true
+        and safe_string(item.path)
+        and (item.name == nil or safe_string(item.name))
     end) then
       return nil, "projects must be an array of { path, name? } tables"
+    end
+    local projects_ok, projects_error = bounded_array(raw.projects, MAX_PROJECTS, "projects")
+    if not projects_ok then
+      return nil, projects_error
     end
 
     config.projects = {}
@@ -96,6 +370,10 @@ local function validate(raw, home)
     if not string_array(raw.hidden) then
       return nil, "hidden must be an array of non-empty strings"
     end
+    local hidden_ok, hidden_error = bounded_array(raw.hidden, MAX_HIDDEN, "hidden")
+    if not hidden_ok then
+      return nil, hidden_error
+    end
     config.hidden = {}
     for index, hidden in ipairs(raw.hidden) do
       config.hidden[index] = expand(hidden, home)
@@ -105,6 +383,14 @@ local function validate(raw, home)
   if raw.apps ~= nil then
     if type(raw.apps) ~= "table" then
       return nil, "apps must be a table"
+    end
+    local apps_ok, apps_error = reject_unknown_keys(raw.apps, {
+      terminal = true,
+      editor = true,
+      file_manager = true,
+    }, "apps")
+    if not apps_ok then
+      return nil, apps_error
     end
     if raw.apps.terminal ~= nil and type(raw.apps.terminal) ~= "string" then
       return nil, "apps.terminal must be a string"
@@ -123,11 +409,32 @@ local function validate(raw, home)
     }
   end
 
+  if raw.monitors ~= nil then
+    if type(raw.monitors) ~= "table" then
+      return nil, "monitors must be a role-to-monitor table"
+    end
+
+    config.monitors = {}
+    local monitor_count = 0
+    for role, monitor in pairs(raw.monitors) do
+      monitor_count = monitor_count + 1
+      if monitor_count > MAX_MONITOR_ALIASES then
+        return nil, "monitor aliases exceed limit of " .. tostring(MAX_MONITOR_ALIASES)
+      end
+      if not safe_string(role) or not safe_string(monitor) then
+        return nil, "monitor aliases must use non-empty string roles and monitor names"
+      end
+      config.monitors[role] = monitor
+    end
+  end
+
   if raw.max_depth ~= nil then
     if type(raw.max_depth) ~= "number"
       or raw.max_depth % 1 ~= 0
-      or raw.max_depth < 1 then
-      return nil, "max_depth must be a positive integer"
+      or raw.max_depth < 1
+      or raw.max_depth > MAX_DISCOVERY_DEPTH then
+      return nil, "max_depth must be an integer between 1 and "
+        .. tostring(MAX_DISCOVERY_DEPTH)
     end
     config.max_depth = raw.max_depth
   end
@@ -142,8 +449,40 @@ local function validate(raw, home)
       if type(key) ~= "string" or key == "" or type(value) ~= "table" then
         return nil, "override keys must be paths and values must be tables"
       end
-      if value.actions ~= nil and type(value.actions) ~= "table" then
-        return nil, "override actions must be a table"
+      local override_ok, override_error = reject_unknown_keys(value, {
+        actions = true,
+        workspace = true,
+      }, "project override")
+      if not override_ok then
+        return nil, override_error
+      end
+
+      if value.actions ~= nil then
+        if not is_dense_array(value.actions, function(item)
+          return type(item) == "table"
+        end) then
+          return nil, "override actions must be an array"
+        end
+        local actions_ok, actions_error = bounded_array(
+          value.actions,
+          MAX_ACTION_OVERRIDES,
+          "override actions"
+        )
+        if not actions_ok then
+          return nil, actions_error
+        end
+        for _, action in ipairs(value.actions) do
+          local action_ok, action_error = validate_action_override(action)
+          if not action_ok then
+            return nil, action_error
+          end
+        end
+      end
+      if value.workspace ~= nil then
+        local workspace_ok, workspace_error = validate_workspace(value.workspace)
+        if not workspace_ok then
+          return nil, workspace_error
+        end
       end
       config.overrides[expand(key, home)] = value
     end
@@ -152,15 +491,25 @@ local function validate(raw, home)
   return config
 end
 
+local function read_file(path)
+  local file = io.open(path, "rb")
+  if not file then
+    return nil, "failed to read project config"
+  end
+  local content = file:read("*a")
+  file:close()
+  return content
+end
+
 local function default_runtime()
   return {
     exists = command.exists,
     load_config = function(path)
-      local ok, value = pcall(dofile, path)
-      if not ok then
-        return nil, tostring(value)
+      local content, read_error = read_file(path)
+      if not content then
+        return nil, read_error
       end
-      return value
+      return toml.decode(content)
     end,
   }
 end
@@ -168,11 +517,19 @@ end
 function M.load(options)
   options = options or {}
   local home = assert(options.home or os.getenv("HOME"), "home is required")
+  local explicit_path = options.config_path ~= nil
   local config_path = options.config_path
-    or paths.join(home, ".config", "hyprland-workstation", "projects.lua")
+    or paths.join(home, ".config", "hyprland-workstation", "projects.toml")
   local runtime = options.runtime or default_runtime()
 
   if not runtime.exists(config_path) then
+    if not explicit_path then
+      local legacy_path = paths.join(home, ".config", "hyprland-workstation", "projects.lua")
+      if runtime.exists(legacy_path) then
+        return clone_defaults(home),
+          "legacy projects.lua is ignored for safety; migrate it to projects.toml"
+      end
+    end
     return clone_defaults(home), nil
   end
 

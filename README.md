@@ -191,7 +191,8 @@ Keyboard behavior:
 - `Up/Down` moves through projects or actions
 - `Tab` / `Right` enters the Actions pane
 - `Left` returns from Actions
-- `Enter` runs the selected action
+- `Enter` on the Projects pane runs the primary **Open Project** action immediately
+- `Enter` in the Actions pane runs the selected secondary action
 - `Esc` closes the launcher
 
 Queries are debounced. Project detection and action logic stay in Lua; QML only renders the UI and talks to the versioned JSON backend.
@@ -206,57 +207,53 @@ The default discovery root is:
 
 Git project roots are discovered with bounded depth; the default maximum depth is 4. Common heavy/generated directories are pruned, symlink Git markers are rejected, and canonical paths are used as stable project IDs.
 
-Additional roots can also be added directly from the launcher with **Add folder**. The launcher now uses its own dark, keyboard-first directory browser instead of the native desktop folder dialog. Navigate with `Up/Down`, open a directory with `Enter`, go up with `Backspace` or `Left`, then choose **Use this folder**. The selected root is persisted in launcher state and rescanned immediately. When no manual `projects.lua` exists, the first UI-selected root replaces the implicit `~/Repository` fallback so a missing default directory does not keep producing warnings.
+Additional roots can also be added directly from the launcher with **Add folder**. The launcher now uses its own dark, keyboard-first directory browser instead of the native desktop folder dialog. Navigate with `Up/Down`, open a directory with `Enter`, go up with `Backspace` or `Left`, then choose **Use this folder**. The selected root is persisted in launcher state and rescanned immediately. When no manual `projects.toml` exists, the first UI-selected root replaces the implicit `~/Repository` fallback so a missing default directory does not keep producing warnings.
 
-Explicit non-Git projects, hidden paths, application preferences, and action overrides can still be configured in:
+Explicit non-Git projects, hidden paths, application preferences, and action overrides are configured as **data-only TOML** in:
 
 ```text
-~/.config/hyprland-workstation/projects.lua
+~/.config/hyprland-workstation/projects.toml
 ```
 
 Example:
 
-```lua
-return {
-  roots = {
-    "~/Repository",
-    "~/Projects",
-  },
+```toml
+roots = [
+  "~/Repository",
+  "~/Projects",
+]
+hidden = ["~/Repository/archive"]
+max_depth = 4
 
-  projects = {
-    { path = "~/scratch/demo", name = "Demo" },
-  },
+[[projects]]
+path = "~/scratch/demo"
+name = "Demo"
 
-  hidden = {
-    "~/Repository/archive",
-  },
+[apps]
+terminal = "auto"
+editor = ["code", "--reuse-window"]
+file_manager = ["thunar"]
 
-  max_depth = 4,
-
-  apps = {
-    terminal = "auto",
-    editor = { "code", "--reuse-window" },
-    file_manager = { "thunar" },
-  },
-
-  overrides = {
-    ["~/Repository/example"] = {
-      actions = {
-        {
-          id = "custom-dev",
-          label = "Custom Dev",
-          argv = { "bash", "-lc", "echo ok" },
-          terminal = true,
-          shell = true,
-          confirm = true,
-        },
-      },
-    },
-  },
-}
+[[overrides."~/Repository/example".actions]]
+id = "custom-dev"
+label = "Custom Dev"
+argv = ["pnpm", "dev"]
+terminal = true
+confirm = true
 ```
 
-If the file is missing, safe defaults are used. A malformed config is ignored with a warning rather than rewritten.
+The TOML parser is intentionally strict and data-only: it does not use `dofile`, `load`, Lua expressions, functions, or metatables. The old `projects.lua` path is never executed; if it is present without `projects.toml`, the launcher falls back to safe defaults and reports a migration warning.
+
+A malformed TOML config is ignored with a warning rather than rewritten. Configuration is still trusted local policy: explicit `argv` entries intentionally launch the programs you configure, so do not install unreviewed project configuration files.
+
+Basic project opening requires **no TOML file at all**. Every discovered project automatically gets a primary **Open Project** action. With no project-specific workspace override, the launcher builds a safe default workspace in memory:
+
+```text
+workspace 1 -> resolved editor
+workspace 2 -> terminal in the project root
+```
+
+This is the first action in the Actions pane, so selecting a project and pressing `Enter` immediately opens the project. `projects.toml` is only needed for advanced customization such as additional dev processes, browser targets, monitor placement, custom application preferences, or verified singleton matching.
 
 ### Favorites, recent projects, and cache
 
@@ -270,6 +267,7 @@ With an empty search query, favorites are shown first, then recent projects, the
 
 Universal actions include:
 
+- Open Project — primary automatic workspace action
 - Open Shell
 - Open Editor
 - Open File Manager
@@ -406,6 +404,93 @@ Workspace Overview uses on-demand keyboard focus rather than permanent exclusive
 The overview also follows the active Omarchy theme. On startup the wrapper resolves `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` (normally `~/.local/state/omarchy/current/theme/colors.toml`, with the legacy config path as fallback). Each time Overview opens it refreshes `background`, `foreground`, `accent`, `muted`, selection, and surface colors from that palette, so built-in and user-installed Omarchy themes are applied automatically. If no Omarchy palette is available, conservative dark/orange fallback colors are used.
 
 Window previews use one-shot Quickshell Hyprland/Wayland `ScreencopyView` snapshots; the implementation does not use screenshot-file polling, continuous live capture, or a render-loop `hyprctl` poller.
+
+## v0.5 — Workspace Orchestrator (in development)
+
+v0.5 extends the Project Launcher from running one project action at a time to opening an automatic development workspace. The default path requires no configuration: **Open Project** opens the resolved editor on workspace 1 and a project-root terminal on workspace 2. TOML overrides replace these defaults when advanced orchestration is needed.
+
+Optional logical monitor aliases can be defined at the top level:
+
+```toml
+[monitors]
+primary = "DP-1"
+secondary = "HDMI-A-1"
+```
+
+When an alias is not configured, `primary`, `secondary`, and `tertiary` resolve from the current Hyprland monitor set: the focused monitor is first, then the remaining monitors are ordered deterministically by geometry. If a configured/direct monitor is unavailable, the orchestrator falls back deterministically and reports the target as degraded instead of silently pretending the requested placement succeeded.
+
+Optional workspace customization is configured per project under `overrides.<project>.workspace.targets`. When these targets are absent, the automatic editor + shell layout is used:
+
+```toml
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "editor"
+workspace = 1
+monitor = "primary"
+operation = "editor"
+singleton = true
+wait_ms = 1200
+match.class = "Code"
+
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "backend"
+workspace = 2
+terminal = true
+argv = ["uv", "run", "fastapi", "dev"]
+
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "frontend"
+workspace = 3
+terminal = true
+argv = ["pnpm", "dev"]
+
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "browser"
+workspace = 4
+operation = "url"
+url = "http://localhost:3000"
+```
+
+Every discovered project exposes the primary action:
+
+```text
+Open Project
+```
+
+Configured workspace targets replace the automatic defaults for that project.
+
+Supported targets:
+
+- `operation = "editor"` — uses the configured/resolved editor adapter;
+- `terminal = true` + `argv` — opens a project-root terminal and runs the argv command;
+- direct `argv` — launches a process without a terminal;
+- `operation = "url"` + `url` — opens through `xdg-open`;
+- optional `workspace` — applies a Hyprland workspace exec rule;
+- optional `monitor` — accepts a direct monitor name or logical role;
+- optional `match` — matches Hyprland clients by `class`, `initial_class`, `title`, and/or `initial_title`;
+- optional `singleton = true` — skips launch when a matching mapped window already exists;
+- optional `wait_ms` — bounds post-launch matching instead of polling indefinitely.
+
+Workspace configuration is bounded before execution: at most 32 targets, at most 10 seconds of total matching wait budget, and at most 16 monitor aliases. URL targets accept only `http://` and `https://`.
+
+Workspace targets intentionally do **not** support a raw shell flag. Arguments remain structured argv data and are quoted before entering Hyprland's command-string dispatcher. Explicit argv is still trusted local configuration and can intentionally invoke command interpreters if you choose to configure one.
+
+For targets with matching metadata, the orchestrator snapshots Hyprland clients before launch and only treats a later **new** matching address as the launched window. If the pre-launch snapshot is unavailable, it refuses to guess and reports degraded placement.
+
+Initial placement uses Hyprland `exec_cmd(..., rules)`. When an application forks or reuses a process and the new window appears on the wrong location, v0.5 can safely correct a single placement dimension:
+
+- workspace-only target → move the matched window to the requested workspace;
+- monitor-only target → move the matched window to the requested monitor.
+
+A target that requests both workspace and monitor is verified after launch, but ambiguous combined correction is deliberately not forced because moving an existing window and workspace between monitors can affect compositor state beyond that one target. A mismatch is surfaced as **degraded**.
+
+Targets are independent. Failed or degraded targets do not hide successfully started targets. Examples:
+
+```text
+Workspace: 2 started, 1 failed · backend: terminal unavailable
+Workspace: 3 started, 1 degraded · editor: combined workspace+monitor placement could not be verified safely
+```
+
+Repeated `Open Project` is idempotent for targets configured with `singleton = true`: an already-running matching client is reported as skipped instead of spawning another instance.
 
 ## Windows-like Interaction Layer
 

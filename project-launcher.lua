@@ -20,6 +20,7 @@ local project_search = require("workstation.project_search")
 local project_state = require("workstation.project_state")
 local project_types = require("workstation.project_types")
 local protocol = require("workstation.launcher_protocol")
+local workspace_orchestrator = require("workstation.workspace_orchestrator")
 
 local home = assert(os.getenv("HOME"), "HOME is not set")
 
@@ -43,10 +44,10 @@ function context.load_config()
 
   local selected_roots = state and state.roots or {}
   if #selected_roots > 0 then
-    local user_config_path = home .. "/.config/hyprland-workstation/projects.lua"
+    local user_config_path = home .. "/.config/hyprland-workstation/projects.toml"
 
     -- UI-selected roots replace the implicit ~/Repository fallback, but never
-    -- replace roots from an explicit projects.lua.
+    -- replace roots from an explicit projects.toml.
     if not command.exists(user_config_path) then
       config.roots = {}
     end
@@ -144,6 +145,11 @@ end
 function context.execute(project, action, confirmed)
   local config = current_config()
   local adapter = select_adapter(config)
+
+  if action.operation == "workspace" then
+    return workspace_orchestrator.run(project, config, adapter)
+  end
+
   return action_executor.run(project, action, adapter, nil, {
     confirmed = confirmed,
   })

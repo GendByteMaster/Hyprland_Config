@@ -23,6 +23,7 @@ FloatingWindow {
   property var pendingAction: null
   property string statusText: ""
   property bool statusError: false
+  property string navigationPane: "projects"
   property string repoRoot: String(Quickshell.env("HYPRLAND_WORKSTATION_REPO_ROOT") || "")
   property string backendScript: repoRoot === "" ? "" : repoRoot + "/project-launcher.lua"
 
@@ -84,6 +85,7 @@ FloatingWindow {
   function showLauncher() {
     theme.refresh()
     visible = true
+    navigationPane = "projects"
     pendingAction = null
     confirmDialog.opened = false
     Qt.callLater(function() {
@@ -174,7 +176,7 @@ FloatingWindow {
     selectedProjectIndex = projects.length > 0 ? 0 : -1
     showWarnings(payload.data)
     requestActions()
-    searchField.focusInput()
+    focusProjects()
   }
 
   function handleActionResponse(text) {
@@ -192,6 +194,42 @@ FloatingWindow {
     actions = Array.isArray(payload.data.actions) ? payload.data.actions : []
     selectedActionIndex = actions.length > 0 ? 0 : -1
     showWarnings(payload.data)
+  }
+
+  function formatExecutionSummary(execution) {
+    if (!execution)
+      return "Workspace partially started"
+
+    var started = Number(execution.started || 0)
+    var failed = Number(execution.failed || 0)
+    var skipped = Number(execution.skipped || 0)
+    var degraded = Number(execution.degraded || 0)
+    var summary = "Workspace: " + started + " started"
+
+    if (failed > 0)
+      summary += ", " + failed + " failed"
+    if (degraded > 0)
+      summary += ", " + degraded + " degraded"
+    if (skipped > 0)
+      summary += ", " + skipped + " skipped"
+
+    var problems = []
+    var results = Array.isArray(execution.results) ? execution.results : []
+    for (var index = 0; index < results.length; ++index) {
+      var item = results[index]
+      if (!item)
+        continue
+
+      if (item.status === "failed")
+        problems.push(String(item.target || "target") + ": " + String(item.error || "failed"))
+      else if (item.degraded === true)
+        problems.push(String(item.target || "target") + ": " + String(item.warning || "placement degraded"))
+    }
+
+    if (problems.length > 0)
+      summary += " · " + problems.join(" · ")
+
+    return summary
   }
 
   function handleRunResponse(text) {
@@ -212,6 +250,14 @@ FloatingWindow {
     }
 
     if (payload.data.dispatched === true) {
+      if (payload.data.partial === true) {
+        pendingAction = null
+        confirmDialog.opened = false
+        statusError = true
+        statusText = formatExecutionSummary(payload.data.execution)
+        return
+      }
+
       closeLauncher()
       return
     }
@@ -225,10 +271,16 @@ FloatingWindow {
   }
 
   function moveProject(delta) {
+    navigationPane = "projects"
     if (projects.length === 0)
       return
     selectedProjectIndex = Math.max(0, Math.min(projects.length - 1, selectedProjectIndex + delta))
     requestActions()
+  }
+
+  function focusProjects() {
+    navigationPane = "projects"
+    searchField.focusInput()
   }
 
   function selectProject(index) {
@@ -236,7 +288,7 @@ FloatingWindow {
       return
     selectedProjectIndex = index
     requestActions()
-    searchField.focusInput()
+    focusProjects()
   }
 
   function selectAction(index) {
@@ -248,6 +300,7 @@ FloatingWindow {
   function focusActions() {
     if (actions.length === 0)
       return
+    navigationPane = "actions"
     if (selectedActionIndex < 0)
       selectedActionIndex = 0
     actionList.focusList()
@@ -256,8 +309,16 @@ FloatingWindow {
   function activateDefaultAction() {
     if (actions.length === 0)
       return
-    if (selectedActionIndex < 0)
-      selectedActionIndex = 0
+
+    var primaryIndex = 0
+    for (var index = 0; index < actions.length; ++index) {
+      if (actions[index] && actions[index].id === "open-workspace") {
+        primaryIndex = index
+        break
+      }
+    }
+
+    selectedActionIndex = primaryIndex
     runSelected(false)
   }
 
@@ -343,7 +404,10 @@ FloatingWindow {
         Layout.fillWidth: true
         themePalette: theme
 
-        onQueryChanged: queryTimer.restart()
+        onQueryChanged: {
+          root.navigationPane = "projects"
+          queryTimer.restart()
+        }
         onMoveUp: root.moveProject(-1)
         onMoveDown: root.moveProject(1)
         onToActions: root.focusActions()
@@ -357,13 +421,14 @@ FloatingWindow {
         spacing: 10
 
         Rectangle {
+          id: projectsPane
           Layout.fillWidth: true
           Layout.fillHeight: true
           Layout.preferredWidth: 1
           radius: 12
           color: theme.darkBackground
-          border.width: 1
-          border.color: theme.border
+          border.width: root.navigationPane === "projects" ? 2 : 1
+          border.color: root.navigationPane === "projects" ? theme.accent : theme.border
 
           ColumnLayout {
             anchors.fill: parent
@@ -372,15 +437,26 @@ FloatingWindow {
 
             RowLayout {
               Layout.fillWidth: true
-              Layout.preferredHeight: 30
+              Layout.preferredHeight: 42
               spacing: 8
 
-              Text {
-                text: "Projects"
-                color: theme.muted
-                font.family: "monospace"
-                font.pixelSize: 11
-                font.bold: true
+              ColumnLayout {
+                spacing: 1
+
+                Text {
+                  text: root.navigationPane === "projects" ? "PROJECTS  •  ACTIVE" : "PROJECTS"
+                  color: root.navigationPane === "projects" ? theme.accent : theme.muted
+                  font.family: "monospace"
+                  font.pixelSize: 11
+                  font.bold: true
+                }
+
+                Text {
+                  text: "↑↓ Select  ·  Enter Open Project"
+                  color: theme.muted
+                  font.family: "monospace"
+                  font.pixelSize: 9
+                }
               }
 
               Item {
@@ -437,6 +513,7 @@ FloatingWindow {
                 themePalette: theme
                 projectsModel: root.projects
                 currentIndex: root.selectedProjectIndex
+                active: root.navigationPane === "projects"
                 onSelected: function(index) { root.selectProject(index) }
               }
 
@@ -560,25 +637,38 @@ FloatingWindow {
         }
 
         Rectangle {
+          id: actionsPane
           Layout.fillWidth: true
           Layout.fillHeight: true
           Layout.preferredWidth: 1
           radius: 12
           color: theme.darkBackground
-          border.width: 1
-          border.color: theme.border
+          border.width: root.navigationPane === "actions" ? 2 : 1
+          border.color: root.navigationPane === "actions" ? theme.accent : theme.border
 
           ColumnLayout {
             anchors.fill: parent
             anchors.margins: 10
             spacing: 8
 
-            Text {
-              text: "Actions"
-              color: theme.muted
-              font.family: "monospace"
-              font.pixelSize: 11
-              font.bold: true
+            ColumnLayout {
+              Layout.preferredHeight: 42
+              spacing: 1
+
+              Text {
+                text: root.navigationPane === "actions" ? "ACTIONS  •  ACTIVE" : "ACTIONS"
+                color: root.navigationPane === "actions" ? theme.accent : theme.muted
+                font.family: "monospace"
+                font.pixelSize: 11
+                font.bold: true
+              }
+
+              Text {
+                text: "↑↓ Select  ·  Enter Run  ·  ← Back"
+                color: theme.muted
+                font.family: "monospace"
+                font.pixelSize: 9
+              }
             }
 
             Components.ActionList {
@@ -588,13 +678,17 @@ FloatingWindow {
               Layout.fillHeight: true
               actionsModel: root.actions
               currentIndex: root.selectedActionIndex
+              active: root.navigationPane === "actions"
 
-              onSelected: function(index) { root.selectAction(index) }
+              onSelected: function(index) {
+                root.navigationPane = "actions"
+                root.selectAction(index)
+              }
               onActivated: function(index) {
                 root.selectAction(index)
                 root.runSelected(false)
               }
-              onBack: searchField.focusInput()
+              onBack: root.focusProjects()
               onEscapePressed: root.closeLauncher()
             }
           }
@@ -610,11 +704,13 @@ FloatingWindow {
 
       Text {
         Layout.fillWidth: true
-        text: "↑↓ navigate   Tab/→ actions   Enter run   Esc close"
-        color: theme.muted
-        horizontalAlignment: Text.AlignRight
+        text: root.navigationPane === "actions"
+          ? "ACTIONS   ↑↓ select   Enter run   ← projects   Esc close"
+          : "PROJECTS   type to search   ↑↓ select   Enter open project   Tab/→ actions   Esc close"
+        color: root.navigationPane === "actions" ? theme.accent : theme.muted
+        horizontalAlignment: Text.AlignLeft
         font.family: "monospace"
-        font.pixelSize: 9
+        font.pixelSize: 10
       }
     }
 
@@ -632,7 +728,7 @@ FloatingWindow {
       }
       onCancelled: {
         closePicker()
-        searchField.focusInput()
+        root.focusProjects()
       }
     }
 
@@ -648,6 +744,7 @@ FloatingWindow {
       onCancelled: {
         opened = false
         root.pendingAction = null
+        root.navigationPane = "actions"
         actionList.focusList()
       }
     }

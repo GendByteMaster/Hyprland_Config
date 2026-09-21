@@ -129,6 +129,25 @@ t.test("project launcher wrapper tolerates slow cold start and serializes startu
   t.truthy(source:find("STARTUP_DELAY=0.05", 1, true))
   t.truthy(source:find("acquire_start_lock", 1, true))
   t.truthy(source:find("wait_for_ipc", 1, true))
+  t.truthy(source:find("ipc show >/dev/null 2>&1", 1, true))
   t.truthy(source:find("project-launcher.log", 1, true))
   t.eq(source:find("seq 1 20", 1, true), nil)
+end)
+
+t.test("project launcher cold start never toggles after losing startup lock", function()
+  local source = read_file("bin/hyprland-workstation-launcher")
+  local busy = assert(source:find("if ! acquire_start_lock; then", 1, true))
+  local starter = assert(source:find("setsid qs", busy, true))
+  local cold_section = source:sub(busy, starter - 1)
+
+  t.truthy(cold_section:find("ipc show", 1, true))
+  t.eq(cold_section:find("ipc toggle", 1, true), nil)
+end)
+
+t.test("project launcher uses ping as readiness probe before warm toggle", function()
+  local source = read_file("bin/hyprland-workstation-launcher")
+  local ping = assert(source:find("if ipc ping >/dev/null 2>&1; then", 1, true))
+  local toggle = assert(source:find("ipc toggle >/dev/null 2>&1", ping, true))
+
+  t.truthy(ping < toggle)
 end)

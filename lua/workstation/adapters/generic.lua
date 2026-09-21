@@ -185,6 +185,13 @@ local function resolve_clipboard(runtime)
   return nil, "clipboard utility is unavailable"
 end
 
+local function resolve_url_opener(runtime)
+  if runtime.command_exists("xdg-open") then
+    return { "xdg-open" }
+  end
+  return nil, "URL opener is unavailable"
+end
+
 function M.detect(config, runtime)
   config = config or { apps = { terminal = "auto" } }
   config.apps = config.apps or { terminal = "auto" }
@@ -194,6 +201,7 @@ function M.detect(config, runtime)
   local editor, editor_error = resolve_editor(config, runtime)
   local file_manager, file_manager_error = resolve_file_manager(config, runtime)
   local clipboard, clipboard_error = resolve_clipboard(runtime)
+  local url_opener, url_error = resolve_url_opener(runtime)
 
   local adapter = {
     kind = "generic",
@@ -210,6 +218,7 @@ function M.detect(config, runtime)
       editor = editor ~= nil,
       file_manager = file_manager ~= nil,
       clipboard = clipboard ~= nil,
+      url = url_opener ~= nil,
       commands = commands,
     }
   end
@@ -240,6 +249,13 @@ function M.detect(config, runtime)
       return nil, nil, clipboard_error or "clipboard utility is unavailable"
     end
     return copy(clipboard), text, nil
+  end
+
+  function adapter.url_argv(url)
+    if not url_opener then
+      return nil, url_error or "URL opener is unavailable"
+    end
+    return append(url_opener, { url })
   end
 
   return adapter
