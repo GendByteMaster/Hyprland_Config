@@ -278,8 +278,14 @@ local function run_action(ctx, args)
       warnings = protocol.list(warnings),
     })
   end
-  if not execution.ok then
-    return protocol.failure(execution.error or "action dispatch failed")
+  local partial = execution.ok ~= true
+    and type(execution.started) == "number"
+    and execution.started > 0
+
+  if not execution.ok and not partial then
+    return protocol.failure(execution.error or "action dispatch failed", {
+      execution = execution,
+    })
   end
 
   ctx.mark_recent(state, project.id, ctx.now())
@@ -287,11 +293,15 @@ local function run_action(ctx, args)
   if not ok then
     return protocol.failure(save_error or "action launched but recent state could not be saved", {
       dispatched = true,
+      partial = partial,
+      execution = execution,
     })
   end
 
   return protocol.success({
     dispatched = true,
+    partial = partial,
+    execution = execution,
     warnings = protocol.list(warnings),
   })
 end
