@@ -104,3 +104,116 @@ test("project config loader errors fall back to defaults", function()
   testlib.truthy(err)
   testlib.eq(config.roots[1], "/home/test/Repository")
 end)
+
+test("project config accepts validated workspace targets", function()
+  local module = require("workstation.project_config")
+  local config, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.lua",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["~/Repository/demo"] = {
+              workspace = {
+                targets = {
+                  {
+                    name = "editor",
+                    workspace = 1,
+                    operation = "editor",
+                  },
+                  {
+                    name = "backend",
+                    workspace = "name:backend",
+                    monitor = "DP-1",
+                    terminal = true,
+                    argv = { "uv", "run", "fastapi", "dev" },
+                  },
+                  {
+                    name = "browser",
+                    workspace = 4,
+                    operation = "url",
+                    url = "http://localhost:3000",
+                  },
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.eq(err, nil)
+  local override = config.overrides["/home/test/Repository/demo"]
+  testlib.truthy(override)
+  testlib.eq(override.workspace.targets[1].operation, "editor")
+  testlib.eq(override.workspace.targets[2].monitor, "DP-1")
+  testlib.eq(override.workspace.targets[3].url, "http://localhost:3000")
+end)
+
+test("project config rejects malformed workspace target", function()
+  local module = require("workstation.project_config")
+  local config, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.lua",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["~/Repository/demo"] = {
+              workspace = {
+                targets = {
+                  {
+                    name = "backend",
+                    workspace = 0,
+                    terminal = true,
+                    argv = { "uv", "run" },
+                  },
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("workspace"))
+  testlib.eq(config.roots[1], "/home/test/Repository")
+  testlib.eq(config.overrides["/home/test/Repository/demo"], nil)
+end)
+
+test("project config rejects shell workspace targets", function()
+  local module = require("workstation.project_config")
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.lua",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["~/Repository/demo"] = {
+              workspace = {
+                targets = {
+                  {
+                    name = "unsafe",
+                    argv = { "bash", "-lc", "echo ok" },
+                    shell = true,
+                  },
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("shell"))
+end)
