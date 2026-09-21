@@ -458,12 +458,36 @@ test("workspace executor revalidates project identity before dispatch", function
   testlib.eq(#rt.calls.run, 0)
 end)
 
-test("workspace planner rejects missing workspace configuration", function()
+test("workspace planner creates automatic editor and shell targets without config", function()
   local orchestrator = require("workstation.workspace_orchestrator")
   local plan, err = orchestrator.plan(project, { overrides = {} }, adapter())
 
-  testlib.eq(plan, nil)
-  testlib.truthy(err:match("not configured"))
+  testlib.eq(err, nil)
+  testlib.eq(plan.automatic, true)
+  testlib.eq(#plan.targets, 2)
+  testlib.eq(plan.targets[1].name, "editor")
+  testlib.eq(plan.targets[1].workspace, "1")
+  testlib.eq(plan.targets[1].argv[1], "code")
+  testlib.eq(plan.targets[2].name, "shell")
+  testlib.eq(plan.targets[2].workspace, "2")
+  testlib.eq(plan.targets[2].argv[1], "foot")
+  testlib.eq(plan.targets[2].argv[3], "bash")
+end)
+
+test("explicit workspace targets replace automatic defaults", function()
+  local orchestrator = require("workstation.workspace_orchestrator")
+  local plan = assert(orchestrator.plan(project, config({
+    {
+      name = "custom",
+      workspace = 7,
+      argv = { "worker" },
+    },
+  }), adapter()))
+
+  testlib.eq(plan.automatic, false)
+  testlib.eq(#plan.targets, 1)
+  testlib.eq(plan.targets[1].name, "custom")
+  testlib.eq(plan.targets[1].workspace, "7")
 end)
 
 test("workspace planner isolates malformed target instead of crashing", function()
