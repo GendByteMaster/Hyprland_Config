@@ -93,7 +93,7 @@ max_depth = 4
 end)
 
 test("toml rejects mixed type arrays", function()
-  local value, err = toml.decode([[roots = ["~/Repository", 42]]])
+  local value, err = toml.decode([=[roots = ["~/Repository", 42]]=])
 
   testlib.eq(value, nil)
   testlib.truthy(err:match("mixed%-type"))
