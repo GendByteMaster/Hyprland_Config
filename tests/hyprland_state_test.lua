@@ -17,7 +17,7 @@ local function runtime(responses)
       local key = table.concat(argv, "|")
       return responses[key]
     end,
-    run_argv = function(argv)
+    run_argv_silent = function(argv)
       calls.run[#calls.run + 1] = argv
       return responses["run:" .. table.concat(argv, "|")] ~= false
     end,
