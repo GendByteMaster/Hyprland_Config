@@ -13,6 +13,7 @@ local function clone_defaults(home)
       terminal = "auto",
     },
     overrides = {},
+    monitors = {},
     max_depth = 4,
   }
 end
@@ -89,6 +90,46 @@ local function validate_workspace_target(target)
   end
   if target.shell ~= nil then
     return nil, "workspace targets do not support shell execution"
+  end
+  if target.singleton ~= nil and type(target.singleton) ~= "boolean" then
+    return nil, "workspace target singleton must be boolean"
+  end
+  if target.wait_ms ~= nil then
+    if type(target.wait_ms) ~= "number"
+      or target.wait_ms % 1 ~= 0
+      or target.wait_ms < 0
+      or target.wait_ms > 5000 then
+      return nil, "workspace target wait_ms must be an integer between 0 and 5000"
+    end
+  end
+
+  if target.match ~= nil then
+    if type(target.match) ~= "table" then
+      return nil, "workspace target match must be a table"
+    end
+
+    local match_fields = {
+      "class",
+      "initial_class",
+      "title",
+      "initial_title",
+    }
+    local matched = 0
+    for _, field in ipairs(match_fields) do
+      local value = target.match[field]
+      if value ~= nil then
+        if not safe_string(value) then
+          return nil, "workspace target match fields must be non-empty strings"
+        end
+        matched = matched + 1
+      end
+    end
+
+    if matched == 0 then
+      return nil, "workspace target match requires at least one selector"
+    end
+  elseif target.singleton == true or target.wait_ms ~= nil then
+    return nil, "workspace target singleton/wait_ms requires match selectors"
   end
 
   local has_argv = target.argv ~= nil
@@ -217,6 +258,20 @@ local function validate(raw, home)
       editor = raw.apps.editor,
       file_manager = raw.apps.file_manager,
     }
+  end
+
+  if raw.monitors ~= nil then
+    if type(raw.monitors) ~= "table" then
+      return nil, "monitors must be a role-to-monitor table"
+    end
+
+    config.monitors = {}
+    for role, monitor in pairs(raw.monitors) do
+      if not safe_string(role) or not safe_string(monitor) then
+        return nil, "monitor aliases must use non-empty string roles and monitor names"
+      end
+      config.monitors[role] = monitor
+    end
   end
 
   if raw.max_depth ~= nil then
