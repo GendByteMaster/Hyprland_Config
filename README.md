@@ -206,57 +206,44 @@ The default discovery root is:
 
 Git project roots are discovered with bounded depth; the default maximum depth is 4. Common heavy/generated directories are pruned, symlink Git markers are rejected, and canonical paths are used as stable project IDs.
 
-Additional roots can also be added directly from the launcher with **Add folder**. The launcher now uses its own dark, keyboard-first directory browser instead of the native desktop folder dialog. Navigate with `Up/Down`, open a directory with `Enter`, go up with `Backspace` or `Left`, then choose **Use this folder**. The selected root is persisted in launcher state and rescanned immediately. When no manual `projects.lua` exists, the first UI-selected root replaces the implicit `~/Repository` fallback so a missing default directory does not keep producing warnings.
+Additional roots can also be added directly from the launcher with **Add folder**. The launcher now uses its own dark, keyboard-first directory browser instead of the native desktop folder dialog. Navigate with `Up/Down`, open a directory with `Enter`, go up with `Backspace` or `Left`, then choose **Use this folder**. The selected root is persisted in launcher state and rescanned immediately. When no manual `projects.toml` exists, the first UI-selected root replaces the implicit `~/Repository` fallback so a missing default directory does not keep producing warnings.
 
-Explicit non-Git projects, hidden paths, application preferences, and action overrides can still be configured in:
+Explicit non-Git projects, hidden paths, application preferences, and action overrides are configured as **data-only TOML** in:
 
 ```text
-~/.config/hyprland-workstation/projects.lua
+~/.config/hyprland-workstation/projects.toml
 ```
 
 Example:
 
-```lua
-return {
-  roots = {
-    "~/Repository",
-    "~/Projects",
-  },
+```toml
+roots = [
+  "~/Repository",
+  "~/Projects",
+]
+hidden = ["~/Repository/archive"]
+max_depth = 4
 
-  projects = {
-    { path = "~/scratch/demo", name = "Demo" },
-  },
+[[projects]]
+path = "~/scratch/demo"
+name = "Demo"
 
-  hidden = {
-    "~/Repository/archive",
-  },
+[apps]
+terminal = "auto"
+editor = ["code", "--reuse-window"]
+file_manager = ["thunar"]
 
-  max_depth = 4,
-
-  apps = {
-    terminal = "auto",
-    editor = { "code", "--reuse-window" },
-    file_manager = { "thunar" },
-  },
-
-  overrides = {
-    ["~/Repository/example"] = {
-      actions = {
-        {
-          id = "custom-dev",
-          label = "Custom Dev",
-          argv = { "bash", "-lc", "echo ok" },
-          terminal = true,
-          shell = true,
-          confirm = true,
-        },
-      },
-    },
-  },
-}
+[[overrides."~/Repository/example".actions]]
+id = "custom-dev"
+label = "Custom Dev"
+argv = ["pnpm", "dev"]
+terminal = true
+confirm = true
 ```
 
-If the file is missing, safe defaults are used. A malformed config is ignored with a warning rather than rewritten.
+The TOML parser is intentionally strict and data-only: it does not use `dofile`, `load`, Lua expressions, functions, or metatables. The old `projects.lua` path is never executed; if it is present without `projects.toml`, the launcher falls back to safe defaults and reports a migration warning.
+
+A malformed TOML config is ignored with a warning rather than rewritten. Configuration is still trusted local policy: explicit `argv` entries intentionally launch the programs you configure, so do not install unreviewed project configuration files.
 
 ### Favorites, recent projects, and cache
 
@@ -413,61 +400,43 @@ v0.5 extends the Project Launcher from running one project action at a time to o
 
 Optional logical monitor aliases can be defined at the top level:
 
-```lua
-monitors = {
-  primary = "DP-1",
-  secondary = "HDMI-A-1",
-}
+```toml
+[monitors]
+primary = "DP-1"
+secondary = "HDMI-A-1"
 ```
 
 When an alias is not configured, `primary`, `secondary`, and `tertiary` resolve from the current Hyprland monitor set: the focused monitor is first, then the remaining monitors are ordered deterministically by geometry. If a configured/direct monitor is unavailable, the orchestrator falls back deterministically and reports the target as degraded instead of silently pretending the requested placement succeeded.
 
 Workspace orchestration is configured per project under `overrides.<project>.workspace.targets`:
 
-```lua
-overrides = {
-  ["~/Repository/Voxelyra"] = {
-    workspace = {
-      targets = {
-        {
-          name = "editor",
-          workspace = 1,
-          monitor = "primary",
-          operation = "editor",
+```toml
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "editor"
+workspace = 1
+monitor = "primary"
+operation = "editor"
+singleton = true
+wait_ms = 1200
+match.class = "Code"
 
-          -- Prevent duplicate editor windows on repeated Open Workspace.
-          singleton = true,
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "backend"
+workspace = 2
+terminal = true
+argv = ["uv", "run", "fastapi", "dev"]
 
-          -- Exact, case-insensitive Hyprland client matching.
-          match = {
-            class = "Code",
-          },
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "frontend"
+workspace = 3
+terminal = true
+argv = ["pnpm", "dev"]
 
-          -- Bounded post-launch wait; allowed range is 0..5000 ms.
-          wait_ms = 1200,
-        },
-        {
-          name = "backend",
-          workspace = 2,
-          terminal = true,
-          argv = { "uv", "run", "fastapi", "dev" },
-        },
-        {
-          name = "frontend",
-          workspace = 3,
-          terminal = true,
-          argv = { "pnpm", "dev" },
-        },
-        {
-          name = "browser",
-          workspace = 4,
-          operation = "url",
-          url = "http://localhost:3000",
-        },
-      },
-    },
-  },
-}
+[[overrides."~/Repository/Voxelyra".workspace.targets]]
+name = "browser"
+workspace = 4
+operation = "url"
+url = "http://localhost:3000"
 ```
 
 When a project has at least one validated workspace target, Project Launcher adds:
@@ -488,7 +457,9 @@ Supported targets:
 - optional `singleton = true` — skips launch when a matching mapped window already exists;
 - optional `wait_ms` — bounds post-launch matching instead of polling indefinitely.
 
-Workspace targets intentionally do **not** support raw `shell = true`. Arguments remain structured data and are quoted before entering Hyprland's command-string dispatcher.
+Workspace configuration is bounded before execution: at most 32 targets, at most 10 seconds of total matching wait budget, and at most 16 monitor aliases. URL targets accept only `http://` and `https://`.
+
+Workspace targets intentionally do **not** support a raw shell flag. Arguments remain structured argv data and are quoted before entering Hyprland's command-string dispatcher. Explicit argv is still trusted local configuration and can intentionally invoke command interpreters if you choose to configure one.
 
 For targets with matching metadata, the orchestrator snapshots Hyprland clients before launch and only treats a later **new** matching address as the launched window. If the pre-launch snapshot is unavailable, it refuses to guess and reports degraded placement.
 
