@@ -1,8 +1,14 @@
 local command = require("workstation.command")
 local paths = require("workstation.paths")
 local project_model = require("workstation.project_model")
+local toml = require("workstation.toml")
 
 local M = {}
+
+local MAX_WORKSPACE_TARGETS = 32
+local DEFAULT_WORKSPACE_WAIT_MS = 1200
+local MAX_WORKSPACE_WAIT_BUDGET_MS = 10000
+local MAX_MONITOR_ALIASES = 16
 
 local function clone_defaults(home)
   return {
@@ -154,6 +160,10 @@ local function validate_workspace_target(target)
     if not safe_string(target.url) then
       return nil, "URL workspace target requires a non-empty url"
     end
+    local lower_url = target.url:lower()
+    if not lower_url:match("^https?://") then
+      return nil, "URL workspace target only supports http:// or https://"
+    end
     if has_argv or target.terminal == true then
       return nil, "URL workspace target cannot define argv or terminal"
     end
@@ -176,11 +186,25 @@ local function validate_workspace(workspace)
   end) or #workspace.targets == 0 then
     return nil, "workspace.targets must be a non-empty array"
   end
+  if #workspace.targets > MAX_WORKSPACE_TARGETS then
+    return nil, "workspace.targets exceeds limit of " .. tostring(MAX_WORKSPACE_TARGETS)
+  end
 
+  local wait_budget = 0
   for _, target in ipairs(workspace.targets) do
     local ok, err = validate_workspace_target(target)
     if not ok then
       return nil, err
+    end
+
+    if target.match ~= nil then
+      wait_budget = wait_budget + (target.wait_ms == nil
+        and DEFAULT_WORKSPACE_WAIT_MS
+        or target.wait_ms)
+      if wait_budget > MAX_WORKSPACE_WAIT_BUDGET_MS then
+        return nil, "workspace matching wait budget exceeds "
+          .. tostring(MAX_WORKSPACE_WAIT_BUDGET_MS) .. "ms"
+      end
     end
   end
 
@@ -266,7 +290,12 @@ local function validate(raw, home)
     end
 
     config.monitors = {}
+    local monitor_count = 0
     for role, monitor in pairs(raw.monitors) do
+      monitor_count = monitor_count + 1
+      if monitor_count > MAX_MONITOR_ALIASES then
+        return nil, "monitor aliases exceed limit of " .. tostring(MAX_MONITOR_ALIASES)
+      end
       if not safe_string(role) or not safe_string(monitor) then
         return nil, "monitor aliases must use non-empty string roles and monitor names"
       end
@@ -309,15 +338,25 @@ local function validate(raw, home)
   return config
 end
 
+local function read_file(path)
+  local file = io.open(path, "rb")
+  if not file then
+    return nil, "failed to read project config"
+  end
+  local content = file:read("*a")
+  file:close()
+  return content
+end
+
 local function default_runtime()
   return {
     exists = command.exists,
     load_config = function(path)
-      local ok, value = pcall(dofile, path)
-      if not ok then
-        return nil, tostring(value)
+      local content, read_error = read_file(path)
+      if not content then
+        return nil, read_error
       end
-      return value
+      return toml.decode(content)
     end,
   }
 end
@@ -325,11 +364,19 @@ end
 function M.load(options)
   options = options or {}
   local home = assert(options.home or os.getenv("HOME"), "home is required")
+  local explicit_path = options.config_path ~= nil
   local config_path = options.config_path
-    or paths.join(home, ".config", "hyprland-workstation", "projects.lua")
+    or paths.join(home, ".config", "hyprland-workstation", "projects.toml")
   local runtime = options.runtime or default_runtime()
 
   if not runtime.exists(config_path) then
+    if not explicit_path then
+      local legacy_path = paths.join(home, ".config", "hyprland-workstation", "projects.lua")
+      if runtime.exists(legacy_path) then
+        return clone_defaults(home),
+          "legacy projects.lua is ignored for safety; migrate it to projects.toml"
+      end
+    end
     return clone_defaults(home), nil
   end
 
