@@ -217,3 +217,113 @@ test("project config rejects shell workspace targets", function()
   testlib.truthy(err)
   testlib.truthy(err:match("shell"))
 end)
+
+test("project config accepts singleton match and monitor aliases", function()
+  local module = require("workstation.project_config")
+  local config, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.lua",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          monitors = {
+            primary = "DP-1",
+            secondary = "HDMI-A-1",
+          },
+          overrides = {
+            ["~/Repository/demo"] = {
+              workspace = {
+                targets = {
+                  {
+                    name = "editor",
+                    workspace = 1,
+                    monitor = "primary",
+                    operation = "editor",
+                    singleton = true,
+                    wait_ms = 900,
+                    match = {
+                      class = "Code",
+                      title = "Demo",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.eq(err, nil)
+  testlib.eq(config.monitors.primary, "DP-1")
+  testlib.eq(config.monitors.secondary, "HDMI-A-1")
+  local target = config.overrides["/home/test/Repository/demo"].workspace.targets[1]
+  testlib.eq(target.singleton, true)
+  testlib.eq(target.wait_ms, 900)
+  testlib.eq(target.match.class, "Code")
+end)
+
+test("project config rejects singleton without match selectors", function()
+  local module = require("workstation.project_config")
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.lua",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["~/Repository/demo"] = {
+              workspace = {
+                targets = {
+                  {
+                    name = "editor",
+                    operation = "editor",
+                    singleton = true,
+                  },
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("requires match"))
+end)
+
+test("project config rejects excessive workspace wait", function()
+  local module = require("workstation.project_config")
+  local _, err = module.load({
+    home = "/home/test",
+    config_path = "/tmp/projects.lua",
+    runtime = {
+      exists = function() return true end,
+      load_config = function()
+        return {
+          overrides = {
+            ["~/Repository/demo"] = {
+              workspace = {
+                targets = {
+                  {
+                    name = "editor",
+                    operation = "editor",
+                    wait_ms = 6000,
+                    match = { class = "Code" },
+                  },
+                },
+              },
+            },
+          },
+        }
+      end,
+    },
+  })
+
+  testlib.truthy(err)
+  testlib.truthy(err:match("wait_ms"))
+end)
