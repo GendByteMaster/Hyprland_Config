@@ -12,7 +12,7 @@ if [[ "$PLUGIN_PATH" != /* || ! -f "$PLUGIN_PATH" ]]; then
   exit 2
 fi
 
-for bin in Hyprland hyprctl jq foot; do
+for bin in Hyprland hyprctl jq foot weston; do
   command -v "$bin" >/dev/null 2>&1 || {
     echo "missing required executable: $bin" >&2
     exit 2
@@ -38,6 +38,7 @@ misc {
 }
 EOF
 
+WESTON_PID=""
 HYPR_PID=""
 loaded=0
 
@@ -52,6 +53,11 @@ cleanup() {
   if [[ -n "$HYPR_PID" ]]; then
     kill "$HYPR_PID" >/dev/null 2>&1 || true
     wait "$HYPR_PID" >/dev/null 2>&1 || true
+  fi
+
+  if [[ -n "$WESTON_PID" ]]; then
+    kill "$WESTON_PID" >/dev/null 2>&1 || true
+    wait "$WESTON_PID" >/dev/null 2>&1 || true
   fi
 
   rm -rf "$RUNTIME_ROOT"
@@ -87,7 +93,7 @@ fi
 
 echo "instance: $HYPRLAND_INSTANCE_SIGNATURE"
 
-echo "== Waiting for fallback headless output =="
+echo "== Waiting for nested Hyprland output =="
 for _ in $(seq 1 80); do
   monitors="$(hyprctl -j monitors 2>/dev/null || true)"
   count="$(printf '%s' "$monitors" | jq 'length' 2>/dev/null || echo 0)"
