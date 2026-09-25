@@ -90,6 +90,15 @@ int luaNudge(lua_State* L) {
     return luaPanError(L, g_adapter.nudge(xDirection, yDirection));
 }
 
+int luaBrake(lua_State* L) {
+    if (lua_gettop(L) != 0) {
+        return luaL_error(L, "gendbyte-spatial.brake: expected no arguments");
+    }
+
+    g_adapter.releaseMotion();
+    return 0;
+}
+
 int luaReset(lua_State* L) {
     if (lua_gettop(L) != 0) {
         return luaL_error(L, "gendbyte-spatial.reset: expected no arguments");
@@ -109,10 +118,11 @@ struct LuaFunctionRegistration {
     PLUGIN_LUA_FN function;
 };
 
-constexpr std::array<LuaFunctionRegistration, 4> kLuaFunctions{{
+constexpr std::array<LuaFunctionRegistration, 5> kLuaFunctions{{
     {"toggle", luaToggle},
     {"pan", luaPan},
     {"nudge", luaNudge},
+    {"brake", luaBrake},
     {"reset", luaReset},
 }};
 
