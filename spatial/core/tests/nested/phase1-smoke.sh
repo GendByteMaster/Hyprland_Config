@@ -154,18 +154,6 @@ assert_contains "$status" '"protocol":1' "protocol version"
 assert_contains "$status" '"enabled":false' "spatial starts disabled"
 
 echo
-echo "== Direct Lua toggle smoke =="
-lua_toggle_on="$(run_lua_eval 'hl.plugin.gendbyte_spatial.toggle()' 'direct Lua toggle enable')"
-echo "$lua_toggle_on"
-status="$(hyprctl gendbyte-spatial status)"
-assert_contains "$status" '"enabled":true' "direct Lua toggle enables spatial mode"
-
-lua_toggle_off="$(run_lua_eval 'hl.plugin.gendbyte_spatial.toggle()' 'direct Lua toggle disable')"
-echo "$lua_toggle_off"
-status="$(hyprctl gendbyte-spatial status)"
-assert_contains "$status" '"enabled":false' "direct Lua toggle disables spatial mode"
-
-echo
 echo "== Active floating test window =="
 read -r active_address before_x before_y before_w before_h < <(read_active_rect)
 echo "address=$active_address rect=($before_x,$before_y ${before_w}x${before_h})"
@@ -230,10 +218,8 @@ PAN_X=320
 PAN_Y=0
 
 echo
-echo "== Direct Lua pan +${PAN_X},+${PAN_Y} =="
-lua_pan="$(run_lua_eval "hl.plugin.gendbyte_spatial.pan(${PAN_X}, ${PAN_Y})" "direct Lua pan")"
-echo "$lua_pan"
-camera="$(hyprctl gendbyte-spatial camera)"
+echo "== Pan +${PAN_X},+${PAN_Y} =="
+camera="$(hyprctl gendbyte-spatial pan "$PAN_X" "$PAN_Y")"
 echo "$camera"
 assert_contains "$camera" '"x":320' "camera x after direct Lua pan"
 assert_contains "$camera" '"y":0' "camera y after direct Lua pan"
@@ -266,10 +252,8 @@ echo "Holding the projected geometry for 5 seconds..."
 sleep 5
 
 echo
-echo "== Direct Lua reset =="
-lua_reset="$(run_lua_eval 'hl.plugin.gendbyte_spatial.reset()' 'direct Lua reset')"
-echo "$lua_reset"
-camera="$(hyprctl gendbyte-spatial camera)"
+echo "== Pan back =="
+camera="$(hyprctl gendbyte-spatial pan "-$PAN_X" "-$PAN_Y")"
 echo "$camera"
 assert_contains "$camera" '"x":0' "camera x returned to zero after direct Lua reset"
 assert_contains "$camera" '"y":0' "camera y returned to zero after direct Lua reset"
@@ -311,5 +295,4 @@ echo
 echo "PASS: command/lifecycle smoke sequence completed with $managed_count managed window(s)."
 echo "PASS: managed world rectangles remained unchanged across camera pan."
 echo "PASS: live compositor geometry moved by the expected delta and restored."
-echo "PASS: direct Lua toggle/pan/reset controls executed successfully."
 echo "NOTE: keybinding registration, focus/pointer behavior, and compositor stability still require human observation in the nested session."

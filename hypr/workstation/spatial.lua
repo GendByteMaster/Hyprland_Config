@@ -1,6 +1,7 @@
 local M = {}
 
 local DEFAULT_STEP = 160
+local PLUGIN_FILENAME = "build/spatial-plugin/gendbyte-spatial.so"
 
 local function plugin_api(hl)
   if type(hl) ~= "table" or type(hl.plugin) ~= "table" then
@@ -19,6 +20,85 @@ local function plugin_api(hl)
   end
 
   return api
+end
+
+local function file_exists(path)
+  local file = io.open(path, "rb")
+  if not file then
+    return false
+  end
+
+  file:close()
+  return true
+end
+
+local function source_repo_root()
+  if type(debug) ~= "table" or type(debug.getinfo) ~= "function" then
+    return nil
+  end
+
+  local info = debug.getinfo(1, "S")
+  local source = info and info.source or ""
+  if source:sub(1, 1) == "@" then
+    source = source:sub(2)
+  end
+
+  local suffix = "/hypr/workstation/spatial.lua"
+  if source:sub(-#suffix) ~= suffix then
+    return nil
+  end
+
+  local root = source:sub(1, #source - #suffix)
+  if root:sub(1, 1) ~= "/" then
+    return nil
+  end
+
+  return root
+end
+
+local function resolve_plugin_path(options)
+  options = options or {}
+
+  if type(options.plugin_path) == "string" and options.plugin_path ~= "" then
+    return options.plugin_path
+  end
+
+  local env_path = os.getenv("GENDBYTE_SPATIAL_PLUGIN")
+  if type(env_path) == "string" and env_path ~= "" then
+    return env_path
+  end
+
+  local root = source_repo_root()
+  if not root then
+    return nil
+  end
+
+  return root .. "/" .. PLUGIN_FILENAME
+end
+
+local function declare_plugin(hl, options)
+  if type(hl) ~= "table"
+      or type(hl.plugin) ~= "table"
+      or type(hl.plugin.load) ~= "function" then
+    return false, "Hyprland plugin.load API is unavailable"
+  end
+
+  local path = resolve_plugin_path(options)
+  if not path then
+    return false, "gendbyte-spatial plugin path could not be resolved"
+  end
+
+  local exists = options and options.file_exists or file_exists
+  if type(exists) ~= "function" or not exists(path) then
+    return false, "gendbyte-spatial plugin is not built: " .. path
+  end
+
+  local ok, err = pcall(hl.plugin.load, path)
+  if not ok then
+    return false, tostring(err)
+  end
+
+  return true, path
 end
 
 local function invoke(hl, name, ...)
@@ -42,6 +122,10 @@ end
 
 function M.available(hl)
   return plugin_api(hl) ~= nil
+end
+
+function M.plugin_path(options)
+  return resolve_plugin_path(options)
 end
 
 function M.toggle(hl)
@@ -73,10 +157,18 @@ function M.register(hl, _o, options)
   assert(type(hl) == "table", "Hyprland API is required")
   assert(type(hl.bind) == "function", "Hyprland bind API is required")
 
+  -- Keep the plugin declared on every Lua config evaluation. Hyprland's
+  -- config-managed plugin lifecycle loads it after the first pass and then
+  -- performs a second reload where hl.plugin.gendbyte_spatial is available.
+  local declared, declare_error = declare_plugin(hl, options)
+
   if not M.available(hl) then
-    return false
+    return false, declared and "gendbyte-spatial load scheduled" or declare_error
   end
 
+  -- If the API exists from a manually loaded plugin, bindings can still work.
+  -- When a resolvable build exists, declaration above also promotes the plugin
+  -- into the normal config-managed lifecycle for subsequent reloads.
   local step = tonumber(options.step) or DEFAULT_STEP
   assert(step > 0 and step < 1000000, "spatial pan step must be a positive bounded number")
 
