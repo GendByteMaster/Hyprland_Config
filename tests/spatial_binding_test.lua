@@ -56,14 +56,14 @@ local function fake_hyprland(with_plugin)
   return hl, calls
 end
 
-local BUILT_OPTIONS = {
+local INSTALLED_OPTIONS = {
   plugin_path = "/tmp/gendbyte-spatial.so",
   file_exists = function()
     return true
   end,
 }
 
-t.test("spatial bindings preserve normal Hyprland when plugin build is unavailable", function()
+t.test("spatial bindings preserve normal Hyprland when plugin install is unavailable", function()
   local hl, calls = fake_hyprland(false)
 
   local registered = spatial.register(hl, {}, {
@@ -80,10 +80,10 @@ t.test("spatial bindings preserve normal Hyprland when plugin build is unavailab
   t.eq(spatial.available(hl), false)
 end)
 
-t.test("spatial config schedules plugin load before API becomes available", function()
+t.test("spatial config schedules installed plugin load before API becomes available", function()
   local hl, calls = fake_hyprland(false)
 
-  local registered, status = spatial.register(hl, {}, BUILT_OPTIONS)
+  local registered, status = spatial.register(hl, {}, INSTALLED_OPTIONS)
 
   t.eq(registered, false)
   t.eq(status, "gendbyte-spatial load scheduled")
@@ -93,10 +93,10 @@ t.test("spatial config schedules plugin load before API becomes available", func
   t.eq(#calls.binds, 0)
 end)
 
-t.test("spatial config keeps plugin declared when API is already available", function()
+t.test("spatial config keeps installed plugin declared when API is already available", function()
   local hl, calls = fake_hyprland(true)
 
-  local registered = spatial.register(hl, {}, BUILT_OPTIONS)
+  local registered = spatial.register(hl, {}, INSTALLED_OPTIONS)
 
   t.eq(registered, true)
   t.eq(#calls.loads, 1)
@@ -108,7 +108,7 @@ end)
 t.test("spatial bindings own only their explicit chords when plugin is available", function()
   local hl, calls = fake_hyprland(true)
 
-  local registered = spatial.register(hl, {}, BUILT_OPTIONS)
+  local registered = spatial.register(hl, {}, INSTALLED_OPTIONS)
 
   t.eq(registered, true)
   t.eq(#calls.unbinds, 6)
@@ -129,7 +129,7 @@ end)
 t.test("spatial binding callbacks call direct plugin Lua functions", function()
   local hl, calls = fake_hyprland(true)
 
-  spatial.register(hl, {}, BUILT_OPTIONS)
+  spatial.register(hl, {}, INSTALLED_OPTIONS)
 
   calls.binds[1].callback()
   calls.binds[2].callback()
@@ -161,8 +161,8 @@ t.test("spatial pan step is configurable", function()
   local hl, calls = fake_hyprland(true)
 
   spatial.register(hl, {}, {
-    plugin_path = BUILT_OPTIONS.plugin_path,
-    file_exists = BUILT_OPTIONS.file_exists,
+    plugin_path = INSTALLED_OPTIONS.plugin_path,
+    file_exists = INSTALLED_OPTIONS.file_exists,
     step = 240,
   })
 

@@ -4,6 +4,8 @@ set -euo pipefail
 BRANCH="feat/issue-24-developer-spatial-desktop"
 BUILD_DIR="build/spatial-plugin"
 PLUGIN="$BUILD_DIR/gendbyte-spatial.so"
+INSTALL_DIR="$HOME/.local/lib/gendbyte-spatial"
+INSTALLED_PLUGIN="$INSTALL_DIR/gendbyte-spatial.so"
 
 die() {
   echo "ERROR: $*" >&2
@@ -13,7 +15,7 @@ die() {
 command -v git >/dev/null || die "git not found"
 command -v cmake >/dev/null || die "cmake not found"
 command -v hyprctl >/dev/null || die "hyprctl not found"
-command -v realpath >/dev/null || die "realpath not found"
+command -v install >/dev/null || die "install not found"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Run this inside the Hyprland_Config repository"
 cd "$ROOT"
@@ -36,26 +38,31 @@ cmake -S spatial/core -B "$BUILD_DIR" \
 cmake --build "$BUILD_DIR" --parallel
 
 [[ -f "$PLUGIN" ]] || die "Plugin was not built: $PLUGIN"
-PLUGIN_ABS="$(realpath "$PLUGIN")"
 
 echo
 echo "== Native tests =="
 ctest --test-dir "$BUILD_DIR" --output-on-failure
 
 echo
-echo "== Remove any manually loaded copy =="
+echo "== Remove old loaded copies =="
 hyprctl gendbyte-spatial disable >/dev/null 2>&1 || true
-hyprctl plugin unload "$PLUGIN_ABS" >/dev/null 2>&1 || true
+hyprctl plugin unload "$ROOT/$PLUGIN" >/dev/null 2>&1 || true
+hyprctl plugin unload "$INSTALLED_PLUGIN" >/dev/null 2>&1 || true
+
+echo
+echo "== Install stable user plugin =="
+install -Dm755 "$PLUGIN" "$INSTALLED_PLUGIN"
+echo "$INSTALLED_PLUGIN"
 
 echo
 echo "== Reload Lua config =="
-echo "The config now declares the local build with hl.plugin.load(...)."
+echo "spatial.lua declares: $INSTALLED_PLUGIN"
 hyprctl reload
 
 echo
 echo "== Wait for config-managed plugin =="
 plugin_ready=0
-for _ in $(seq 1 100); do
+for _ in $(seq 1 120); do
   if hyprctl plugin list 2>/dev/null | grep -q "gendbyte-spatial"; then
     plugin_ready=1
     break
@@ -63,9 +70,14 @@ for _ in $(seq 1 100); do
   sleep 0.1
 done
 
-[[ "$plugin_ready" -eq 1 ]] || die "gendbyte-spatial was not loaded by Lua config"
+[[ "$plugin_ready" -eq 1 ]] || {
+  echo
+  echo "== Config errors after failed plugin load =="
+  hyprctl configerrors || true
+  die "gendbyte-spatial was not loaded by Lua config from $INSTALLED_PLUGIN"
+}
 
-# PluginSystem queues another config reload after the .so is loaded.
+# PluginSystem performs a second config reload after loading the .so.
 sleep 1
 
 echo
@@ -80,7 +92,9 @@ printf '%s\n' "$config_errors"
 
 echo
 echo "== Check direct Lua API =="
-hyprctl eval 'assert(type(hl.plugin.gendbyte_spatial) == "table", "missing hl.plugin.gendbyte_spatial"); assert(type(hl.plugin.gendbyte_spatial.toggle) == "function", "missing toggle"); assert(type(hl.plugin.gendbyte_spatial.pan) == "function", "missing pan"); assert(type(hl.plugin.gendbyte_spatial.reset) == "function", "missing reset")'
+lua_check="$(hyprctl eval 'assert(type(hl.plugin.gendbyte_spatial) == "table", "missing hl.plugin.gendbyte_spatial"); assert(type(hl.plugin.gendbyte_spatial.toggle) == "function", "missing toggle"); assert(type(hl.plugin.gendbyte_spatial.pan) == "function", "missing pan"); assert(type(hl.plugin.gendbyte_spatial.reset) == "function", "missing reset")')"
+printf '%s\n' "$lua_check"
+[[ "$lua_check" != error:* ]] || die "Lua plugin namespace validation failed"
 echo "Lua API: OK"
 
 echo
@@ -100,7 +114,9 @@ fi
 
 echo
 echo "== Direct Lua toggle ON =="
-hyprctl eval 'hl.plugin.gendbyte_spatial.toggle()'
+toggle_on="$(hyprctl eval 'hl.plugin.gendbyte_spatial.toggle()')"
+printf '%s\n' "$toggle_on"
+[[ "$toggle_on" != error:* ]] || die "Direct Lua toggle ON failed"
 sleep 0.2
 status_on="$(hyprctl gendbyte-spatial status)"
 printf '%s\n' "$status_on"
@@ -108,7 +124,9 @@ printf '%s\n' "$status_on"
 
 echo
 echo "== Direct Lua toggle OFF =="
-hyprctl eval 'hl.plugin.gendbyte_spatial.toggle()'
+toggle_off="$(hyprctl eval 'hl.plugin.gendbyte_spatial.toggle()')"
+printf '%s\n' "$toggle_off"
+[[ "$toggle_off" != error:* ]] || die "Direct Lua toggle OFF failed"
 sleep 0.2
 status_off="$(hyprctl gendbyte-spatial status)"
 printf '%s\n' "$status_off"
@@ -116,7 +134,9 @@ printf '%s\n' "$status_off"
 
 echo
 echo "=============================================="
-echo "Spatial plugin is config-managed and Lua API is ready."
+echo "Spatial plugin is installed and config-managed."
+echo "Lua API: OK"
+echo "Spatial bindings: OK"
 echo
 echo "Hotkeys:"
 echo "  Ctrl+Super+G     Toggle Spatial Desktop"
