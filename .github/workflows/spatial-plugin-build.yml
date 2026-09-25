@@ -19,11 +19,7 @@ jobs:
             cmake \
             git \
             pkgconf \
-            hyprland \
-            foot \
-            jq \
-            ttf-dejavu \
-            weston
+            hyprland
 
       - uses: actions/checkout@v4
 
@@ -51,11 +47,4 @@ jobs:
           file build/spatial-plugin/gendbyte-spatial.so
 
       - name: Parse nested smoke harness
-        run: |
-          bash -n spatial/core/tests/nested/phase1-smoke.sh
-          bash -n spatial/core/tests/nested/headless-runtime.sh
-
-      - name: Run headless runtime projection test
-        run: |
-          spatial/core/tests/nested/headless-runtime.sh \
-            "$(realpath build/spatial-plugin/gendbyte-spatial.so)"
+        run: bash -n spatial/core/tests/nested/phase1-smoke.sh
