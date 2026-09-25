@@ -64,8 +64,37 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "== Starting isolated headless Hyprland =="
-HYPRLAND_NO_CRASHREPORTER=1   Hyprland --i-am-really-stupid --config "$CONFIG_PATH" >"$LOG_PATH" 2>&1 &
+echo "== Starting software-only parent Weston =="
+WESTON_LOG="$RUNTIME_ROOT/weston.log"
+weston \
+  --backend=headless-backend.so \
+  --renderer=pixman \
+  --socket=wayland-parent \
+  --idle-time=0 >"$WESTON_LOG" 2>&1 &
+WESTON_PID=$!
+
+for _ in $(seq 1 80); do
+  if ! kill -0 "$WESTON_PID" 2>/dev/null; then
+    echo "Weston exited before publishing its Wayland socket" >&2
+    cat "$WESTON_LOG" >&2
+    exit 1
+  fi
+
+  [[ -S "$XDG_RUNTIME_DIR/wayland-parent" ]] && break
+  sleep 0.1
+done
+
+if [[ ! -S "$XDG_RUNTIME_DIR/wayland-parent" ]]; then
+  echo "Weston Wayland socket did not become available" >&2
+  cat "$WESTON_LOG" >&2
+  exit 1
+fi
+
+export WAYLAND_DISPLAY=wayland-parent
+
+echo "== Starting isolated nested Hyprland =="
+HYPRLAND_NO_CRASHREPORTER=1 \
+  Hyprland --i-am-really-stupid --config "$CONFIG_PATH" >"$LOG_PATH" 2>&1 &
 HYPR_PID=$!
 
 for _ in $(seq 1 80); do
