@@ -2,14 +2,11 @@
 
 #include "spatial/SpatialState.hpp"
 
+#include <hyprland/src/desktop/DesktopTypes.hpp>
 #include <hyprland/src/helpers/signal/Signal.hpp>
 
 #include <optional>
 #include <string>
-
-class CWindow;
-template <typename T>
-class CSharedPointer;
 
 namespace spatial {
 
@@ -29,12 +26,12 @@ public:
 
 private:
     [[nodiscard]] std::optional<DeskRect> currentDesk() const;
-    [[nodiscard]] std::optional<ManagedWindow> toManagedWindow(const SP<Desktop::View::CWindow>& window, const DeskRect& desk) const;
-    [[nodiscard]] bool eligible(const SP<Desktop::View::CWindow>& window) const;
-    [[nodiscard]] static std::string sessionWindowId(const SP<Desktop::View::CWindow>& window);
+    [[nodiscard]] std::optional<ManagedWindow> toManagedWindow(const PHLWINDOW& window, const DeskRect& desk) const;
+    [[nodiscard]] bool eligible(const PHLWINDOW& window) const;
+    [[nodiscard]] static std::string sessionWindowId(const PHLWINDOW& window);
 
-    void onWindowOpened(const SP<Desktop::View::CWindow>& window);
-    void onWindowClosed(const SP<Desktop::View::CWindow>& window);
+    void onWindowOpened(const PHLWINDOW& window);
+    void onWindowClosed(const PHLWINDOW& window);
     void onMonitorLayoutChanged();
 
     SpatialState* state_ = nullptr;

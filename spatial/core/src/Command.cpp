@@ -62,6 +62,14 @@ ParseResult fail(protocol::ErrorCode error, std::string message) {
     };
 }
 
+ParseResult success(Command command) {
+    return {
+        .command = command,
+        .error = protocol::ErrorCode::InvalidCommand,
+        .message = {},
+    };
+}
+
 } // namespace
 
 ParseResult parse(std::string_view request) {
@@ -104,7 +112,7 @@ ParseResult parse(std::string_view request) {
             kind = Kind::Disable;
         }
 
-        return {.command = Command{.kind = kind}};
+        return success(Command{.kind = kind});
     }
 
     if (subcommand == "pan") {
@@ -122,7 +130,7 @@ ParseResult parse(std::string_view request) {
             return fail(protocol::ErrorCode::OutOfRange, "pan delta is out of range");
         }
 
-        return {.command = Command{.kind = Kind::Pan, .dx = dx, .dy = dy}};
+        return success(Command{.kind = Kind::Pan, .dx = dx, .dy = dy});
     }
 
     return fail(protocol::ErrorCode::InvalidCommand, "unknown spatial subcommand");
