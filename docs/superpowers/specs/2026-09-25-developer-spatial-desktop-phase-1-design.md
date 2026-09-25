@@ -228,7 +228,7 @@ The exact Hyprland geometry accessor used by the plugin must be centralized so l
 When a window becomes managed for the first time:
 
 ```text
-world_rect := current compositor logical rect + camera offset
+world_rect.position := camera + compositorToDesk(current_compositor_position, DeskRect)\nworld_rect.size := current compositor logical size
 ```
 
 At `camera = (0, 0)`, entering spatial mode must not visually jump the window.
