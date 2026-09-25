@@ -174,6 +174,10 @@ PanResult HyprlandAdapter::nudge(int xDirection, int yDirection) {
     return PanResult::Success;
 }
 
+void HyprlandAdapter::releaseMotion() noexcept {
+    motion_.release();
+}
+
 void HyprlandAdapter::cancelMotion() noexcept {
     motion_.stop();
     if (motionTimer_ && !motionTimer_->cancelled()) {
