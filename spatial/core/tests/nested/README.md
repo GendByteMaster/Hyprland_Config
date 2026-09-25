@@ -103,3 +103,20 @@ For Issue #24, record:
 - whether disable restored geometry;
 - whether unload remained stable;
 - `hyprctl configerrors`.
+
+
+## Why runtime projection is not executed in GitHub-hosted container CI
+
+An automated runtime attempt was implemented and tested against the Arch Linux GitHub container.
+
+The compositor reached the Hyprland startup path, but Aquamarine could not create a backend because the hosted container exposes no DRM render node.
+
+This is not a plugin build failure:
+
+- the pure native suite passes;
+- `gendbyte-spatial.so` builds successfully against Arch Hyprland 0.56.2;
+- shell smoke syntax is validated.
+
+Aquamarine currently requires a primary allocator before Hyprland can run. Its Wayland backend also expects linux-dmabuf/DRM feedback and a usable DRM node; a software-only Weston/pixman parent does not satisfy that requirement. Therefore a normal GitHub-hosted container without `/dev/dri` cannot provide a representative compositor runtime gate.
+
+Do not mark runtime acceptance green from compile CI alone. The `phase1-smoke.sh` test remains required on a disposable/nested Hyprland session backed by a real render node.
