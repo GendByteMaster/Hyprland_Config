@@ -23,25 +23,26 @@ public:
     static constexpr double kDeceleration = 6000.0;
     static constexpr double kStopVelocity = 4.0;
 
-    static constexpr auto kInputGrace = std::chrono::milliseconds(110);
     static constexpr auto kMaxFrameDelta = std::chrono::milliseconds(50);
 
     [[nodiscard]] bool nudge(int xDirection, int yDirection, TimePoint now) noexcept;
+    void release() noexcept;
     [[nodiscard]] MotionFrame tick(TimePoint now) noexcept;
 
     void stop() noexcept;
 
     [[nodiscard]] bool active() const noexcept;
+    [[nodiscard]] bool held() const noexcept;
     [[nodiscard]] Point velocity() const noexcept;
 
 private:
     [[nodiscard]] static double approach(double value, double target, double maxDelta) noexcept;
 
     bool active_ = false;
+    bool held_ = false;
     int xDirection_ = 0;
     int yDirection_ = 0;
     Point velocity_{};
-    TimePoint lastInput_{};
     TimePoint lastTick_{};
 };
 
