@@ -9,6 +9,7 @@ add_library(spatial_core STATIC
     src/SpatialState.cpp
     src/Protocol.cpp
     src/Command.cpp
+    src/Projection.cpp
 )
 
 target_include_directories(spatial_core PUBLIC include)

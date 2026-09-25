@@ -52,19 +52,26 @@ std::string handleHyprCtl(eHyprCtlOutputFormat, std::string request) {
         g_adapter.disable();
         return spatial::protocol::statusJson(g_state);
     case spatial::command::Kind::Pan:
-        if (!g_state.enabled()) {
+        switch (g_adapter.pan(parsed.command->dx, parsed.command->dy)) {
+        case spatial::PanResult::Success:
+            return spatial::protocol::cameraJson(g_state);
+        case spatial::PanResult::Disabled:
             return spatial::protocol::errorJson(
                 spatial::protocol::ErrorCode::SpatialDisabled,
                 "spatial mode is not enabled"
             );
-        }
-        if (!g_state.pan(parsed.command->dx, parsed.command->dy)) {
+        case spatial::PanResult::OutOfRange:
             return spatial::protocol::errorJson(
                 spatial::protocol::ErrorCode::OutOfRange,
                 "camera pan would exceed the allowed range"
             );
+        case spatial::PanResult::ProjectionUnavailable:
+            return spatial::protocol::errorJson(
+                spatial::protocol::ErrorCode::InternalError,
+                "managed window projection is not currently safe"
+            );
         }
-        return spatial::protocol::cameraJson(g_state);
+        break;
     }
 
     return spatial::protocol::errorJson(

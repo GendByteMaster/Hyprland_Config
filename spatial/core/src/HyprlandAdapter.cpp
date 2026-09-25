@@ -1,8 +1,11 @@
 #include "spatial/HyprlandAdapter.hpp"
 
+#include "spatial/Projection.hpp"
+
 #include <hyprland/src/desktop/state/WindowState.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/event/EventBus.hpp>
+#include <hyprland/src/layout/target/Target.hpp>
 #include <hyprland/src/managers/fullscreen/FullscreenController.hpp>
 #include <hyprland/src/state/MonitorState.hpp>
 
@@ -11,6 +14,7 @@
 #include <iomanip>
 #include <limits>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 namespace spatial {
@@ -32,11 +36,17 @@ bool HyprlandAdapter::start(SpatialState& state) {
     windowClosed_ = Event::bus()->m_events.window.close.listen([this](PHLWINDOW window) {
         onWindowClosed(window);
     });
+    windowFloating_ = Event::bus()->m_events.window.floating.listen([this](PHLWINDOW window) {
+        onWindowEligibilityChanged(window);
+    });
+    windowFullscreen_ = Event::bus()->m_events.window.fullscreen.listen([this](PHLWINDOW window) {
+        onWindowEligibilityChanged(window);
+    });
     monitorLayoutChanged_ = Event::bus()->m_events.monitor.layoutChanged.listen([this] {
         onMonitorLayoutChanged();
     });
 
-    if (!windowOpened_ || !windowClosed_ || !monitorLayoutChanged_) {
+    if (!windowOpened_ || !windowClosed_ || !windowFloating_ || !windowFullscreen_ || !monitorLayoutChanged_) {
         stop();
         return false;
     }
@@ -45,9 +55,11 @@ bool HyprlandAdapter::start(SpatialState& state) {
 }
 
 void HyprlandAdapter::stop() noexcept {
-    disable();
+    deactivate(true);
 
     monitorLayoutChanged_.reset();
+    windowFullscreen_.reset();
+    windowFloating_.reset();
     windowClosed_.reset();
     windowOpened_.reset();
     state_ = nullptr;
@@ -68,27 +80,161 @@ bool HyprlandAdapter::enable() {
     }
 
     std::vector<ManagedWindow> windows;
+    std::vector<WindowBinding> bindings;
     windows.reserve(std::min<std::size_t>(Desktop::windowState()->windows().size(), SpatialState::kMaxManagedWindows));
+    bindings.reserve(SpatialState::kMaxManagedWindows);
 
     for (const auto& window : Desktop::windowState()->windows()) {
+        const auto compositorRect = currentCompositorRect(window);
         const auto managed = toManagedWindow(window, *desk);
-        if (!managed) {
+        if (!compositorRect || !managed) {
             continue;
         }
 
         if (windows.size() >= SpatialState::kMaxManagedWindows) {
             return false;
         }
+
         windows.push_back(*managed);
+        bindings.push_back(WindowBinding{
+            .id = managed->id,
+            .window = window,
+            .originalCompositorRect = *compositorRect,
+        });
     }
 
-    return state_->enable(*desk, std::move(windows));
+    if (!state_->enable(*desk, std::move(windows))) {
+        return false;
+    }
+
+    bindings_ = std::move(bindings);
+    return true;
 }
 
 void HyprlandAdapter::disable() noexcept {
-    if (state_ != nullptr) {
-        state_->disable();
+    deactivate(true);
+}
+
+PanResult HyprlandAdapter::pan(double dx, double dy) {
+    if (state_ == nullptr || !state_->enabled()) {
+        return PanResult::Disabled;
     }
+
+    pruneBindings();
+
+    if (!projectionReady()) {
+        return PanResult::ProjectionUnavailable;
+    }
+
+    if (!state_->pan(dx, dy)) {
+        return PanResult::OutOfRange;
+    }
+
+    applyProjection();
+    return PanResult::Success;
+}
+
+void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
+    if (state_ == nullptr || !state_->enabled()) {
+        bindings_.clear();
+        return;
+    }
+
+    if (restoreGeometry) {
+        restoreOriginalGeometry();
+    }
+
+    bindings_.clear();
+    state_->disable();
+}
+
+void HyprlandAdapter::restoreOriginalGeometry() noexcept {
+    for (const auto& binding : bindings_) {
+        const auto window = binding.window.lock();
+        if (!eligible(window)) {
+            continue;
+        }
+
+        (void)applyCompositorRect(window, binding.originalCompositorRect);
+    }
+}
+
+void HyprlandAdapter::pruneBindings() {
+    if (state_ == nullptr || !state_->enabled()) {
+        bindings_.clear();
+        return;
+    }
+
+    auto it = bindings_.begin();
+    while (it != bindings_.end()) {
+        const auto window = it->window.lock();
+        if (!eligible(window)) {
+            (void)state_->removeWindow(it->id);
+            it = bindings_.erase(it);
+            continue;
+        }
+
+        ++it;
+    }
+}
+
+bool HyprlandAdapter::projectionReady() const {
+    if (state_ == nullptr || !state_->enabled() || bindings_.size() != state_->windows().size()) {
+        return false;
+    }
+
+    for (const auto& binding : bindings_) {
+        const auto window = binding.window.lock();
+        if (!eligible(window) || !window->layoutTarget() || state_->findWindow(binding.id) == nullptr) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void HyprlandAdapter::applyProjection() noexcept {
+    if (state_ == nullptr || !state_->enabled()) {
+        return;
+    }
+
+    for (const auto& binding : bindings_) {
+        const auto window = binding.window.lock();
+        const auto* managed = state_->findWindow(binding.id);
+        if (!window || managed == nullptr) {
+            continue;
+        }
+
+        const auto projected = projectWorldRect(managed->world, state_->camera(), state_->desk());
+        (void)applyCompositorRect(window, projected);
+    }
+}
+
+bool HyprlandAdapter::applyCompositorRect(const PHLWINDOW& window, const Rect& rect) const noexcept {
+    if (!eligible(window) || !isValid(rect)) {
+        return false;
+    }
+
+    const auto target = window->layoutTarget();
+    if (!target) {
+        return false;
+    }
+
+    target->setPositionGlobal(
+        CBox{
+            Vector2D{rect.x, rect.y},
+            Vector2D{rect.width, rect.height},
+        },
+        Layout::TARGET_UPDATE_NO_CLIENT_CONFIGURE
+    );
+    target->warpPositionSize();
+    return true;
+}
+
+void HyprlandAdapter::dropBinding(std::string_view id) noexcept {
+    std::erase_if(bindings_, [&](const WindowBinding& binding) {
+        return binding.id == id;
+    });
 }
 
 std::optional<DeskRect> HyprlandAdapter::currentDesk() const {
@@ -132,6 +278,23 @@ std::optional<DeskRect> HyprlandAdapter::currentDesk() const {
     return desk;
 }
 
+std::optional<Rect> HyprlandAdapter::currentCompositorRect(const PHLWINDOW& window) const {
+    if (!eligible(window)) {
+        return std::nullopt;
+    }
+
+    const auto position = window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+    const auto size = window->size(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+    Rect rect{
+        .x = position.x,
+        .y = position.y,
+        .width = size.x,
+        .height = size.y,
+    };
+
+    return isValid(rect) ? std::optional<Rect>{rect} : std::nullopt;
+}
+
 bool HyprlandAdapter::eligible(const PHLWINDOW& window) const {
     if (!Desktop::View::validMapped(window) || !window->m_isFloating) {
         return false;
@@ -150,31 +313,24 @@ bool HyprlandAdapter::eligible(const PHLWINDOW& window) const {
 }
 
 std::optional<ManagedWindow> HyprlandAdapter::toManagedWindow(const PHLWINDOW& window, const DeskRect& desk) const {
-    if (state_ == nullptr || !eligible(window)) {
+    if (state_ == nullptr) {
         return std::nullopt;
     }
 
-    const auto compositorPosition = window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
-    const auto size = window->size(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+    const auto compositorRect = currentCompositorRect(window);
+    if (!compositorRect) {
+        return std::nullopt;
+    }
 
-    const Point deskPosition = compositorToDesk({compositorPosition.x, compositorPosition.y}, desk);
-    const Point worldPosition = state_->camera().deskToWorld(deskPosition);
+    const auto world = captureWorldRect(*compositorRect, state_->camera(), desk);
+    if (!isValid(world)) {
+        return std::nullopt;
+    }
 
-    ManagedWindow managed{
+    return ManagedWindow{
         .id = sessionWindowId(window),
-        .world = {
-            .x = worldPosition.x,
-            .y = worldPosition.y,
-            .width = size.x,
-            .height = size.y,
-        },
+        .world = world,
     };
-
-    if (!isValid(managed.world)) {
-        return std::nullopt;
-    }
-
-    return managed;
 }
 
 std::string HyprlandAdapter::sessionWindowId(const PHLWINDOW& window) {
@@ -188,12 +344,21 @@ void HyprlandAdapter::onWindowOpened(const PHLWINDOW& window) {
         return;
     }
 
+    const auto compositorRect = currentCompositorRect(window);
     const auto managed = toManagedWindow(window, state_->desk());
-    if (!managed) {
+    if (!compositorRect || !managed || state_->findWindow(managed->id) != nullptr) {
         return;
     }
 
-    (void)state_->addWindow(*managed);
+    if (!state_->addWindow(*managed)) {
+        return;
+    }
+
+    bindings_.push_back(WindowBinding{
+        .id = managed->id,
+        .window = window,
+        .originalCompositorRect = *compositorRect,
+    });
 }
 
 void HyprlandAdapter::onWindowClosed(const PHLWINDOW& window) {
@@ -201,7 +366,29 @@ void HyprlandAdapter::onWindowClosed(const PHLWINDOW& window) {
         return;
     }
 
-    (void)state_->removeWindow(sessionWindowId(window));
+    const auto id = sessionWindowId(window);
+    (void)state_->removeWindow(id);
+    dropBinding(id);
+}
+
+void HyprlandAdapter::onWindowEligibilityChanged(const PHLWINDOW& window) {
+    if (state_ == nullptr || !state_->enabled() || !window) {
+        return;
+    }
+
+    const auto id = sessionWindowId(window);
+
+    if (!eligible(window)) {
+        (void)state_->removeWindow(id);
+        dropBinding(id);
+        return;
+    }
+
+    if (state_->findWindow(id) != nullptr) {
+        return;
+    }
+
+    onWindowOpened(window);
 }
 
 void HyprlandAdapter::onMonitorLayoutChanged() {
@@ -209,10 +396,10 @@ void HyprlandAdapter::onMonitorLayoutChanged() {
         return;
     }
 
-    // Phase 1 deliberately fails closed on topology changes. A later phase may
-    // preserve an anchor across monitor reconfiguration once that behavior is
-    // covered by nested multi-monitor tests.
-    disable();
+    // Hyprland has already changed monitor topology at this point. Restoring
+    // pre-change compositor coordinates could place windows off-screen, so the
+    // safe Phase 1 behavior is to relinquish spatial ownership without restore.
+    deactivate(false);
 }
 
 } // namespace spatial

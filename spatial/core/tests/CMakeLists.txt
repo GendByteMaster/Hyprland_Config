@@ -17,3 +17,7 @@ add_test(NAME spatial_protocol_test COMMAND spatial_protocol_test)
 add_executable(spatial_command_test command_test.cpp)
 target_link_libraries(spatial_command_test PRIVATE spatial_core)
 add_test(NAME spatial_command_test COMMAND spatial_command_test)
+
+add_executable(spatial_projection_test projection_test.cpp)
+target_link_libraries(spatial_projection_test PRIVATE spatial_core)
+add_test(NAME spatial_projection_test COMMAND spatial_projection_test)

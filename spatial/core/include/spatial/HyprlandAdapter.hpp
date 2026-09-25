@@ -7,8 +7,16 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace spatial {
+
+enum class PanResult {
+    Success,
+    Disabled,
+    OutOfRange,
+    ProjectionUnavailable,
+};
 
 class HyprlandAdapter {
 public:
@@ -23,20 +31,40 @@ public:
 
     [[nodiscard]] bool enable();
     void disable() noexcept;
+    [[nodiscard]] PanResult pan(double dx, double dy);
 
 private:
+    struct WindowBinding {
+        SessionWindowId id;
+        PHLWINDOWREF window;
+        Rect originalCompositorRect;
+    };
+
     [[nodiscard]] std::optional<DeskRect> currentDesk() const;
+    [[nodiscard]] std::optional<Rect> currentCompositorRect(const PHLWINDOW& window) const;
     [[nodiscard]] std::optional<ManagedWindow> toManagedWindow(const PHLWINDOW& window, const DeskRect& desk) const;
     [[nodiscard]] bool eligible(const PHLWINDOW& window) const;
     [[nodiscard]] static std::string sessionWindowId(const PHLWINDOW& window);
 
+    void deactivate(bool restoreGeometry) noexcept;
+    void restoreOriginalGeometry() noexcept;
+    void pruneBindings();
+    [[nodiscard]] bool projectionReady() const;
+    void applyProjection() noexcept;
+    [[nodiscard]] bool applyCompositorRect(const PHLWINDOW& window, const Rect& rect) const noexcept;
+    void dropBinding(std::string_view id) noexcept;
+
     void onWindowOpened(const PHLWINDOW& window);
     void onWindowClosed(const PHLWINDOW& window);
+    void onWindowEligibilityChanged(const PHLWINDOW& window);
     void onMonitorLayoutChanged();
 
     SpatialState* state_ = nullptr;
+    std::vector<WindowBinding> bindings_;
     CHyprSignalListener windowOpened_;
     CHyprSignalListener windowClosed_;
+    CHyprSignalListener windowFloating_;
+    CHyprSignalListener windowFullscreen_;
     CHyprSignalListener monitorLayoutChanged_;
 };
 
