@@ -1,0 +1,31 @@
+name: Spatial Core
+
+on:
+  push:
+    branches:
+      - "feat/**"
+  pull_request:
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Configure pure spatial core
+        run: |
+          cmake -S spatial/core -B build/spatial-core \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSPATIAL_BUILD_PLUGIN=OFF \
+            -DSPATIAL_BUILD_TESTS=ON
+
+      - name: Build pure spatial core
+        run: cmake --build build/spatial-core --parallel 2
+
+      - name: Run spatial core tests
+        run: ctest --test-dir build/spatial-core --output-on-failure
