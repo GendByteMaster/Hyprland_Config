@@ -22,7 +22,8 @@ jobs:
             hyprland \
             foot \
             jq \
-            ttf-dejavu
+            ttf-dejavu \
+            weston
 
       - uses: actions/checkout@v4
 
