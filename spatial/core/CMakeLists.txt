@@ -10,6 +10,7 @@ add_library(spatial_core STATIC
     src/Protocol.cpp
     src/Command.cpp
     src/Projection.cpp
+    src/CameraMotion.cpp
 )
 
 target_include_directories(spatial_core PUBLIC include)
