@@ -15,6 +15,7 @@ local function plugin_api(hl)
   if type(api.toggle) ~= "function"
       or type(api.pan) ~= "function"
       or type(api.nudge) ~= "function"
+      or type(api.brake) ~= "function"
       or type(api.reset) ~= "function" then
     return nil
   end
@@ -116,18 +117,39 @@ function M.nudge(hl, xDirection, yDirection)
   return invoke(hl, "nudge", xDirection, yDirection)
 end
 
+function M.brake(hl)
+  return invoke(hl, "brake")
+end
+
 function M.reset(hl)
   return invoke(hl, "reset")
 end
 
-local function register_binding(hl, keys, callback, description, repeating)
+local function register_binding(hl, keys, callback, description)
   if type(hl.unbind) == "function" then
     hl.unbind(keys)
   end
 
   hl.bind(keys, callback, {
     description = description,
-    repeating = repeating == true,
+  })
+end
+
+local function register_motion_binding(hl, keys, xDirection, yDirection, description)
+  if type(hl.unbind) == "function" then
+    hl.unbind(keys)
+  end
+
+  hl.bind(keys, function()
+    M.nudge(hl, xDirection, yDirection)
+  end, {
+    description = description,
+  })
+
+  hl.bind(keys, function()
+    M.brake(hl)
+  end, {
+    release = true,
   })
 end
 
@@ -152,49 +174,13 @@ function M.register(hl, _o, options)
     function()
       M.toggle(hl)
     end,
-    "Toggle Spatial Desktop",
-    false
+    "Toggle Spatial Desktop"
   )
 
-  register_binding(
-    hl,
-    "SUPER + ALT + LEFT",
-    function()
-      M.nudge(hl, -1, 0)
-    end,
-    "Spatial Camera Left",
-    true
-  )
-
-  register_binding(
-    hl,
-    "SUPER + ALT + RIGHT",
-    function()
-      M.nudge(hl, 1, 0)
-    end,
-    "Spatial Camera Right",
-    true
-  )
-
-  register_binding(
-    hl,
-    "SUPER + ALT + UP",
-    function()
-      M.nudge(hl, 0, -1)
-    end,
-    "Spatial Camera Up",
-    true
-  )
-
-  register_binding(
-    hl,
-    "SUPER + ALT + DOWN",
-    function()
-      M.nudge(hl, 0, 1)
-    end,
-    "Spatial Camera Down",
-    true
-  )
+  register_motion_binding(hl, "SUPER + ALT + LEFT", -1, 0, "Spatial Camera Left")
+  register_motion_binding(hl, "SUPER + ALT + RIGHT", 1, 0, "Spatial Camera Right")
+  register_motion_binding(hl, "SUPER + ALT + UP", 0, -1, "Spatial Camera Up")
+  register_motion_binding(hl, "SUPER + ALT + DOWN", 0, 1, "Spatial Camera Down")
 
   register_binding(
     hl,
@@ -202,8 +188,7 @@ function M.register(hl, _o, options)
     function()
       M.reset(hl)
     end,
-    "Reset Spatial Camera",
-    false
+    "Reset Spatial Camera"
   )
 
   return true
