@@ -126,7 +126,7 @@ t.test("spatial bindings own only their explicit chords when plugin is available
 
   t.eq(registered, true)
   t.eq(#calls.unbinds, 6)
-  t.eq(#calls.binds, 6)
+  t.eq(#calls.binds, 10)
 
   t.eq(calls.binds[1].keys, "CTRL + SUPER + G")
   t.eq(calls.binds[2].keys, "SUPER + ALT + LEFT")
