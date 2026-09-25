@@ -42,6 +42,12 @@ local function fake_hyprland(with_plugin)
       }
     end
 
+    function hl.plugin.gendbyte_spatial.brake()
+      calls.plugin[#calls.plugin + 1] = {
+        name = "brake",
+      }
+    end
+
     function hl.plugin.gendbyte_spatial.reset()
       calls.plugin[#calls.plugin + 1] = {
         name = "reset",
@@ -110,7 +116,7 @@ t.test("spatial config keeps installed plugin declared when API is already avail
   t.eq(#calls.loads, 1)
   t.eq(calls.loads[1], "/tmp/gendbyte-spatial.so")
   t.eq(#calls.unbinds, 6)
-  t.eq(#calls.binds, 6)
+  t.eq(#calls.binds, 10)
 end)
 
 t.test("spatial bindings own only their explicit chords when plugin is available", function()
@@ -124,14 +130,20 @@ t.test("spatial bindings own only their explicit chords when plugin is available
 
   t.eq(calls.binds[1].keys, "CTRL + SUPER + G")
   t.eq(calls.binds[2].keys, "SUPER + ALT + LEFT")
-  t.eq(calls.binds[3].keys, "SUPER + ALT + RIGHT")
-  t.eq(calls.binds[4].keys, "SUPER + ALT + UP")
-  t.eq(calls.binds[5].keys, "SUPER + ALT + DOWN")
-  t.eq(calls.binds[6].keys, "SUPER + ALT + 0")
+  t.eq(calls.binds[3].keys, "SUPER + ALT + LEFT")
+  t.eq(calls.binds[4].keys, "SUPER + ALT + RIGHT")
+  t.eq(calls.binds[5].keys, "SUPER + ALT + RIGHT")
+  t.eq(calls.binds[6].keys, "SUPER + ALT + UP")
+  t.eq(calls.binds[7].keys, "SUPER + ALT + UP")
+  t.eq(calls.binds[8].keys, "SUPER + ALT + DOWN")
+  t.eq(calls.binds[9].keys, "SUPER + ALT + DOWN")
+  t.eq(calls.binds[10].keys, "SUPER + ALT + 0")
 
   t.eq(calls.binds[1].options.description, "Toggle Spatial Desktop")
-  t.eq(calls.binds[2].options.repeating, true)
-  t.eq(calls.binds[6].options.repeating, false)
+  t.eq(calls.binds[3].options.release, true)
+  t.eq(calls.binds[5].options.release, true)
+  t.eq(calls.binds[7].options.release, true)
+  t.eq(calls.binds[9].options.release, true)
 end)
 
 t.test("spatial binding callbacks call direct plugin Lua functions", function()
@@ -139,30 +151,34 @@ t.test("spatial binding callbacks call direct plugin Lua functions", function()
 
   spatial.register(hl, {}, INSTALLED_OPTIONS)
 
-  calls.binds[1].callback()
-  calls.binds[2].callback()
-  calls.binds[3].callback()
-  calls.binds[4].callback()
-  calls.binds[5].callback()
-  calls.binds[6].callback()
+  for index = 1, #calls.binds do
+    calls.binds[index].callback()
+  end
 
-  t.eq(#calls.plugin, 6)
+  t.eq(#calls.plugin, 10)
   t.eq(calls.plugin[1].name, "toggle")
 
   t.eq(calls.plugin[2].name, "nudge")
   t.eq(calls.plugin[2].dx, -1)
   t.eq(calls.plugin[2].dy, 0)
+  t.eq(calls.plugin[3].name, "brake")
 
-  t.eq(calls.plugin[3].dx, 1)
-  t.eq(calls.plugin[3].dy, 0)
+  t.eq(calls.plugin[4].name, "nudge")
+  t.eq(calls.plugin[4].dx, 1)
+  t.eq(calls.plugin[4].dy, 0)
+  t.eq(calls.plugin[5].name, "brake")
 
-  t.eq(calls.plugin[4].dx, 0)
-  t.eq(calls.plugin[4].dy, -1)
+  t.eq(calls.plugin[6].name, "nudge")
+  t.eq(calls.plugin[6].dx, 0)
+  t.eq(calls.plugin[6].dy, -1)
+  t.eq(calls.plugin[7].name, "brake")
 
-  t.eq(calls.plugin[5].dx, 0)
-  t.eq(calls.plugin[5].dy, 1)
+  t.eq(calls.plugin[8].name, "nudge")
+  t.eq(calls.plugin[8].dx, 0)
+  t.eq(calls.plugin[8].dy, 1)
+  t.eq(calls.plugin[9].name, "brake")
 
-  t.eq(calls.plugin[6].name, "reset")
+  t.eq(calls.plugin[10].name, "reset")
 end)
 
 t.test("spatial exact pan remains available for deterministic control", function()
@@ -186,6 +202,7 @@ t.test("spatial wrapper contains plugin callback failures", function()
         end,
         pan = function() end,
         nudge = function() end,
+        brake = function() end,
         reset = function() end,
       },
     },
