@@ -246,6 +246,19 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         throw std::runtime_error("gendbyte-spatial: failed to register Lua plugin functions");
     }
 
+    // Loading the optional plugin happens after the user Lua config has
+    // normally been evaluated. Queue one supported reload so spatial.lua
+    // can see hl.plugin.gendbyte_spatial and register its hotkeys.
+    if (!HyprlandAPI::reloadConfig()) {
+        unregisterLuaFunctions();
+        (void)HyprlandAPI::unregisterHyprCtlCommand(g_pluginHandle, g_hyprCtlCommand);
+        g_hyprCtlCommand.reset();
+        g_adapter.stop();
+        notifyFailure("failed to queue Lua config reload");
+        g_pluginHandle = nullptr;
+        throw std::runtime_error("gendbyte-spatial: failed to queue Lua config reload");
+    }
+
     return {
         "gendbyte-spatial",
         "Developer Spatial Desktop core for Hyprland",

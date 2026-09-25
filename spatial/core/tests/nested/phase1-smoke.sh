@@ -115,6 +115,28 @@ assert_contains() {
   fi
 }
 
+run_lua_eval() {
+  local code="$1"
+  local label="$2"
+  local output
+  local rc
+
+  set +e
+  output="$(hyprctl eval "$code" 2>&1)"
+  rc=$?
+  set -e
+
+  if [[ "$rc" -ne 0 ]]; then
+    echo "FAIL: $label" >&2
+    echo "Lua code: $code" >&2
+    echo "hyprctl exit: $rc" >&2
+    echo "hyprctl output: $output" >&2
+    return "$rc"
+  fi
+
+  printf '%s\n' "$output"
+}
+
 echo "== Hyprland =="
 hyprctl version
 
@@ -133,12 +155,12 @@ assert_contains "$status" '"enabled":false' "spatial starts disabled"
 
 echo
 echo "== Direct Lua toggle smoke =="
-lua_toggle_on="$(hyprctl eval 'hl.plugin.gendbyte_spatial.toggle()')"
+lua_toggle_on="$(run_lua_eval 'hl.plugin.gendbyte_spatial.toggle()' 'direct Lua toggle enable')"
 echo "$lua_toggle_on"
 status="$(hyprctl gendbyte-spatial status)"
 assert_contains "$status" '"enabled":true' "direct Lua toggle enables spatial mode"
 
-lua_toggle_off="$(hyprctl eval 'hl.plugin.gendbyte_spatial.toggle()')"
+lua_toggle_off="$(run_lua_eval 'hl.plugin.gendbyte_spatial.toggle()' 'direct Lua toggle disable')"
 echo "$lua_toggle_off"
 status="$(hyprctl gendbyte-spatial status)"
 assert_contains "$status" '"enabled":false' "direct Lua toggle disables spatial mode"
@@ -209,7 +231,7 @@ PAN_Y=0
 
 echo
 echo "== Direct Lua pan +${PAN_X},+${PAN_Y} =="
-lua_pan="$(hyprctl eval "hl.plugin.gendbyte_spatial.pan(${PAN_X}, ${PAN_Y})")"
+lua_pan="$(run_lua_eval "hl.plugin.gendbyte_spatial.pan(${PAN_X}, ${PAN_Y})" "direct Lua pan")"
 echo "$lua_pan"
 camera="$(hyprctl gendbyte-spatial camera)"
 echo "$camera"
@@ -245,7 +267,7 @@ sleep 5
 
 echo
 echo "== Direct Lua reset =="
-lua_reset="$(hyprctl eval 'hl.plugin.gendbyte_spatial.reset()')"
+lua_reset="$(run_lua_eval 'hl.plugin.gendbyte_spatial.reset()' 'direct Lua reset')"
 echo "$lua_reset"
 camera="$(hyprctl gendbyte-spatial camera)"
 echo "$camera"
