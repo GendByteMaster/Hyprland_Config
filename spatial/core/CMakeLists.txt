@@ -7,6 +7,7 @@ option(SPATIAL_BUILD_TESTS "Build pure spatial core tests" ON)
 add_library(spatial_core STATIC
     src/Camera.cpp
     src/SpatialState.cpp
+    src/Protocol.cpp
 )
 
 target_include_directories(spatial_core PUBLIC include)
