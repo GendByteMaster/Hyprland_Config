@@ -8,6 +8,7 @@ add_library(spatial_core STATIC
     src/Camera.cpp
     src/SpatialState.cpp
     src/Protocol.cpp
+    src/Command.cpp
 )
 
 target_include_directories(spatial_core PUBLIC include)

@@ -1,3 +1,5 @@
+#include "spatial/Command.hpp"
+#include "spatial/Protocol.hpp"
 #include "spatial/SpatialState.hpp"
 
 #include <hyprland/src/plugins/PluginAPI.hpp>
@@ -23,6 +25,49 @@ void notifyFailure(const std::string& message) {
     );
 }
 
+std::string handleHyprCtl(eHyprCtlOutputFormat, std::string request) {
+    const auto parsed = spatial::command::parse(request);
+    if (!parsed) {
+        return spatial::protocol::errorJson(parsed.error, parsed.message);
+    }
+
+    switch (parsed.command->kind) {
+    case spatial::command::Kind::Status:
+        return spatial::protocol::statusJson(g_state);
+    case spatial::command::Kind::Windows:
+        return spatial::protocol::windowsJson(g_state);
+    case spatial::command::Kind::Camera:
+        return spatial::protocol::cameraJson(g_state);
+    case spatial::command::Kind::Enable:
+        return spatial::protocol::errorJson(
+            spatial::protocol::ErrorCode::InternalError,
+            "spatial enable is gated until the monitor topology adapter is initialized"
+        );
+    case spatial::command::Kind::Disable:
+        g_state.disable();
+        return spatial::protocol::statusJson(g_state);
+    case spatial::command::Kind::Pan:
+        if (!g_state.enabled()) {
+            return spatial::protocol::errorJson(
+                spatial::protocol::ErrorCode::SpatialDisabled,
+                "spatial mode is not enabled"
+            );
+        }
+        if (!g_state.pan(parsed.command->dx, parsed.command->dy)) {
+            return spatial::protocol::errorJson(
+                spatial::protocol::ErrorCode::OutOfRange,
+                "camera pan would exceed the allowed range"
+            );
+        }
+        return spatial::protocol::cameraJson(g_state);
+    }
+
+    return spatial::protocol::errorJson(
+        spatial::protocol::ErrorCode::InternalError,
+        "unreachable command state"
+    );
+}
+
 } // namespace
 
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
@@ -42,6 +87,21 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     }
 
     g_state.disable();
+
+    const auto command = HyprlandAPI::registerHyprCtlCommand(
+        g_pluginHandle,
+        SHyprCtlCommand{
+            .name = "gendbyte-spatial",
+            .exact = false,
+            .fn = handleHyprCtl,
+        }
+    );
+
+    if (!command) {
+        notifyFailure("failed to register hyprctl command");
+        g_pluginHandle = nullptr;
+        throw std::runtime_error("gendbyte-spatial: failed to register hyprctl command");
+    }
 
     return {
         "gendbyte-spatial",

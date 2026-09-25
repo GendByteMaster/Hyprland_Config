@@ -13,3 +13,7 @@ add_test(NAME spatial_state_test COMMAND spatial_state_test)
 add_executable(spatial_protocol_test protocol_test.cpp)
 target_link_libraries(spatial_protocol_test PRIVATE spatial_core)
 add_test(NAME spatial_protocol_test COMMAND spatial_protocol_test)
+
+add_executable(spatial_command_test command_test.cpp)
+target_link_libraries(spatial_command_test PRIVATE spatial_core)
+add_test(NAME spatial_command_test COMMAND spatial_command_test)
