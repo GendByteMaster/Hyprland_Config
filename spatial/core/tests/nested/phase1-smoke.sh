@@ -128,6 +128,8 @@ fi
 echo
 echo "Visually verify that every managed floating window moved exactly -64 px horizontally and -32 px vertically."
 echo "World rectangles were also checked automatically and remained unchanged."
+echo "Holding the projected geometry for 2 seconds..."
+sleep 2
 
 echo
 echo "== Pan back =="
