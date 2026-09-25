@@ -45,3 +45,6 @@ jobs:
         run: |
           test -f build/spatial-plugin/gendbyte-spatial.so
           file build/spatial-plugin/gendbyte-spatial.so
+
+      - name: Parse nested smoke harness
+        run: bash -n spatial/core/tests/nested/phase1-smoke.sh
