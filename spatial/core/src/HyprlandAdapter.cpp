@@ -2,6 +2,10 @@
 
 #include "spatial/Projection.hpp"
 
+#include <hyprland/src/helpers/time/Time.hpp>
+#include <hyprland/src/managers/eventLoop/EventLoopManager.hpp>
+#include <hyprland/src/managers/eventLoop/EventLoopTimer.hpp>
+
 #include <hyprland/src/desktop/state/WindowState.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/event/EventBus.hpp>
@@ -18,6 +22,11 @@
 #include <vector>
 
 namespace spatial {
+namespace {
+
+constexpr auto kMotionTick = std::chrono::milliseconds(16);
+
+} // namespace
 
 HyprlandAdapter::~HyprlandAdapter() {
     stop();
@@ -56,6 +65,14 @@ bool HyprlandAdapter::start(SpatialState& state) {
 
 void HyprlandAdapter::stop() noexcept {
     deactivate(true);
+
+    if (motionTimer_) {
+        motionTimer_->cancel();
+        if (g_pEventLoopManager) {
+            g_pEventLoopManager->removeTimer(motionTimer_);
+        }
+        motionTimer_.reset();
+    }
 
     monitorLayoutChanged_.reset();
     windowFullscreen_.reset();
@@ -134,7 +151,81 @@ PanResult HyprlandAdapter::pan(double dx, double dy) {
     return PanResult::Success;
 }
 
+PanResult HyprlandAdapter::nudge(int xDirection, int yDirection) {
+    if (state_ == nullptr || !state_->enabled()) {
+        return PanResult::Disabled;
+    }
+
+    pruneBindings();
+    if (!projectionReady()) {
+        return PanResult::ProjectionUnavailable;
+    }
+
+    if (!motion_.nudge(xDirection, yDirection, Time::steadyNow())) {
+        return PanResult::OutOfRange;
+    }
+
+    if (!ensureMotionTimer()) {
+        motion_.stop();
+        return PanResult::ProjectionUnavailable;
+    }
+
+    motionTimer_->updateTimeout(std::chrono::milliseconds(1));
+    return PanResult::Success;
+}
+
+void HyprlandAdapter::cancelMotion() noexcept {
+    motion_.stop();
+    if (motionTimer_ && !motionTimer_->cancelled()) {
+        motionTimer_->updateTimeout(std::nullopt);
+    }
+}
+
+bool HyprlandAdapter::ensureMotionTimer() {
+    if (motionTimer_) {
+        return true;
+    }
+
+    if (!g_pEventLoopManager) {
+        return false;
+    }
+
+    motionTimer_ = makeShared<CEventLoopTimer>(
+        std::nullopt,
+        [this](SP<CEventLoopTimer>, void*) {
+            onMotionTick();
+        },
+        nullptr
+    );
+    g_pEventLoopManager->addTimer(motionTimer_);
+    return true;
+}
+
+void HyprlandAdapter::onMotionTick() {
+    if (state_ == nullptr || !state_->enabled() || !motion_.active()) {
+        cancelMotion();
+        return;
+    }
+
+    const auto frame = motion_.tick(Time::steadyNow());
+
+    if (frame.delta.x != 0.0 || frame.delta.y != 0.0) {
+        const auto result = pan(frame.delta.x, frame.delta.y);
+        if (result != PanResult::Success) {
+            cancelMotion();
+            return;
+        }
+    }
+
+    if (frame.active && motion_.active()) {
+        motionTimer_->updateTimeout(kMotionTick);
+    } else {
+        cancelMotion();
+    }
+}
+
 void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
+    cancelMotion();
     if (state_ == nullptr || !state_->enabled()) {
         bindings_.clear();
         return;

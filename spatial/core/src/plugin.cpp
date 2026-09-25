@@ -75,7 +75,19 @@ int luaPan(lua_State* L) {
 
     const double dx = static_cast<double>(luaL_checknumber(L, 1));
     const double dy = static_cast<double>(luaL_checknumber(L, 2));
+
+    g_adapter.cancelMotion();
     return luaPanError(L, g_adapter.pan(dx, dy));
+}
+
+int luaNudge(lua_State* L) {
+    if (lua_gettop(L) != 2) {
+        return luaL_error(L, "gendbyte-spatial.nudge: expected xDirection and yDirection");
+    }
+
+    const auto xDirection = static_cast<int>(luaL_checkinteger(L, 1));
+    const auto yDirection = static_cast<int>(luaL_checkinteger(L, 2));
+    return luaPanError(L, g_adapter.nudge(xDirection, yDirection));
 }
 
 int luaReset(lua_State* L) {
@@ -88,6 +100,7 @@ int luaReset(lua_State* L) {
     }
 
     const auto camera = g_state.camera().position();
+    g_adapter.cancelMotion();
     return luaPanError(L, g_adapter.pan(-camera.x, -camera.y));
 }
 
@@ -96,9 +109,10 @@ struct LuaFunctionRegistration {
     PLUGIN_LUA_FN function;
 };
 
-constexpr std::array<LuaFunctionRegistration, 3> kLuaFunctions{{
+constexpr std::array<LuaFunctionRegistration, 4> kLuaFunctions{{
     {"toggle", luaToggle},
     {"pan", luaPan},
+    {"nudge", luaNudge},
     {"reset", luaReset},
 }};
 
@@ -167,6 +181,7 @@ std::string handleHyprCtl(eHyprCtlOutputFormat, std::string request) {
         g_adapter.disable();
         return spatial::protocol::statusJson(g_state);
     case spatial::command::Kind::Pan:
+        g_adapter.cancelMotion();
         switch (g_adapter.pan(parsed.command->dx, parsed.command->dy)) {
         case spatial::PanResult::Success:
             return spatial::protocol::cameraJson(g_state);
@@ -250,7 +265,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         "gendbyte-spatial",
         "Developer Spatial Desktop core for Hyprland",
         "GendByteMaster",
-        "0.1.1-dev",
+        "0.2.0-dev",
     };
 }
 

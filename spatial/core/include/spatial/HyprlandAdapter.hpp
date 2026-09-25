@@ -1,5 +1,6 @@
 #pragma once
 
+#include "spatial/CameraMotion.hpp"
 #include "spatial/SpatialState.hpp"
 
 #include <hyprland/src/desktop/DesktopTypes.hpp>
@@ -8,6 +9,8 @@
 #include <optional>
 #include <string>
 #include <vector>
+
+class CEventLoopTimer;
 
 namespace spatial {
 
@@ -32,6 +35,8 @@ public:
     [[nodiscard]] bool enable();
     void disable() noexcept;
     [[nodiscard]] PanResult pan(double dx, double dy);
+    [[nodiscard]] PanResult nudge(int xDirection, int yDirection);
+    void cancelMotion() noexcept;
 
 private:
     struct WindowBinding {
@@ -54,6 +59,9 @@ private:
     [[nodiscard]] bool applyCompositorRect(const PHLWINDOW& window, const Rect& rect) const noexcept;
     void dropBinding(std::string_view id) noexcept;
 
+    [[nodiscard]] bool ensureMotionTimer();
+    void onMotionTick();
+
     void onWindowOpened(const PHLWINDOW& window);
     void onWindowClosed(const PHLWINDOW& window);
     void onWindowEligibilityChanged(const PHLWINDOW& window);
@@ -61,6 +69,8 @@ private:
 
     SpatialState* state_ = nullptr;
     std::vector<WindowBinding> bindings_;
+    CameraMotion motion_;
+    SP<CEventLoopTimer> motionTimer_;
     CHyprSignalListener windowOpened_;
     CHyprSignalListener windowClosed_;
     CHyprSignalListener windowFloating_;

@@ -1,6 +1,5 @@
 local M = {}
 
-local DEFAULT_STEP = 160
 local DEFAULT_INSTALL_RELATIVE = ".local/lib/gendbyte-spatial/gendbyte-spatial.so"
 
 local function plugin_api(hl)
@@ -15,6 +14,7 @@ local function plugin_api(hl)
 
   if type(api.toggle) ~= "function"
       or type(api.pan) ~= "function"
+      or type(api.nudge) ~= "function"
       or type(api.reset) ~= "function" then
     return nil
   end
@@ -112,6 +112,10 @@ function M.pan(hl, dx, dy)
   return invoke(hl, "pan", dx, dy)
 end
 
+function M.nudge(hl, xDirection, yDirection)
+  return invoke(hl, "nudge", xDirection, yDirection)
+end
+
 function M.reset(hl)
   return invoke(hl, "reset")
 end
@@ -142,9 +146,6 @@ function M.register(hl, _o, options)
     return false, declared and "gendbyte-spatial load scheduled" or declare_error
   end
 
-  local step = tonumber(options.step) or DEFAULT_STEP
-  assert(step > 0 and step < 1000000, "spatial pan step must be a positive bounded number")
-
   register_binding(
     hl,
     "CTRL + SUPER + G",
@@ -159,7 +160,7 @@ function M.register(hl, _o, options)
     hl,
     "SUPER + ALT + LEFT",
     function()
-      M.pan(hl, -step, 0)
+      M.nudge(hl, -1, 0)
     end,
     "Spatial Camera Left",
     true
@@ -169,7 +170,7 @@ function M.register(hl, _o, options)
     hl,
     "SUPER + ALT + RIGHT",
     function()
-      M.pan(hl, step, 0)
+      M.nudge(hl, 1, 0)
     end,
     "Spatial Camera Right",
     true
@@ -179,7 +180,7 @@ function M.register(hl, _o, options)
     hl,
     "SUPER + ALT + UP",
     function()
-      M.pan(hl, 0, -step)
+      M.nudge(hl, 0, -1)
     end,
     "Spatial Camera Up",
     true
@@ -189,7 +190,7 @@ function M.register(hl, _o, options)
     hl,
     "SUPER + ALT + DOWN",
     function()
-      M.pan(hl, 0, step)
+      M.nudge(hl, 0, 1)
     end,
     "Spatial Camera Down",
     true

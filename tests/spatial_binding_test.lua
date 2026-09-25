@@ -34,6 +34,14 @@ local function fake_hyprland(with_plugin)
       }
     end
 
+    function hl.plugin.gendbyte_spatial.nudge(xDirection, yDirection)
+      calls.plugin[#calls.plugin + 1] = {
+        name = "nudge",
+        dx = xDirection,
+        dy = yDirection,
+      }
+    end
+
     function hl.plugin.gendbyte_spatial.reset()
       calls.plugin[#calls.plugin + 1] = {
         name = "reset",
@@ -141,38 +149,32 @@ t.test("spatial binding callbacks call direct plugin Lua functions", function()
   t.eq(#calls.plugin, 6)
   t.eq(calls.plugin[1].name, "toggle")
 
-  t.eq(calls.plugin[2].name, "pan")
-  t.eq(calls.plugin[2].dx, -160)
+  t.eq(calls.plugin[2].name, "nudge")
+  t.eq(calls.plugin[2].dx, -1)
   t.eq(calls.plugin[2].dy, 0)
 
-  t.eq(calls.plugin[3].dx, 160)
+  t.eq(calls.plugin[3].dx, 1)
   t.eq(calls.plugin[3].dy, 0)
 
   t.eq(calls.plugin[4].dx, 0)
-  t.eq(calls.plugin[4].dy, -160)
+  t.eq(calls.plugin[4].dy, -1)
 
   t.eq(calls.plugin[5].dx, 0)
-  t.eq(calls.plugin[5].dy, 160)
+  t.eq(calls.plugin[5].dy, 1)
 
   t.eq(calls.plugin[6].name, "reset")
 end)
 
-t.test("spatial pan step is configurable", function()
+t.test("spatial exact pan remains available for deterministic control", function()
   local hl, calls = fake_hyprland(true)
 
-  spatial.register(hl, {}, {
-    plugin_path = INSTALLED_OPTIONS.plugin_path,
-    file_exists = INSTALLED_OPTIONS.file_exists,
-    step = 240,
-  })
+  local ok = spatial.pan(hl, 123, -45)
 
-  calls.binds[3].callback()
-  calls.binds[5].callback()
-
-  t.eq(calls.plugin[1].dx, 240)
-  t.eq(calls.plugin[1].dy, 0)
-  t.eq(calls.plugin[2].dx, 0)
-  t.eq(calls.plugin[2].dy, 240)
+  t.eq(ok, true)
+  t.eq(#calls.plugin, 1)
+  t.eq(calls.plugin[1].name, "pan")
+  t.eq(calls.plugin[1].dx, 123)
+  t.eq(calls.plugin[1].dy, -45)
 end)
 
 t.test("spatial wrapper contains plugin callback failures", function()
@@ -183,6 +185,7 @@ t.test("spatial wrapper contains plugin callback failures", function()
           error("simulated plugin error")
         end,
         pan = function() end,
+        nudge = function() end,
         reset = function() end,
       },
     },
