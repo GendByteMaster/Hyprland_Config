@@ -1,0 +1,7 @@
+add_executable(spatial_geometry_test geometry_test.cpp)
+target_link_libraries(spatial_geometry_test PRIVATE spatial_core)
+add_test(NAME spatial_geometry_test COMMAND spatial_geometry_test)
+
+add_executable(spatial_camera_test camera_test.cpp)
+target_link_libraries(spatial_camera_test PRIVATE spatial_core)
+add_test(NAME spatial_camera_test COMMAND spatial_camera_test)
