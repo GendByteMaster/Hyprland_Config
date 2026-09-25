@@ -5,7 +5,7 @@ BRANCH="feat/issue-24-developer-spatial-desktop"
 BUILD_DIR="build/spatial-plugin"
 PLUGIN="$BUILD_DIR/gendbyte-spatial.so"
 INSTALL_DIR="$HOME/.local/lib/gendbyte-spatial"
-INSTALLED_PLUGIN="$INSTALL_DIR/gendbyte-spatial.so"
+CURRENT_PATH_FILE="$INSTALL_DIR/current-path"
 
 die() {
   echo "ERROR: $*" >&2
@@ -16,6 +16,7 @@ command -v git >/dev/null || die "git not found"
 command -v cmake >/dev/null || die "cmake not found"
 command -v hyprctl >/dev/null || die "hyprctl not found"
 command -v install >/dev/null || die "install not found"
+command -v sha256sum >/dev/null || die "sha256sum not found"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Run this inside the Hyprland_Config repository"
 cd "$ROOT"
@@ -44,19 +45,30 @@ echo "== Native tests =="
 ctest --test-dir "$BUILD_DIR" --output-on-failure
 
 echo
-echo "== Remove old loaded copies =="
-hyprctl gendbyte-spatial disable >/dev/null 2>&1 || true
-hyprctl plugin unload "$ROOT/$PLUGIN" >/dev/null 2>&1 || true
-hyprctl plugin unload "$INSTALLED_PLUGIN" >/dev/null 2>&1 || true
+echo "== Install versioned user plugin =="
+PLUGIN_HASH="$(sha256sum "$PLUGIN" | awk '{print substr($1, 1, 16)}')"
+INSTALLED_PLUGIN="$INSTALL_DIR/gendbyte-spatial-$PLUGIN_HASH.so"
 
-echo
-echo "== Install stable user plugin =="
 install -Dm755 "$PLUGIN" "$INSTALLED_PLUGIN"
-echo "$INSTALLED_PLUGIN"
+mkdir -p "$INSTALL_DIR"
+
+tmp_pointer="$CURRENT_PATH_FILE.tmp.$"
+printf '%s\n' "$INSTALLED_PLUGIN" >"$tmp_pointer"
+mv -f "$tmp_pointer" "$CURRENT_PATH_FILE"
+
+echo "installed: $INSTALLED_PLUGIN"
+echo "pointer:   $CURRENT_PATH_FILE"
 
 echo
 echo "== Reload Lua config =="
-echo "spatial.lua declares: $INSTALLED_PLUGIN"
+echo "spatial.lua declares versioned plugin: $INSTALLED_PLUGIN"
+
+# Do NOT manually unload a config-managed plugin here.
+# Hyprland 0.56.2 caches the last config plugin path list. A manual unload
+# followed by the same config path can leave the plugin unloaded because
+# updateConfigPlugins() returns early when the path list is unchanged.
+# The versioned path above intentionally changes when the .so content changes,
+# so config reconciliation unloads the old build and loads this one.
 hyprctl reload
 
 echo
@@ -74,6 +86,12 @@ done
   echo
   echo "== Config errors after failed plugin load =="
   hyprctl configerrors || true
+  echo
+  echo "current pointer:"
+  cat "$CURRENT_PATH_FILE" 2>/dev/null || true
+  echo
+  echo "plugin list:"
+  hyprctl plugin list || true
   die "gendbyte-spatial was not loaded by Lua config from $INSTALLED_PLUGIN"
 }
 
@@ -134,7 +152,7 @@ printf '%s\n' "$status_off"
 
 echo
 echo "=============================================="
-echo "Spatial plugin is installed and config-managed."
+echo "Spatial plugin is versioned, installed, and config-managed."
 echo "Lua API: OK"
 echo "Spatial bindings: OK"
 echo

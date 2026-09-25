@@ -77,6 +77,28 @@ local INSTALLED_OPTIONS = {
   end,
 }
 
+t.test("spatial plugin resolver prefers current-path pointer", function()
+  local path = spatial.plugin_path({
+    read_path = function(pointer)
+      t.truthy(pointer:find("/.local/lib/gendbyte-spatial/current-path", 1, true) ~= nil)
+      return "/tmp/gendbyte-spatial-deadbeef.so"
+    end,
+  })
+
+  t.eq(path, "/tmp/gendbyte-spatial-deadbeef.so")
+end)
+
+t.test("spatial plugin resolver rejects relative pointer entries", function()
+  local path = spatial.plugin_path({
+    read_path = function()
+      return "relative/gendbyte-spatial.so"
+    end,
+  })
+
+  local home = os.getenv("HOME")
+  t.eq(path, home .. "/.local/lib/gendbyte-spatial/gendbyte-spatial.so")
+end)
+
 t.test("spatial bindings preserve normal Hyprland when plugin install is unavailable", function()
   local hl, calls = fake_hyprland(false)
 

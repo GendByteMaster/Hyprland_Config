@@ -1,6 +1,8 @@
 local M = {}
 
-local DEFAULT_INSTALL_RELATIVE = ".local/lib/gendbyte-spatial/gendbyte-spatial.so"
+local DEFAULT_INSTALL_RELATIVE = ".local/lib/gendbyte-spatial"
+local CURRENT_PATH_FILENAME = "current-path"
+local LEGACY_PLUGIN_FILENAME = "gendbyte-spatial.so"
 
 local function plugin_api(hl)
   if type(hl) ~= "table" or type(hl.plugin) ~= "table" then
@@ -33,6 +35,22 @@ local function file_exists(path)
   return true
 end
 
+local function read_first_line(path)
+  local file = io.open(path, "r")
+  if not file then
+    return nil
+  end
+
+  local line = file:read("*l")
+  file:close()
+
+  if type(line) ~= "string" or line == "" then
+    return nil
+  end
+
+  return line
+end
+
 local function resolve_plugin_path(options)
   options = options or {}
 
@@ -50,7 +68,19 @@ local function resolve_plugin_path(options)
     return nil
   end
 
-  return home .. "/" .. DEFAULT_INSTALL_RELATIVE
+  local install_dir = home .. "/" .. DEFAULT_INSTALL_RELATIVE
+  local pointer_file = install_dir .. "/" .. CURRENT_PATH_FILENAME
+
+  local read_path = options.read_path or read_first_line
+  if type(read_path) == "function" then
+    local current = read_path(pointer_file)
+    if type(current) == "string" and current:sub(1, 1) == "/" then
+      return current
+    end
+  end
+
+  -- Migration fallback for installs created before versioned plugin paths.
+  return install_dir .. "/" .. LEGACY_PLUGIN_FILENAME
 end
 
 local function declare_plugin(hl, options)
