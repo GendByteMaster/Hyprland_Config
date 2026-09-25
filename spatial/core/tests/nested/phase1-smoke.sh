@@ -88,9 +88,27 @@ enabled="$(hyprctl gendbyte-spatial enable)"
 echo "$enabled"
 assert_contains "$enabled" '"enabled":true' "spatial enable"
 
+managed_count="$(printf '%s\n' "$enabled" | sed -n 's/.*"managed_window_count":\([0-9][0-9]*\).*/\1/p')"
+if [[ -z "$managed_count" || "$managed_count" -lt 1 ]]; then
+  cat >&2 <<'EOF'
+FAIL: spatial mode enabled with zero managed windows.
+
+Task 7 projection cannot be validated without at least one eligible window.
+Before rerunning this smoke test, open a normal window and make it floating
+on the currently visible workspace. Tiled and fullscreen windows are
+intentionally excluded by the Phase 1 eligibility policy.
+EOF
+  exit 1
+fi
+
 echo
 echo "== Managed windows =="
-hyprctl gendbyte-spatial windows
+windows_before="$(hyprctl gendbyte-spatial windows)"
+echo "$windows_before"
+
+normalize_windows() {
+  printf '%s\n' "$1" | sed -E 's/"epoch":[0-9]+,//'
+}
 
 echo
 echo "== Pan +64,+32 =="
@@ -99,9 +117,17 @@ echo "$camera"
 assert_contains "$camera" '"x":64' "camera x after positive pan"
 assert_contains "$camera" '"y":32' "camera y after positive pan"
 
+windows_after_pan="$(hyprctl gendbyte-spatial windows)"
+if [[ "$(normalize_windows "$windows_before")" != "$(normalize_windows "$windows_after_pan")" ]]; then
+  echo "FAIL: managed world rectangles changed after camera pan" >&2
+  echo "before: $windows_before" >&2
+  echo "after:  $windows_after_pan" >&2
+  exit 1
+fi
+
 echo
 echo "Visually verify that every managed floating window moved exactly -64 px horizontally and -32 px vertically."
-echo "World coordinates reported by 'gendbyte-spatial windows' must remain unchanged."
+echo "World rectangles were also checked automatically and remained unchanged."
 
 echo
 echo "== Pan back =="
@@ -130,5 +156,6 @@ loaded=0
 trap - EXIT INT TERM
 
 echo
-echo "PASS: command/lifecycle smoke sequence completed."
-echo "NOTE: visual geometry correctness and compositor stability still require human observation in the nested session."
+echo "PASS: command/lifecycle smoke sequence completed with $managed_count managed window(s)."
+echo "PASS: managed world rectangles remained unchanged across camera pan."
+echo "NOTE: visual geometry correctness, focus/pointer behavior, and compositor stability still require human observation in the nested session."
