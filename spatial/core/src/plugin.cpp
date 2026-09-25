@@ -1,4 +1,5 @@
 #include "spatial/Command.hpp"
+#include "spatial/HyprlandAdapter.hpp"
 #include "spatial/Protocol.hpp"
 #include "spatial/SpatialState.hpp"
 
@@ -11,6 +12,7 @@ namespace {
 
 HANDLE g_pluginHandle = nullptr;
 spatial::SpatialState g_state;
+spatial::HyprlandAdapter g_adapter;
 
 void notifyFailure(const std::string& message) {
     if (g_pluginHandle == nullptr) {
@@ -39,12 +41,15 @@ std::string handleHyprCtl(eHyprCtlOutputFormat, std::string request) {
     case spatial::command::Kind::Camera:
         return spatial::protocol::cameraJson(g_state);
     case spatial::command::Kind::Enable:
-        return spatial::protocol::errorJson(
-            spatial::protocol::ErrorCode::InternalError,
-            "spatial enable is gated until the monitor topology adapter is initialized"
-        );
+        if (!g_adapter.enable()) {
+            return spatial::protocol::errorJson(
+                spatial::protocol::ErrorCode::InternalError,
+                "failed to initialize spatial desk/window snapshot"
+            );
+        }
+        return spatial::protocol::statusJson(g_state);
     case spatial::command::Kind::Disable:
-        g_state.disable();
+        g_adapter.disable();
         return spatial::protocol::statusJson(g_state);
     case spatial::command::Kind::Pan:
         if (!g_state.enabled()) {
@@ -88,6 +93,12 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     g_state.disable();
 
+    if (!g_adapter.start(g_state)) {
+        notifyFailure("failed to register Hyprland lifecycle listeners");
+        g_pluginHandle = nullptr;
+        throw std::runtime_error("gendbyte-spatial: failed to initialize Hyprland adapter");
+    }
+
     const auto command = HyprlandAPI::registerHyprCtlCommand(
         g_pluginHandle,
         SHyprCtlCommand{
@@ -98,6 +109,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     );
 
     if (!command) {
+        g_adapter.stop();
         notifyFailure("failed to register hyprctl command");
         g_pluginHandle = nullptr;
         throw std::runtime_error("gendbyte-spatial: failed to register hyprctl command");
@@ -112,6 +124,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
+    g_adapter.stop();
     g_state.disable();
     g_pluginHandle = nullptr;
 }

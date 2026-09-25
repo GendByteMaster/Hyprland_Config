@@ -48,4 +48,18 @@ struct DeskRect {
     return isFinite(desk.minX) && isFinite(desk.minY) && isFinite(desk.maxX) && isFinite(desk.maxY) && desk.maxX >= desk.minX && desk.maxY >= desk.minY;
 }
 
+[[nodiscard]] inline Point compositorToDesk(Point compositor, DeskRect desk) noexcept {
+    return {
+        compositor.x - desk.minX,
+        compositor.y - desk.minY,
+    };
+}
+
+[[nodiscard]] inline Point deskToCompositor(Point deskPoint, DeskRect desk) noexcept {
+    return {
+        deskPoint.x + desk.minX,
+        deskPoint.y + desk.minY,
+    };
+}
+
 } // namespace spatial

@@ -1,6 +1,7 @@
 #include "spatial/SpatialState.hpp"
 
 #include <algorithm>
+#include <unordered_set>
 #include <utility>
 
 namespace spatial {
@@ -38,6 +39,19 @@ bool SpatialState::enable(DeskRect desk) noexcept {
     return true;
 }
 
+bool SpatialState::enable(DeskRect desk, std::vector<ManagedWindow> windows) {
+    if (enabled_ || !isValid(desk) || !validWindowSet(windows)) {
+        return false;
+    }
+
+    enabled_ = true;
+    desk_ = desk;
+    camera_ = Camera{};
+    windows_ = std::move(windows);
+    ++epoch_;
+    return true;
+}
+
 void SpatialState::disable() noexcept {
     if (!enabled_) {
         return;
@@ -52,6 +66,23 @@ void SpatialState::disable() noexcept {
 
 bool SpatialState::validWindow(const ManagedWindow& window) noexcept {
     return !window.id.empty() && window.id.size() <= kMaxWindowIdLength && isValid(window.world);
+}
+
+bool SpatialState::validWindowSet(const std::vector<ManagedWindow>& windows) {
+    if (windows.size() > kMaxManagedWindows) {
+        return false;
+    }
+
+    std::unordered_set<std::string_view> ids;
+    ids.reserve(windows.size());
+
+    for (const auto& window : windows) {
+        if (!validWindow(window) || !ids.emplace(window.id).second) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool SpatialState::addWindow(ManagedWindow window) {

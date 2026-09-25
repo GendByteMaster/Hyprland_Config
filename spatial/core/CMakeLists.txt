@@ -35,7 +35,10 @@ if(SPATIAL_BUILD_PLUGIN)
         xkbcommon
     )
 
-    add_library(gendbyte-spatial SHARED src/plugin.cpp)
+    add_library(gendbyte-spatial SHARED
+        src/plugin.cpp
+        src/HyprlandAdapter.cpp
+    )
     target_link_libraries(gendbyte-spatial PRIVATE spatial_core rt PkgConfig::hyprland_deps)
     target_compile_features(gendbyte-spatial PRIVATE cxx_std_23)
     target_compile_options(gendbyte-spatial PRIVATE -Wall -Wextra -Wpedantic)

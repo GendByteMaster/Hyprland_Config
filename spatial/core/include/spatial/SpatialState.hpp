@@ -31,6 +31,7 @@ public:
     [[nodiscard]] const DeskRect& desk() const noexcept;
 
     [[nodiscard]] bool enable(DeskRect desk) noexcept;
+    [[nodiscard]] bool enable(DeskRect desk, std::vector<ManagedWindow> windows);
     void disable() noexcept;
 
     [[nodiscard]] bool addWindow(ManagedWindow window);
@@ -43,6 +44,7 @@ public:
 
 private:
     [[nodiscard]] static bool validWindow(const ManagedWindow& window) noexcept;
+    [[nodiscard]] static bool validWindowSet(const std::vector<ManagedWindow>& windows);
 
     bool enabled_ = false;
     std::uint64_t epoch_ = 0;

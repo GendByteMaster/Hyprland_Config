@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -73,6 +74,23 @@ int main() {
     const auto epochAfterDisable = state.epoch();
     state.disable();
     require(state.epoch() == epochAfterDisable, "repeated disable is idempotent");
+
+    spatial::SpatialState transactional;
+    std::vector<spatial::ManagedWindow> initial{
+        {"a", {10.0, 20.0, 100.0, 100.0}},
+        {"b", {120.0, 20.0, 100.0, 100.0}},
+    };
+    require(transactional.enable(desk, initial), "transactional enable accepts a valid initial window set");
+    require(transactional.epoch() == 1, "transactional enable increments epoch once");
+    require(transactional.windows().size() == 2, "transactional enable commits all windows together");
+
+    spatial::SpatialState duplicateSet;
+    require(!duplicateSet.enable(desk, {
+        {"dup", {0.0, 0.0, 1.0, 1.0}},
+        {"dup", {2.0, 0.0, 1.0, 1.0}},
+    }), "transactional enable rejects duplicate IDs");
+    require(!duplicateSet.enabled(), "failed transactional enable leaves state disabled");
+    require(duplicateSet.epoch() == 0, "failed transactional enable does not advance epoch");
 
     std::cout << "state_test: PASS\n";
     return 0;
