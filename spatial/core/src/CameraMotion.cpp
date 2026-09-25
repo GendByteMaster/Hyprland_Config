@@ -41,10 +41,14 @@ bool CameraMotion::nudge(int xDirection, int yDirection, TimePoint now) noexcept
         active_ = true;
     }
 
+    held_ = true;
     xDirection_ = xDirection;
     yDirection_ = yDirection;
-    lastInput_ = now;
     return true;
+}
+
+void CameraMotion::release() noexcept {
+    held_ = false;
 }
 
 MotionFrame CameraMotion::tick(TimePoint now) noexcept {
@@ -61,12 +65,11 @@ MotionFrame CameraMotion::tick(TimePoint now) noexcept {
     lastTick_ = now;
 
     const double dt = std::chrono::duration<double>(elapsed).count();
-    const bool inputFresh = (now - lastInput_) <= kInputGrace;
 
     Point target{};
     double rate = kDeceleration;
 
-    if (inputFresh) {
+    if (held_) {
         const auto direction = normalizedDirection(xDirection_, yDirection_);
         target = {
             direction.x * kMaxSpeed,
@@ -79,7 +82,7 @@ MotionFrame CameraMotion::tick(TimePoint now) noexcept {
     velocity_.x = approach(velocity_.x, target.x, maxDelta);
     velocity_.y = approach(velocity_.y, target.y, maxDelta);
 
-    if (!inputFresh
+    if (!held_
         && std::abs(velocity_.x) <= kStopVelocity
         && std::abs(velocity_.y) <= kStopVelocity) {
         stop();
@@ -98,15 +101,19 @@ MotionFrame CameraMotion::tick(TimePoint now) noexcept {
 
 void CameraMotion::stop() noexcept {
     active_ = false;
+    held_ = false;
     xDirection_ = 0;
     yDirection_ = 0;
     velocity_ = {};
-    lastInput_ = {};
     lastTick_ = {};
 }
 
 bool CameraMotion::active() const noexcept {
     return active_;
+}
+
+bool CameraMotion::held() const noexcept {
+    return held_;
 }
 
 Point CameraMotion::velocity() const noexcept {
