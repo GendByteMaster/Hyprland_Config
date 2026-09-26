@@ -170,6 +170,29 @@ bool SpatialState::setZoom(double value) noexcept {
     return true;
 }
 
+bool SpatialState::resetCamera() noexcept {
+    if (!enabled_) {
+        return false;
+    }
+
+    const auto before = camera_.position();
+    const auto zoom = camera_.zoom();
+    const Point deskCenter{desk_.width() / 2.0, desk_.height() / 2.0};
+    const Point initialCenteredPosition{
+        deskCenter.x - deskCenter.x / zoom,
+        deskCenter.y - deskCenter.y / zoom,
+    };
+
+    if (!camera_.setPosition(initialCenteredPosition)) {
+        return false;
+    }
+
+    if (camera_.position() != before) {
+        ++epoch_;
+    }
+    return true;
+}
+
 std::span<const ManagedWindow> SpatialState::windows() const noexcept {
     return windows_;
 }
