@@ -224,13 +224,13 @@ function M.register(hl, o, options)
   local declared, declare_error = declare_plugin(hl, options)
 
   -- Super+Tab has exactly one owner from the very first config pass. Reserve
-  -- it even while the plugin API is still loading so the legacy overview can
+  -- it only while the plugin API is still loading so the legacy overview can
   -- never race Spatial and create two overlapping overview surfaces.
-  if type(hl.unbind) == "function" then
-    hl.unbind("SUPER + TAB")
-  end
-
   if not M.available(hl) then
+    if type(hl.unbind) == "function" then
+      hl.unbind("SUPER + TAB")
+    end
+
     if declared then
       hl.bind("SUPER + TAB", function()
         -- During the tiny plugin-load window this is intentionally a no-op.
