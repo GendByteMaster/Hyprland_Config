@@ -253,7 +253,7 @@ function M.register(hl, _o, options)
 
   register_binding(
     hl,
-    "F12",
+    "SUPER + F12",
     toggle_and_sync,
     "Toggle Spatial Desktop (Try Omarchy)"
   )
