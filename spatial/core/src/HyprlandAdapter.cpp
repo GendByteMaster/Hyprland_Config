@@ -6,6 +6,7 @@
 #include <hyprland/src/managers/eventLoop/EventLoopManager.hpp>
 #include <hyprland/src/managers/eventLoop/EventLoopTimer.hpp>
 
+#include <hyprland/src/desktop/state/FocusState.hpp>
 #include <hyprland/src/desktop/state/GlobalWindowController.hpp>
 #include <hyprland/src/desktop/state/WindowState.hpp>
 #include <hyprland/src/desktop/Workspace.hpp>
@@ -14,6 +15,8 @@
 #include <hyprland/src/layout/space/Space.hpp>
 #include <hyprland/src/layout/target/Target.hpp>
 #include <hyprland/src/managers/fullscreen/FullscreenController.hpp>
+#include <hyprland/src/managers/input/InputManager.hpp>
+#include <hyprland/src/output/Monitor.hpp>
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/state/MonitorState.hpp>
 #include <hyprland/src/state/WorkspaceState.hpp>
@@ -213,6 +216,72 @@ PanResult HyprlandAdapter::resetCamera() {
 
     applyProjection();
     return PanResult::Success;
+}
+
+bool HyprlandAdapter::selectAtPointer() {
+    if (state_ == nullptr || !state_->enabled() || !g_pInputManager) {
+        return false;
+    }
+
+    pruneBindings();
+    if (!projectionReady()) {
+        return false;
+    }
+
+    const auto pointer = g_pInputManager->getMouseCoordsInternal();
+    PHLWINDOW selected;
+
+    // bindings_ follows Hyprland's window-state order. Search it backwards so
+    // overlapping floating windows behave like a normal top-most click.
+    for (auto it = bindings_.rbegin(); it != bindings_.rend(); ++it) {
+        const auto window = it->window.lock();
+        const auto* managed = state_->findWindow(it->id);
+        if (!Desktop::View::validMapped(window) || managed == nullptr) {
+            continue;
+        }
+
+        const auto projected = projectWorldRect(managed->world, state_->camera(), state_->desk());
+        if (!isValid(projected)) {
+            continue;
+        }
+
+        const bool inside = pointer.x >= projected.x
+            && pointer.y >= projected.y
+            && pointer.x < projected.x + projected.width
+            && pointer.y < projected.y + projected.height;
+        if (inside) {
+            selected = window;
+            break;
+        }
+    }
+
+    if (!selected || !selected->m_workspace) {
+        return false;
+    }
+
+    const auto workspace = selected->m_workspace;
+    const auto monitor = selected->m_monitor.lock();
+    if (!monitor) {
+        return false;
+    }
+
+    // Keep a strong reference to the selected window while restoring the
+    // entire canvas. Windows never leave their original workspace/layout tree,
+    // so the transition back to normal mode is lossless.
+    cancelMotion();
+    deactivate(true);
+
+    if (!Desktop::View::validMapped(selected) || !workspace || !monitor) {
+        return false;
+    }
+
+    if (monitor->m_activeWorkspace != workspace) {
+        monitor->changeWorkspace(workspace, false, true, true);
+    }
+
+    Desktop::focusState()->fullWindowFocus(selected, Desktop::FOCUS_REASON_CLICK);
+    g_pHyprRenderer->damageMonitor(monitor);
+    return true;
 }
 
 PanResult HyprlandAdapter::nudge(int xDirection, int yDirection) {
