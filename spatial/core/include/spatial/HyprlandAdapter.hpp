@@ -6,6 +6,7 @@
 #include <hyprland/src/desktop/DesktopTypes.hpp>
 #include <hyprland/src/helpers/signal/Signal.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
