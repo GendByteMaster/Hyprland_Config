@@ -6,6 +6,8 @@ BUILD_DIR="build/spatial-plugin"
 PLUGIN="$BUILD_DIR/gendbyte-spatial.so"
 INSTALL_DIR="$HOME/.local/lib/gendbyte-spatial"
 CURRENT_PATH_FILE="$INSTALL_DIR/current-path"
+MIN_FREE_KB=262144
+MIN_FREE_INODES=2048
 
 die() {
   echo "ERROR: $*" >&2
@@ -17,6 +19,7 @@ command -v cmake >/dev/null || die "cmake not found"
 command -v hyprctl >/dev/null || die "hyprctl not found"
 command -v install >/dev/null || die "install not found"
 command -v sha256sum >/dev/null || die "sha256sum not found"
+command -v df >/dev/null || die "df not found"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Run this inside the Hyprland_Config repository"
 cd "$ROOT"
@@ -30,13 +33,61 @@ git switch "$BRANCH"
 git pull --ff-only
 
 echo
+echo "== Disk preflight =="
+
+# Keep only the currently referenced installed plugin before rebuilding.
+# Old content-addressed builds are safe to remove and can accumulate quickly
+# on the small Try Omarchy virtual disk.
+if [[ -d "$INSTALL_DIR" ]]; then
+  current_plugin="$(cat "$CURRENT_PATH_FILE" 2>/dev/null || true)"
+  while IFS= read -r -d '' old_plugin; do
+    if [[ -n "$current_plugin" && "$old_plugin" == "$current_plugin" ]]; then
+      continue
+    fi
+    rm -f -- "$old_plugin"
+  done < <(find "$INSTALL_DIR" -maxdepth 1 -type f -name 'gendbyte-spatial-*.so' -print0 2>/dev/null || true)
+fi
+
+# A clean Release build uses much less disk than accumulated RelWithDebInfo
+# objects and avoids linker failures on the small Try Omarchy filesystem.
+rm -rf -- "$BUILD_DIR"
+
+df -h "$ROOT" || true
+df -ih "$ROOT" || true
+
+free_kb="$(df -Pk "$ROOT" | awk 'NR == 2 { print $4 }')"
+free_inodes="$(df -Pi "$ROOT" | awk 'NR == 2 { print $4 }')"
+
+if [[ -z "$free_kb" || ! "$free_kb" =~ ^[0-9]+$ ]]; then
+  die "Could not determine free disk space"
+fi
+
+if [[ -z "$free_inodes" || ! "$free_inodes" =~ ^[0-9]+$ ]]; then
+  die "Could not determine free inode count"
+fi
+
+if (( free_kb < MIN_FREE_KB || free_inodes < MIN_FREE_INODES )); then
+  echo >&2
+  echo "Spatial build needs more free filesystem capacity." >&2
+  echo "Available: $((free_kb / 1024)) MiB and $free_inodes inodes." >&2
+  echo "Required preflight minimum: $((MIN_FREE_KB / 1024)) MiB and $MIN_FREE_INODES inodes." >&2
+  echo >&2
+  echo "Largest user directories:" >&2
+  du -xhd1 "$HOME" 2>/dev/null | sort -h | tail -n 12 >&2 || true
+  echo >&2
+  echo "Free some disk space, then rerun this script." >&2
+  echo "The Spatial build directory has already been cleaned safely." >&2
+  exit 1
+fi
+
+echo
 echo "== Build spatial plugin =="
 cmake -S spatial/core -B "$BUILD_DIR" \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DCMAKE_BUILD_TYPE=Release \
   -DSPATIAL_BUILD_PLUGIN=ON \
   -DSPATIAL_BUILD_TESTS=ON
 
-cmake --build "$BUILD_DIR" --parallel
+cmake --build "$BUILD_DIR" --parallel 2
 
 [[ -f "$PLUGIN" ]] || die "Plugin was not built: $PLUGIN"
 
@@ -177,4 +228,14 @@ echo
 echo "Single-monitor sessions can use ordinary tiled windows directly."
 echo "No manual 'hyprctl dispatch setfloating' step is required."
 echo "On multi-monitor sessions, tiled cross-seam projection is still deferred."
+
+echo
+echo "== Prune superseded plugin builds =="
+while IFS= read -r -d '' old_plugin; do
+  if [[ "$old_plugin" != "$INSTALLED_PLUGIN" ]]; then
+    rm -f -- "$old_plugin"
+  fi
+done < <(find "$INSTALL_DIR" -maxdepth 1 -type f -name 'gendbyte-spatial-*.so' -print0 2>/dev/null || true)
+
+echo "kept: $INSTALLED_PLUGIN"
 echo "=============================================="
