@@ -158,6 +158,25 @@ PanResult HyprlandAdapter::pan(double dx, double dy) {
     return PanResult::Success;
 }
 
+PanResult HyprlandAdapter::setZoom(double value) {
+    if (state_ == nullptr || !state_->enabled()) {
+        return PanResult::Disabled;
+    }
+
+    pruneBindings();
+
+    if (!projectionReady()) {
+        return PanResult::ProjectionUnavailable;
+    }
+
+    if (!state_->setZoom(value)) {
+        return PanResult::OutOfRange;
+    }
+
+    applyProjection();
+    return PanResult::Success;
+}
+
 PanResult HyprlandAdapter::nudge(int xDirection, int yDirection) {
     if (state_ == nullptr || !state_->enabled()) {
         return PanResult::Disabled;
