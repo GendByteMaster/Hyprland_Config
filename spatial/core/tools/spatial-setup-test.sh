@@ -108,7 +108,7 @@ INSTALLED_PLUGIN="$INSTALL_DIR/gendbyte-spatial-$PLUGIN_HASH.so"
 install -Dm755 "$PLUGIN" "$INSTALLED_PLUGIN"
 mkdir -p "$INSTALL_DIR"
 
-tmp_pointer="$CURRENT_PATH_FILE.tmp.$"
+tmp_pointer="$CURRENT_PATH_FILE.tmp.$$"
 printf '%s\n' "$INSTALLED_PLUGIN" >"$tmp_pointer"
 mv -f "$tmp_pointer" "$CURRENT_PATH_FILE"
 
