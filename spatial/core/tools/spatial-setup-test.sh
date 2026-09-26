@@ -164,6 +164,64 @@ done
 sleep 1
 
 echo
+echo "== Close legacy overview surface =="
+if command -v qs >/dev/null 2>&1; then
+  qs -c gendbyte-workspace-overview ipc call gendbyte-workspace-overview hide >/dev/null 2>&1 || true
+  qs -p "$ROOT/quickshell/gendbyte-workspace-overview" ipc call gendbyte-workspace-overview hide >/dev/null 2>&1 || true
+fi
+
+echo
+echo "== Verify Super+Tab ownership =="
+super_tab_ready=0
+for _ in $(seq 1 50); do
+  binds_now="$(hyprctl -j binds 2>/dev/null || true)"
+  if BINDS_JSON="$binds_now" python3 - <<'PY'
+import json
+import os
+
+try:
+    binds = json.loads(os.environ["BINDS_JSON"])
+except Exception:
+    raise SystemExit(1)
+
+descriptions = [str(item.get("description") or "") for item in binds if isinstance(item, dict)]
+live = sum(desc == "Spatial Window Overview" for desc in descriptions)
+loading = sum(desc == "Spatial Window Overview (Loading)" for desc in descriptions)
+legacy = sum("Legacy Fallback" in desc and "Overview" in desc for desc in descriptions)
+
+raise SystemExit(0 if live == 1 and loading == 0 and legacy == 0 else 1)
+PY
+  then
+    super_tab_ready=1
+    break
+  fi
+  sleep 0.1
+done
+
+[[ "$super_tab_ready" -eq 1 ]] || {
+  echo "Super+Tab ownership is not stable:" >&2
+  hyprctl -j binds 2>/dev/null | python3 -c '
+import json
+import sys
+
+try:
+    binds = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+
+for item in binds:
+    if not isinstance(item, dict):
+        continue
+    desc = str(item.get("description") or "")
+    if "Overview" in desc or "Spatial" in desc:
+        print(f"{item.get('modmask')}  {item.get('key')}  {desc}")
+' >&2 || true
+  die "Super+Tab must have exactly one live owner: Spatial Window Overview"
+}
+
+echo "Super+Tab owner: Spatial Window Overview"
+
+echo
 echo "== Plugin list =="
 hyprctl plugin list
 
