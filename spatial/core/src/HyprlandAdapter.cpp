@@ -484,7 +484,8 @@ bool HyprlandAdapter::activateWorkspaceCanvas() {
     }
 
     std::vector<PHLWORKSPACE> workspaces;
-    for (const auto& workspace : State::workspaceState()->workspaces()) {
+    for (const auto& workspaceRef : State::workspaceState()->workspaces()) {
+        const auto workspace = workspaceRef.lock();
         if (!workspace || workspace->m_isSpecialWorkspace) {
             continue;
         }
