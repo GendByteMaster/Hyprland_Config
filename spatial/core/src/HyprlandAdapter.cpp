@@ -9,8 +9,10 @@
 #include <hyprland/src/desktop/state/WindowState.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/event/EventBus.hpp>
+#include <hyprland/src/layout/space/Space.hpp>
 #include <hyprland/src/layout/target/Target.hpp>
 #include <hyprland/src/managers/fullscreen/FullscreenController.hpp>
+#include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/state/MonitorState.hpp>
 
 #include <algorithm>
@@ -65,6 +67,11 @@ bool HyprlandAdapter::start(SpatialState& state) {
 
 void HyprlandAdapter::stop() noexcept {
     deactivate(true);
+
+    if (pendingProjectionRefresh_ != 0 && g_pEventLoopManager) {
+        g_pEventLoopManager->removeDoLater(pendingProjectionRefresh_);
+        pendingProjectionRefresh_ = 0;
+    }
 
     if (motionTimer_) {
         motionTimer_->cancel();
@@ -228,6 +235,25 @@ void HyprlandAdapter::onMotionTick() {
     }
 }
 
+void HyprlandAdapter::scheduleProjectionRefresh() {
+    if (pendingProjectionRefresh_ != 0 || !g_pEventLoopManager || state_ == nullptr || !state_->enabled()) {
+        return;
+    }
+
+    pendingProjectionRefresh_ = g_pEventLoopManager->doLater([this] {
+        pendingProjectionRefresh_ = 0;
+
+        if (state_ == nullptr || !state_->enabled()) {
+            return;
+        }
+
+        pruneBindings();
+        if (projectionReady()) {
+            applyProjection();
+        }
+    });
+}
+
 void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
     cancelMotion();
     if (state_ == nullptr || !state_->enabled()) {
@@ -244,13 +270,43 @@ void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
 }
 
 void HyprlandAdapter::restoreOriginalGeometry() noexcept {
+    std::vector<SP<Layout::CSpace>> tiledSpaces;
+
     for (const auto& binding : bindings_) {
         const auto window = binding.window.lock();
-        if (!eligible(window)) {
+        if (!Desktop::View::validMapped(window) || Fullscreen::controller()->isFullscreen(window)) {
             continue;
         }
 
-        (void)applyCompositorRect(window, binding.originalCompositorRect);
+        if (window->m_isFloating) {
+            (void)applyCompositorRect(window, binding.originalCompositorRect);
+            continue;
+        }
+
+        const auto target = window->layoutTarget();
+        const auto space = target ? target->space() : nullptr;
+        if (!space) {
+            g_pHyprRenderer->damageWindow(window);
+            window->setBox(CBox{
+                Vector2D{binding.originalCompositorRect.x, binding.originalCompositorRect.y},
+                Vector2D{binding.originalCompositorRect.width, binding.originalCompositorRect.height},
+            });
+            window->updateWindowDecos();
+            g_pHyprRenderer->damageWindow(window);
+            continue;
+        }
+
+        if (!std::ranges::contains(tiledSpaces, space)) {
+            tiledSpaces.push_back(space);
+        }
+    }
+
+    // Tiled targets never leave Hyprland's layout tree. Recalculate the
+    // untouched tree to restore canonical geometry exactly.
+    for (const auto& space : tiledSpaces) {
+        if (space) {
+            space->recalculate();
+        }
     }
 }
 
@@ -310,18 +366,28 @@ bool HyprlandAdapter::applyCompositorRect(const PHLWINDOW& window, const Rect& r
         return false;
     }
 
+    const CBox box{
+        Vector2D{rect.x, rect.y},
+        Vector2D{rect.width, rect.height},
+    };
+
+    if (!window->m_isFloating) {
+        // Keep the tiled target inside Hyprland's layout tree. Only override
+        // the live compositor box. This preserves the split/master topology
+        // for exact restoration through space->recalculate().
+        g_pHyprRenderer->damageWindow(window);
+        window->setBox(box);
+        window->updateWindowDecos();
+        g_pHyprRenderer->damageWindow(window);
+        return true;
+    }
+
     const auto target = window->layoutTarget();
     if (!target) {
         return false;
     }
 
-    target->setPositionGlobal(
-        CBox{
-            Vector2D{rect.x, rect.y},
-            Vector2D{rect.width, rect.height},
-        },
-        Layout::TARGET_UPDATE_NO_CLIENT_CONFIGURE
-    );
+    target->setPositionGlobal(box, Layout::TARGET_UPDATE_NO_CLIENT_CONFIGURE);
     target->warpPositionSize();
     return true;
 }
@@ -391,7 +457,7 @@ std::optional<Rect> HyprlandAdapter::currentCompositorRect(const PHLWINDOW& wind
 }
 
 bool HyprlandAdapter::eligible(const PHLWINDOW& window) const {
-    if (!Desktop::View::validMapped(window) || !window->m_isFloating) {
+    if (!Desktop::View::validMapped(window)) {
         return false;
     }
 
@@ -404,7 +470,28 @@ bool HyprlandAdapter::eligible(const PHLWINDOW& window) const {
         return false;
     }
 
-    return window->m_workspace == monitor->m_activeWorkspace || window->m_workspace == monitor->m_activeSpecialWorkspace;
+    const bool visible = window->m_workspace == monitor->m_activeWorkspace || window->m_workspace == monitor->m_activeSpecialWorkspace;
+    if (!visible) {
+        return false;
+    }
+
+    // Hyprland 0.56.2 does not render tiled windows across monitor ownership
+    // boundaries. Single-monitor tiled projection is safe because the live
+    // box and hit-testing geometry move together while the layout tree stays
+    // untouched. Multi-monitor tiled cross-seam support is intentionally
+    // deferred.
+    return window->m_isFloating || tiledProjectionAllowed();
+}
+
+bool HyprlandAdapter::tiledProjectionAllowed() const {
+    std::size_t monitors = 0;
+    for (const auto& monitor : State::monitorState()->monitors()) {
+        if (monitor) {
+            ++monitors;
+        }
+    }
+
+    return monitors == 1;
 }
 
 std::optional<ManagedWindow> HyprlandAdapter::toManagedWindow(const PHLWINDOW& window, const DeskRect& desk) const {
@@ -454,6 +541,8 @@ void HyprlandAdapter::onWindowOpened(const PHLWINDOW& window) {
         .window = window,
         .originalCompositorRect = *compositorRect,
     });
+
+    scheduleProjectionRefresh();
 }
 
 void HyprlandAdapter::onWindowClosed(const PHLWINDOW& window) {
@@ -464,6 +553,7 @@ void HyprlandAdapter::onWindowClosed(const PHLWINDOW& window) {
     const auto id = sessionWindowId(window);
     (void)state_->removeWindow(id);
     dropBinding(id);
+    scheduleProjectionRefresh();
 }
 
 void HyprlandAdapter::onWindowEligibilityChanged(const PHLWINDOW& window) {
@@ -476,10 +566,12 @@ void HyprlandAdapter::onWindowEligibilityChanged(const PHLWINDOW& window) {
     if (!eligible(window)) {
         (void)state_->removeWindow(id);
         dropBinding(id);
+        scheduleProjectionRefresh();
         return;
     }
 
     if (state_->findWindow(id) != nullptr) {
+        scheduleProjectionRefresh();
         return;
     }
 

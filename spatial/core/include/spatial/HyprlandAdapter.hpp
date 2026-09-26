@@ -50,6 +50,7 @@ private:
     [[nodiscard]] std::optional<Rect> currentCompositorRect(const PHLWINDOW& window) const;
     [[nodiscard]] std::optional<ManagedWindow> toManagedWindow(const PHLWINDOW& window, const DeskRect& desk) const;
     [[nodiscard]] bool eligible(const PHLWINDOW& window) const;
+    [[nodiscard]] bool tiledProjectionAllowed() const;
     [[nodiscard]] static std::string sessionWindowId(const PHLWINDOW& window);
 
     void deactivate(bool restoreGeometry) noexcept;
@@ -62,6 +63,7 @@ private:
 
     [[nodiscard]] bool ensureMotionTimer();
     void onMotionTick();
+    void scheduleProjectionRefresh();
 
     void onWindowOpened(const PHLWINDOW& window);
     void onWindowClosed(const PHLWINDOW& window);
@@ -72,6 +74,7 @@ private:
     std::vector<WindowBinding> bindings_;
     CameraMotion motion_;
     SP<CEventLoopTimer> motionTimer_;
+    std::uint64_t pendingProjectionRefresh_ = 0;
     CHyprSignalListener windowOpened_;
     CHyprSignalListener windowClosed_;
     CHyprSignalListener windowFloating_;

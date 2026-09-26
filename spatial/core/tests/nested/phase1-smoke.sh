@@ -154,7 +154,7 @@ assert_contains "$status" '"protocol":1' "protocol version"
 assert_contains "$status" '"enabled":false' "spatial starts disabled"
 
 echo
-echo "== Active floating test window =="
+echo "== Active test window =="
 read -r active_address before_x before_y before_w before_h < <(read_active_rect)
 echo "address=$active_address rect=($before_x,$before_y ${before_w}x${before_h})"
 
@@ -169,10 +169,11 @@ if [[ -z "$managed_count" || "$managed_count" -lt 1 ]]; then
   cat >&2 <<'EOF'
 FAIL: spatial mode enabled with zero managed windows.
 
-Task 7 projection cannot be validated without at least one eligible window.
-Before rerunning this smoke test, open a normal window and make it floating
-on the currently visible workspace. Tiled and fullscreen windows are
-intentionally excluded by the Phase 1 eligibility policy.
+Spatial projection cannot be validated without at least one eligible window.
+On a single-monitor session, an ordinary tiled or floating window on the
+visible workspace is eligible. Fullscreen windows remain excluded.
+On multi-monitor sessions, tiled cross-seam projection is intentionally
+deferred, so use a floating test window there.
 EOF
   exit 1
 fi
@@ -203,9 +204,8 @@ FAIL: the active test window is not managed by spatial mode.
 
 Active address: $active_address
 
-Focus a floating, non-fullscreen window on the visible workspace and rerun.
-This makes the geometry assertion deterministic instead of checking an
-unrelated managed window.
+Focus a non-fullscreen window on the visible workspace and rerun.
+On a single monitor it may remain tiled; no manual setfloating is required.
 EOF
   exit 1
 fi

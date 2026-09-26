@@ -25,16 +25,21 @@ ctest --test-dir build/spatial-plugin --output-on-failure
 
 ## Prepare the nested session
 
-Open at least three ordinary floating windows on visible workspaces.
+Open at least one ordinary window on the visible workspace.
 
 Do not use important unsaved applications for the test.
 
-The current Phase 1 eligibility policy intentionally excludes:
+Eligibility:
 
-- tiled windows;
-- fullscreen/maximized windows managed as fullscreen;
-- layer surfaces;
-- windows on non-visible workspaces.
+- on a single-monitor session, ordinary tiled and floating windows are managed;
+- on multi-monitor sessions, floating windows are managed, while tiled cross-seam projection is intentionally deferred;
+- fullscreen/maximized windows managed as fullscreen are excluded;
+- layer surfaces are excluded;
+- windows on non-visible workspaces are excluded.
+
+Tiled windows are **not** converted to floating. Spatial projection overrides
+their live compositor box while leaving Hyprland's layout tree untouched.
+Disable restores canonical tiling by recalculating the existing layout tree.
 
 ## Run
 
@@ -54,7 +59,7 @@ The script:
 3. confirms protocol v1 and disabled-by-default state;
 4. enables spatial mode;
 5. prints managed world rectangles;
-6. pans the camera by `(+64,+32)`;
+6. pans the camera by `(+320,0)`;
 7. pans back to zero;
 8. disables spatial mode;
 9. prints `hyprctl configerrors`;
@@ -65,13 +70,13 @@ The script:
 
 While the script pauses only through normal command output, observe the desktop during the two pan operations.
 
-At `camera = (+64,+32)`:
+At `camera = (+320,0)`:
 
-- every managed window should move by `(-64,-32)` in compositor coordinates;
+- every managed window should move by `(-320,0)` in compositor coordinates;
 - relative distances between managed windows must remain unchanged;
 - window size must not change;
 - pointer targeting/focus should still correspond to the moved window geometry;
-- windows may cross monitor boundaries when their source workspace is visible; Hyprland 0.56.2 explicitly permits floating windows on visible workspaces to render on other monitors;
+- floating windows may cross monitor boundaries when their source workspace is visible; tiled cross-monitor projection is intentionally deferred;
 - `hyprctl gendbyte-spatial windows` must keep the same world rectangles.
 
 After the reverse pan and `disable`:

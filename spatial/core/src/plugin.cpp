@@ -275,7 +275,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         "gendbyte-spatial",
         "Developer Spatial Desktop core for Hyprland",
         "GendByteMaster",
-        "0.2.0-dev",
+        "0.3.0-dev",
     };
 }
 
