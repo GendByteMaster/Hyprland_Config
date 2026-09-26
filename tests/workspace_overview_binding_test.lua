@@ -1,13 +1,28 @@
 local t = require("tests.testlib")
 local overview = require("hypr.workstation.workspace_overview")
 
-local function fake_hyprland()
+local function fake_hyprland(with_spatial)
   local calls = {
     binds = {},
     unbinds = {},
   }
 
-  local hl = { dsp = {} }
+  local hl = {
+    dsp = {},
+    plugin = {},
+  }
+
+  if with_spatial then
+    hl.plugin.gendbyte_spatial = {
+      enabled = function() return false end,
+      toggle = function() return false end,
+      pan = function() end,
+      nudge = function() end,
+      brake = function() end,
+      reset = function() end,
+      select = function() return false end,
+    }
+  end
 
   function hl.dsp.exec_cmd(command)
     return {
@@ -31,7 +46,7 @@ local function fake_hyprland()
   return hl, calls
 end
 
-t.test("workspace UI owns only overview and persistent switcher bindings", function()
+t.test("workspace UI keeps legacy fallback bindings when Spatial is unavailable", function()
   local hl, calls = fake_hyprland()
 
   local registered = overview.register(hl, {}, {
@@ -51,7 +66,7 @@ t.test("workspace UI owns only overview and persistent switcher bindings", funct
 
   t.eq(calls.binds[1].keys, "SUPER + TAB")
   t.eq(calls.binds[1].dispatcher.kind, "exec")
-  t.eq(calls.binds[1].options.description, "Workspace Overview")
+  t.eq(calls.binds[1].options.description, "Workspace Overview (Legacy Fallback)")
   t.eq(
     calls.binds[1].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview"
@@ -63,7 +78,7 @@ t.test("workspace UI owns only overview and persistent switcher bindings", funct
     calls.binds[2].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
   )
-  t.eq(calls.binds[2].options.description, "Persistent Window Switcher")
+  t.eq(calls.binds[2].options.description, "Legacy Persistent Window Switcher")
 
   t.eq(calls.binds[3].keys, "SUPER + F10")
   t.eq(calls.binds[3].dispatcher.kind, "exec")
@@ -71,7 +86,27 @@ t.test("workspace UI owns only overview and persistent switcher bindings", funct
     calls.binds[3].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview task-switcher"
   )
-  t.eq(calls.binds[3].options.description, "All-Monitor Window Switcher")
+  t.eq(calls.binds[3].options.description, "Legacy All-Monitor Window Switcher")
+end)
+
+t.test("Spatial Overview owns Super Tab when plugin API is available", function()
+  local hl, calls = fake_hyprland(true)
+
+  local registered = overview.register(hl, {}, {
+    launcher = "/home/test/.local/bin/hyprland-workspace-overview",
+    exists = function() return true end,
+  })
+
+  t.eq(registered, true)
+  t.eq(#calls.unbinds, 2)
+  t.eq(calls.unbinds[1], "CTRL + ALT + TAB")
+  t.eq(calls.unbinds[2], "SUPER + F10")
+
+  t.eq(#calls.binds, 2)
+  t.eq(calls.binds[1].keys, "CTRL + ALT + TAB")
+  t.eq(calls.binds[1].options.description, "Legacy Persistent Window Switcher")
+  t.eq(calls.binds[2].keys, "SUPER + F10")
+  t.eq(calls.binds[2].options.description, "Legacy All-Monitor Window Switcher")
 end)
 
 t.test("workspace UI adds only the Try Omarchy overview fallback", function()
@@ -90,6 +125,7 @@ t.test("workspace UI adds only the Try Omarchy overview fallback", function()
   t.eq(#calls.binds, 4)
   t.eq(calls.binds[4].keys, "SUPER + F9")
   t.eq(calls.binds[4].dispatcher.kind, "exec")
+  t.eq(calls.binds[4].options.description, "Legacy Workspace Overview (Try Omarchy)")
   t.eq(
     calls.binds[4].dispatcher.command,
     "/home/test/.local/bin/hyprland-workspace-overview"
