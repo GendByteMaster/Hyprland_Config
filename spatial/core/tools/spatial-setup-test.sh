@@ -175,7 +175,7 @@ printf '%s\n' "$config_errors"
 
 echo
 echo "== Check direct Lua API =="
-lua_check="$(hyprctl eval 'assert(type(hl.plugin.gendbyte_spatial) == "table", "missing hl.plugin.gendbyte_spatial"); assert(type(hl.plugin.gendbyte_spatial.enabled) == "function", "missing enabled"); assert(type(hl.plugin.gendbyte_spatial.toggle) == "function", "missing toggle"); assert(type(hl.plugin.gendbyte_spatial.pan) == "function", "missing pan"); assert(type(hl.plugin.gendbyte_spatial.nudge) == "function", "missing nudge"); assert(type(hl.plugin.gendbyte_spatial.brake) == "function", "missing brake"); assert(type(hl.plugin.gendbyte_spatial.reset) == "function", "missing reset")')"
+lua_check="$(hyprctl eval 'assert(type(hl.plugin.gendbyte_spatial) == "table", "missing hl.plugin.gendbyte_spatial"); assert(type(hl.plugin.gendbyte_spatial.enabled) == "function", "missing enabled"); assert(type(hl.plugin.gendbyte_spatial.toggle) == "function", "missing toggle"); assert(type(hl.plugin.gendbyte_spatial.select) == "function", "missing select"); assert(type(hl.plugin.gendbyte_spatial.pan) == "function", "missing pan"); assert(type(hl.plugin.gendbyte_spatial.nudge) == "function", "missing nudge"); assert(type(hl.plugin.gendbyte_spatial.brake) == "function", "missing brake"); assert(type(hl.plugin.gendbyte_spatial.reset) == "function", "missing reset")')"
 printf '%s\n' "$lua_check"
 [[ "$lua_check" != error:* ]] || die "Lua plugin namespace validation failed"
 echo "Lua API: OK"
@@ -292,7 +292,7 @@ printf '%s\n' "$status_off"
 echo
 echo
 echo "Note: Windows Xbox Game Bar intercepts Win+Alt+G before Hyprland."
-echo "On Try Omarchy, use Super+F12 to toggle Spatial Desktop; while enabled, use plain Arrow keys to move the camera."
+echo "Use Super+Tab for Spatial Overview (Super+F12 remains the Try Omarchy fallback); click a window to restore its workspace and focus it."
 echo "=============================================="
 echo "Spatial plugin is versioned, installed, and config-managed."
 echo "Spatial HUD: $SPATIAL_HUD_ID"
@@ -301,11 +301,13 @@ echo "Spatial bindings: OK"
 echo
 echo "Hotkeys:"
 echo "  Super+Alt+G      Toggle Spatial Desktop (native Linux)"
-echo "  Super+F12        Toggle Spatial Desktop (Try Omarchy)"
+echo "  Super+Tab        Spatial Window Overview"
+echo "  Super+F12        Spatial Overview fallback (Try Omarchy)"
 echo "  Super+Alt+Arrow  Camera movement (native Linux)"
 echo "  Arrow keys       Camera movement while Spatial is ON"
 echo "  Super+Alt+0      Reset camera (native Linux)"
 echo "  0                Reset camera while Spatial is ON"
+echo "  Left click       Select window, exit Spatial, restore its workspace/focus"
 echo
 echo "Single-monitor Spatial mode captures eligible windows from every normal workspace."
 echo "Normal workspaces are projected as horizontal world lanes without moving windows out of their layout trees."
