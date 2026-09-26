@@ -38,6 +38,7 @@ public:
     [[nodiscard]] PanResult pan(double dx, double dy);
     [[nodiscard]] PanResult setZoom(double value);
     [[nodiscard]] PanResult resetCamera();
+    [[nodiscard]] bool selectAtPointer();
     [[nodiscard]] PanResult nudge(int xDirection, int yDirection);
     void releaseMotion() noexcept;
     void cancelMotion() noexcept;
