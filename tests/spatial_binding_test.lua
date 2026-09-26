@@ -221,7 +221,7 @@ t.test("spatial toggle synchronizes mode-scoped input bindings and HUD", functio
     plugin_path = INSTALLED_OPTIONS.plugin_path,
     file_exists = INSTALLED_OPTIONS.file_exists,
     hud = {
-      show_spatial = function(enabled, zoom_percent, action)
+      show = function(enabled, zoom_percent, action)
         hud_calls[#hud_calls + 1] = {
           enabled = enabled,
           zoom_percent = zoom_percent,
