@@ -7,6 +7,7 @@ PLUGIN="$BUILD_DIR/gendbyte-spatial.so"
 INSTALL_DIR="$HOME/.local/lib/gendbyte-spatial"
 CURRENT_PATH_FILE="$INSTALL_DIR/current-path"
 SPATIAL_HUD_ID="gendbyte.spatial-hud"
+SPATIAL_HUD_INSTALLER="spatial/core/tools/install-spatial-hud.sh"
 MIN_FREE_KB=262144
 MIN_FREE_INODES=2048
 
@@ -22,14 +23,9 @@ command -v install >/dev/null || die "install not found"
 command -v sha256sum >/dev/null || die "sha256sum not found"
 command -v df >/dev/null || die "df not found"
 command -v python3 >/dev/null || die "python3 not found"
-command -v readlink >/dev/null || die "readlink not found"
-command -v ln >/dev/null || die "ln not found"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Run this inside the Hyprland_Config repository"
 cd "$ROOT"
-
-SPATIAL_HUD_SOURCE="$ROOT/omarchy/plugins/$SPATIAL_HUD_ID"
-SPATIAL_HUD_TARGET="$HOME/.config/omarchy/plugins/$SPATIAL_HUD_ID"
 
 echo "== Repository =="
 echo "$ROOT"
@@ -125,27 +121,8 @@ echo "pointer:   $CURRENT_PATH_FILE"
 echo
 echo "== Install Spatial HUD =="
 
-[[ -d "$SPATIAL_HUD_SOURCE" ]] || die "Spatial HUD source is missing: $SPATIAL_HUD_SOURCE"
-mkdir -p "$(dirname "$SPATIAL_HUD_TARGET")"
-
-if [[ -L "$SPATIAL_HUD_TARGET" ]]; then
-  hud_target_real="$(readlink -f "$SPATIAL_HUD_TARGET" 2>/dev/null || true)"
-  hud_source_real="$(readlink -f "$SPATIAL_HUD_SOURCE" 2>/dev/null || true)"
-  [[ -n "$hud_target_real" && "$hud_target_real" == "$hud_source_real" ]]     || die "Spatial HUD target is owned by another source: $SPATIAL_HUD_TARGET"
-elif [[ -e "$SPATIAL_HUD_TARGET" ]]; then
-  die "Spatial HUD target is occupied by another file: $SPATIAL_HUD_TARGET"
-else
-  ln -s "$SPATIAL_HUD_SOURCE" "$SPATIAL_HUD_TARGET"
-fi
-
-if command -v omarchy-shell >/dev/null 2>&1; then
-  omarchy-shell shell rescanPlugins >/dev/null     || die "Omarchy Shell failed to rescan plugins for Spatial HUD"
-  hud_enabled="$(omarchy-shell shell setPluginEnabled "$SPATIAL_HUD_ID" true 2>/dev/null || true)"
-  [[ "$hud_enabled" == "ok" ]]     || die "Omarchy Shell failed to enable $SPATIAL_HUD_ID"
-  echo "Spatial HUD enabled: $SPATIAL_HUD_ID"
-else
-  echo "Spatial HUD linked, but omarchy-shell is unavailable; HUD enable skipped."
-fi
+[[ -x "$SPATIAL_HUD_INSTALLER" ]] || chmod +x "$SPATIAL_HUD_INSTALLER"
+"$SPATIAL_HUD_INSTALLER"
 
 echo
 echo "== Reload Lua config =="
