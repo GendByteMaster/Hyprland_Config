@@ -200,7 +200,7 @@ function M.register(hl, _o, options)
 
   register_binding(
     hl,
-    "CTRL + SUPER + G",
+    "SUPER + ALT + G",
     function()
       M.toggle(hl)
     end,
