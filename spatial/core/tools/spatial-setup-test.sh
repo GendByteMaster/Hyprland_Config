@@ -125,7 +125,7 @@ if command -v jq >/dev/null 2>&1; then
     | "\(.modmask)  \(.key)  \(.description // "")"
   '
   count="$(printf '%s\n' "$binds" | jq '[.[] | select((.description // "") | ascii_downcase | contains("spatial"))] | length')"
-  [[ "$count" -eq 7 ]] || die "Expected 7 Spatial bindings, found $count"
+  [[ "$count" -eq 12 ]] || die "Expected 12 Spatial bindings, found $count"
 else
   printf '%s\n' "$binds" | grep -i spatial || true
 fi
@@ -160,7 +160,7 @@ printf '%s\n' "$status_off"
 echo
 echo
 echo "Note: Windows Xbox Game Bar intercepts Win+Alt+G before Hyprland."
-echo "On Try Omarchy, use Ctrl+Super+G unless Game Bar is disabled in Windows."
+echo "On Try Omarchy, use Ctrl+Alt+G and Ctrl+Alt+Arrow keys; these avoid the Windows Super/Win key."
 echo "=============================================="
 echo "Spatial plugin is versioned, installed, and config-managed."
 echo "Lua API: OK"
@@ -168,12 +168,11 @@ echo "Spatial bindings: OK"
 echo
 echo "Hotkeys:"
 echo "  Super+Alt+G      Toggle Spatial Desktop (native Linux)"
-echo "  Ctrl+Super+G     Toggle Spatial Desktop (Try Omarchy / Windows fallback)"
-echo "  Super+Alt+Left   Camera left"
-echo "  Super+Alt+Right  Camera right"
-echo "  Super+Alt+Up     Camera up"
-echo "  Super+Alt+Down   Camera down"
-echo "  Super+Alt+0      Reset camera"
+echo "  Ctrl+Alt+G       Toggle Spatial Desktop (Try Omarchy)"
+echo "  Super+Alt+Arrow  Camera movement (native Linux)"
+echo "  Ctrl+Alt+Arrow   Camera movement (Try Omarchy)"
+echo "  Super+Alt+0      Reset camera (native Linux)"
+echo "  Ctrl+Alt+0       Reset camera (Try Omarchy)"
 echo
 echo "For visible movement first make the active window floating:"
 echo "  hyprctl dispatch setfloating"

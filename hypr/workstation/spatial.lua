@@ -209,17 +209,22 @@ function M.register(hl, _o, options)
 
   register_binding(
     hl,
-    "CTRL + SUPER + G",
+    "CTRL + ALT + G",
     function()
       M.toggle(hl)
     end,
-    "Toggle Spatial Desktop (Windows fallback)"
+    "Toggle Spatial Desktop (Try Omarchy)"
   )
 
   register_motion_binding(hl, "SUPER + ALT + LEFT", -1, 0, "Spatial Camera Left")
   register_motion_binding(hl, "SUPER + ALT + RIGHT", 1, 0, "Spatial Camera Right")
   register_motion_binding(hl, "SUPER + ALT + UP", 0, -1, "Spatial Camera Up")
   register_motion_binding(hl, "SUPER + ALT + DOWN", 0, 1, "Spatial Camera Down")
+
+  register_motion_binding(hl, "CTRL + ALT + LEFT", -1, 0, "Spatial Camera Left (Try Omarchy)")
+  register_motion_binding(hl, "CTRL + ALT + RIGHT", 1, 0, "Spatial Camera Right (Try Omarchy)")
+  register_motion_binding(hl, "CTRL + ALT + UP", 0, -1, "Spatial Camera Up (Try Omarchy)")
+  register_motion_binding(hl, "CTRL + ALT + DOWN", 0, 1, "Spatial Camera Down (Try Omarchy)")
 
   register_binding(
     hl,
@@ -228,6 +233,15 @@ function M.register(hl, _o, options)
       M.reset(hl)
     end,
     "Reset Spatial Camera"
+  )
+
+  register_binding(
+    hl,
+    "CTRL + ALT + 0",
+    function()
+      M.reset(hl)
+    end,
+    "Reset Spatial Camera (Try Omarchy)"
   )
 
   return true

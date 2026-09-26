@@ -137,37 +137,52 @@ t.test("spatial config keeps installed plugin declared when API is already avail
   t.eq(registered, true)
   t.eq(#calls.loads, 1)
   t.eq(calls.loads[1], "/tmp/gendbyte-spatial.so")
-  t.eq(#calls.unbinds, 7)
-  t.eq(#calls.binds, 11)
+  t.eq(#calls.unbinds, 12)
+  t.eq(#calls.binds, 20)
 end)
 
-t.test("spatial bindings own only their explicit chords when plugin is available", function()
+t.test("spatial bindings register native and Try Omarchy chords", function()
   local hl, calls = fake_hyprland(true)
 
   local registered = spatial.register(hl, {}, INSTALLED_OPTIONS)
 
   t.eq(registered, true)
-  t.eq(#calls.unbinds, 7)
-  t.eq(#calls.binds, 11)
+  t.eq(#calls.unbinds, 12)
+  t.eq(#calls.binds, 20)
 
-  t.eq(calls.binds[1].keys, "SUPER + ALT + G")
-  t.eq(calls.binds[2].keys, "CTRL + SUPER + G")
-  t.eq(calls.binds[3].keys, "SUPER + ALT + LEFT")
-  t.eq(calls.binds[4].keys, "SUPER + ALT + LEFT")
-  t.eq(calls.binds[5].keys, "SUPER + ALT + RIGHT")
-  t.eq(calls.binds[6].keys, "SUPER + ALT + RIGHT")
-  t.eq(calls.binds[7].keys, "SUPER + ALT + UP")
-  t.eq(calls.binds[8].keys, "SUPER + ALT + UP")
-  t.eq(calls.binds[9].keys, "SUPER + ALT + DOWN")
-  t.eq(calls.binds[10].keys, "SUPER + ALT + DOWN")
-  t.eq(calls.binds[11].keys, "SUPER + ALT + 0")
+  local expected = {
+    "SUPER + ALT + G",
+    "CTRL + ALT + G",
+    "SUPER + ALT + LEFT",
+    "SUPER + ALT + LEFT",
+    "SUPER + ALT + RIGHT",
+    "SUPER + ALT + RIGHT",
+    "SUPER + ALT + UP",
+    "SUPER + ALT + UP",
+    "SUPER + ALT + DOWN",
+    "SUPER + ALT + DOWN",
+    "CTRL + ALT + LEFT",
+    "CTRL + ALT + LEFT",
+    "CTRL + ALT + RIGHT",
+    "CTRL + ALT + RIGHT",
+    "CTRL + ALT + UP",
+    "CTRL + ALT + UP",
+    "CTRL + ALT + DOWN",
+    "CTRL + ALT + DOWN",
+    "SUPER + ALT + 0",
+    "CTRL + ALT + 0",
+  }
+
+  for index, keys in ipairs(expected) do
+    t.eq(calls.binds[index].keys, keys)
+  end
 
   t.eq(calls.binds[1].options.description, "Toggle Spatial Desktop")
-  t.eq(calls.binds[2].options.description, "Toggle Spatial Desktop (Windows fallback)")
-  t.eq(calls.binds[4].options.release, true)
-  t.eq(calls.binds[6].options.release, true)
-  t.eq(calls.binds[8].options.release, true)
-  t.eq(calls.binds[10].options.release, true)
+  t.eq(calls.binds[2].options.description, "Toggle Spatial Desktop (Try Omarchy)")
+
+  for _, index in ipairs({4, 6, 8, 10, 12, 14, 16, 18}) do
+    t.eq(calls.binds[index].options.release, true)
+  end
 end)
 
 t.test("spatial binding callbacks call direct plugin Lua functions", function()
@@ -179,31 +194,32 @@ t.test("spatial binding callbacks call direct plugin Lua functions", function()
     calls.binds[index].callback()
   end
 
-  t.eq(#calls.plugin, 11)
+  t.eq(#calls.plugin, 20)
   t.eq(calls.plugin[1].name, "toggle")
   t.eq(calls.plugin[2].name, "toggle")
 
-  t.eq(calls.plugin[3].name, "nudge")
-  t.eq(calls.plugin[3].dx, -1)
-  t.eq(calls.plugin[3].dy, 0)
-  t.eq(calls.plugin[4].name, "brake")
+  local motion_expectations = {
+    {3, "nudge", -1, 0}, {4, "brake"},
+    {5, "nudge", 1, 0},  {6, "brake"},
+    {7, "nudge", 0, -1}, {8, "brake"},
+    {9, "nudge", 0, 1},  {10, "brake"},
+    {11, "nudge", -1, 0}, {12, "brake"},
+    {13, "nudge", 1, 0},  {14, "brake"},
+    {15, "nudge", 0, -1}, {16, "brake"},
+    {17, "nudge", 0, 1},  {18, "brake"},
+  }
 
-  t.eq(calls.plugin[5].name, "nudge")
-  t.eq(calls.plugin[5].dx, 1)
-  t.eq(calls.plugin[5].dy, 0)
-  t.eq(calls.plugin[6].name, "brake")
+  for _, expected in ipairs(motion_expectations) do
+    local call = calls.plugin[expected[1]]
+    t.eq(call.name, expected[2])
+    if expected[2] == "nudge" then
+      t.eq(call.dx, expected[3])
+      t.eq(call.dy, expected[4])
+    end
+  end
 
-  t.eq(calls.plugin[7].name, "nudge")
-  t.eq(calls.plugin[7].dx, 0)
-  t.eq(calls.plugin[7].dy, -1)
-  t.eq(calls.plugin[8].name, "brake")
-
-  t.eq(calls.plugin[9].name, "nudge")
-  t.eq(calls.plugin[9].dx, 0)
-  t.eq(calls.plugin[9].dy, 1)
-  t.eq(calls.plugin[10].name, "brake")
-
-  t.eq(calls.plugin[11].name, "reset")
+  t.eq(calls.plugin[19].name, "reset")
+  t.eq(calls.plugin[20].name, "reset")
 end)
 
 t.test("spatial exact pan remains available for deterministic control", function()
