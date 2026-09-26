@@ -14,7 +14,8 @@ local function plugin_api(hl)
     return nil
   end
 
-  if type(api.toggle) ~= "function"
+  if type(api.enabled) ~= "function"
+      or type(api.toggle) ~= "function"
       or type(api.pan) ~= "function"
       or type(api.nudge) ~= "function"
       or type(api.brake) ~= "function"
@@ -135,6 +136,14 @@ function M.plugin_path(options)
   return resolve_plugin_path(options)
 end
 
+function M.enabled(hl)
+  local ok, enabled = invoke(hl, "enabled")
+  if not ok then
+    return false, enabled
+  end
+  return true, enabled == true
+end
+
 function M.toggle(hl)
   return invoke(hl, "toggle")
 end
@@ -160,7 +169,7 @@ local function register_binding(hl, keys, callback, description)
     hl.unbind(keys)
   end
 
-  hl.bind(keys, callback, {
+  return hl.bind(keys, callback, {
     description = description,
   })
 end
@@ -170,17 +179,27 @@ local function register_motion_binding(hl, keys, xDirection, yDirection, descrip
     hl.unbind(keys)
   end
 
-  hl.bind(keys, function()
+  local press = hl.bind(keys, function()
     M.nudge(hl, xDirection, yDirection)
   end, {
     description = description,
   })
 
-  hl.bind(keys, function()
+  local release = hl.bind(keys, function()
     M.brake(hl)
   end, {
     release = true,
   })
+
+  return press, release
+end
+
+local function set_handles_enabled(handles, enabled)
+  for _, handle in ipairs(handles) do
+    if handle and type(handle.set_enabled) == "function" then
+      handle:set_enabled(enabled)
+    end
+  end
 end
 
 function M.register(hl, _o, options)
@@ -198,52 +217,82 @@ function M.register(hl, _o, options)
     return false, declared and "gendbyte-spatial load scheduled" or declare_error
   end
 
+  local input_handles = {}
+
+  local function track(handle)
+    if handle then
+      input_handles[#input_handles + 1] = handle
+    end
+    return handle
+  end
+
+  local function track_motion(keys, xDirection, yDirection, description)
+    local press, release = register_motion_binding(hl, keys, xDirection, yDirection, description)
+    track(press)
+    track(release)
+  end
+
+  local function sync_input_mode(enabled)
+    set_handles_enabled(input_handles, enabled == true)
+  end
+
+  local function toggle_and_sync()
+    local ok, enabled = M.toggle(hl)
+    if ok then
+      sync_input_mode(enabled == true)
+    end
+    return { ok = ok }
+  end
+
   register_binding(
     hl,
     "SUPER + ALT + G",
-    function()
-      M.toggle(hl)
-    end,
+    toggle_and_sync,
     "Toggle Spatial Desktop"
   )
 
   register_binding(
     hl,
     "F12",
-    function()
-      M.toggle(hl)
-    end,
+    toggle_and_sync,
     "Toggle Spatial Desktop (Try Omarchy)"
   )
 
-  register_motion_binding(hl, "SUPER + ALT + LEFT", -1, 0, "Spatial Camera Left")
-  register_motion_binding(hl, "SUPER + ALT + RIGHT", 1, 0, "Spatial Camera Right")
-  register_motion_binding(hl, "SUPER + ALT + UP", 0, -1, "Spatial Camera Up")
-  register_motion_binding(hl, "SUPER + ALT + DOWN", 0, 1, "Spatial Camera Down")
+  -- Camera controls are real mode-scoped bindings: they only consume input
+  -- while Spatial is enabled. Outside Spatial, arrows and 0 pass through to
+  -- the focused application normally.
+  track_motion("SUPER + ALT + LEFT", -1, 0, "Spatial Camera Left")
+  track_motion("SUPER + ALT + RIGHT", 1, 0, "Spatial Camera Right")
+  track_motion("SUPER + ALT + UP", 0, -1, "Spatial Camera Up")
+  track_motion("SUPER + ALT + DOWN", 0, 1, "Spatial Camera Down")
 
-  register_motion_binding(hl, "CTRL + ALT + LEFT", -1, 0, "Spatial Camera Left (Try Omarchy)")
-  register_motion_binding(hl, "CTRL + ALT + RIGHT", 1, 0, "Spatial Camera Right (Try Omarchy)")
-  register_motion_binding(hl, "CTRL + ALT + UP", 0, -1, "Spatial Camera Up (Try Omarchy)")
-  register_motion_binding(hl, "CTRL + ALT + DOWN", 0, 1, "Spatial Camera Down (Try Omarchy)")
+  track_motion("LEFT", -1, 0, "Spatial Camera Left (Mode)")
+  track_motion("RIGHT", 1, 0, "Spatial Camera Right (Mode)")
+  track_motion("UP", 0, -1, "Spatial Camera Up (Mode)")
+  track_motion("DOWN", 0, 1, "Spatial Camera Down (Mode)")
 
-  register_binding(
+  track(register_binding(
     hl,
     "SUPER + ALT + 0",
     function()
       M.reset(hl)
     end,
     "Reset Spatial Camera"
-  )
+  ))
 
-  register_binding(
+  track(register_binding(
     hl,
-    "CTRL + ALT + 0",
+    "0",
     function()
       M.reset(hl)
     end,
-    "Reset Spatial Camera (Try Omarchy)"
-  )
+    "Reset Spatial Camera (Mode)"
+  ))
 
+  local state_ok, spatial_enabled = M.enabled(hl)
+  sync_input_mode(state_ok and spatial_enabled)
+
+  return true
   return true
 end
 
