@@ -196,7 +196,15 @@ echo "== Enable =="
 enabled="$(hyprctl gendbyte-spatial enable)"
 echo "$enabled"
 assert_contains "$enabled" '"enabled":true' "spatial enable"
-assert_contains "$enabled" '"zoom":0.74' "default spatial zoom"
+ENABLED_JSON="$enabled" python3 - <<'PY'
+import json
+import math
+import os
+status = json.loads(os.environ["ENABLED_JSON"])
+zoom = float(status["camera"]["zoom"])
+if not math.isclose(zoom, 0.74, rel_tol=0.0, abs_tol=1e-9):
+    raise SystemExit(f"unexpected default zoom: {zoom}")
+PY
 
 read -r camera_base_x camera_base_y < <(printf '%s\n' "$enabled" | read_camera_xy)
 read -r zoomed_address zoomed_x zoomed_y zoomed_w zoomed_h < <(read_active_rect)
@@ -293,7 +301,7 @@ assert_rect_delta \
   "$(python3 -c "print(-$PAN_X * 0.74)")" "$(python3 -c "print(-$PAN_Y * 0.74)")"
 
 echo
-echo "PASS: hyprctl reports the active window moved by -${PAN_X}px horizontally."
+echo "PASS: hyprctl reports the camera moved by +${PAN_X} world units and the zoomed window projected accordingly."
 echo "Visually verify the same large movement now."
 echo "World rectangles were also checked automatically and remained unchanged."
 echo "Holding the projected geometry for 5 seconds..."
