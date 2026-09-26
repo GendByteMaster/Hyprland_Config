@@ -9,6 +9,8 @@ local function fake_hyprland(with_plugin)
     loads = {},
   }
 
+  local enabled_state = false
+
   local hl = {
     plugin = {},
   }
@@ -20,10 +22,17 @@ local function fake_hyprland(with_plugin)
   if with_plugin then
     hl.plugin.gendbyte_spatial = {}
 
+    function hl.plugin.gendbyte_spatial.enabled()
+      return enabled_state
+    end
+
     function hl.plugin.gendbyte_spatial.toggle()
+      enabled_state = not enabled_state
       calls.plugin[#calls.plugin + 1] = {
         name = "toggle",
+        enabled = enabled_state,
       }
+      return enabled_state
     end
 
     function hl.plugin.gendbyte_spatial.pan(dx, dy)
@@ -56,11 +65,22 @@ local function fake_hyprland(with_plugin)
   end
 
   function hl.bind(keys, callback, options)
+    local handle = {
+      enabled = true,
+    }
+
+    function handle:set_enabled(enabled)
+      self.enabled = enabled == true
+    end
+
     calls.binds[#calls.binds + 1] = {
       keys = keys,
       callback = callback,
       options = options or {},
+      handle = handle,
     }
+
+    return handle
   end
 
   function hl.unbind(keys)
@@ -161,16 +181,16 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
     "SUPER + ALT + UP",
     "SUPER + ALT + DOWN",
     "SUPER + ALT + DOWN",
-    "CTRL + ALT + LEFT",
-    "CTRL + ALT + LEFT",
-    "CTRL + ALT + RIGHT",
-    "CTRL + ALT + RIGHT",
-    "CTRL + ALT + UP",
-    "CTRL + ALT + UP",
-    "CTRL + ALT + DOWN",
-    "CTRL + ALT + DOWN",
+    "LEFT",
+    "LEFT",
+    "RIGHT",
+    "RIGHT",
+    "UP",
+    "UP",
+    "DOWN",
+    "DOWN",
     "SUPER + ALT + 0",
-    "CTRL + ALT + 0",
+    "0",
   }
 
   for index, keys in ipairs(expected) do
@@ -180,46 +200,49 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
   t.eq(calls.binds[1].options.description, "Toggle Spatial Desktop")
   t.eq(calls.binds[2].options.description, "Toggle Spatial Desktop (Try Omarchy)")
 
+  -- Toggle bindings stay active; every camera/reset binding starts disabled
+  -- while Spatial mode is off.
+  t.eq(calls.binds[1].handle.enabled, true)
+  t.eq(calls.binds[2].handle.enabled, true)
+  for index = 3, 20 do
+    t.eq(calls.binds[index].handle.enabled, false)
+  end
+
   for _, index in ipairs({4, 6, 8, 10, 12, 14, 16, 18}) do
     t.eq(calls.binds[index].options.release, true)
   end
 end)
 
-t.test("spatial binding callbacks call direct plugin Lua functions", function()
+t.test("spatial toggle synchronizes mode-scoped input bindings", function()
   local hl, calls = fake_hyprland(true)
 
   spatial.register(hl, {}, INSTALLED_OPTIONS)
 
-  for index = 1, #calls.binds do
-    calls.binds[index].callback()
-  end
+  t.eq(calls.binds[3].handle.enabled, false)
+  calls.binds[2].callback()
 
-  t.eq(#calls.plugin, 20)
   t.eq(calls.plugin[1].name, "toggle")
-  t.eq(calls.plugin[2].name, "toggle")
-
-  local motion_expectations = {
-    {3, "nudge", -1, 0}, {4, "brake"},
-    {5, "nudge", 1, 0},  {6, "brake"},
-    {7, "nudge", 0, -1}, {8, "brake"},
-    {9, "nudge", 0, 1},  {10, "brake"},
-    {11, "nudge", -1, 0}, {12, "brake"},
-    {13, "nudge", 1, 0},  {14, "brake"},
-    {15, "nudge", 0, -1}, {16, "brake"},
-    {17, "nudge", 0, 1},  {18, "brake"},
-  }
-
-  for _, expected in ipairs(motion_expectations) do
-    local call = calls.plugin[expected[1]]
-    t.eq(call.name, expected[2])
-    if expected[2] == "nudge" then
-      t.eq(call.dx, expected[3])
-      t.eq(call.dy, expected[4])
-    end
+  t.eq(calls.plugin[1].enabled, true)
+  for index = 3, 20 do
+    t.eq(calls.binds[index].handle.enabled, true)
   end
 
-  t.eq(calls.plugin[19].name, "reset")
-  t.eq(calls.plugin[20].name, "reset")
+  calls.binds[11].callback()
+  calls.binds[12].callback()
+  t.eq(calls.plugin[2].name, "nudge")
+  t.eq(calls.plugin[2].dx, -1)
+  t.eq(calls.plugin[2].dy, 0)
+  t.eq(calls.plugin[3].name, "brake")
+
+  calls.binds[20].callback()
+  t.eq(calls.plugin[4].name, "reset")
+
+  calls.binds[2].callback()
+  t.eq(calls.plugin[5].name, "toggle")
+  t.eq(calls.plugin[5].enabled, false)
+  for index = 3, 20 do
+    t.eq(calls.binds[index].handle.enabled, false)
+  end
 end)
 
 t.test("spatial exact pan remains available for deterministic control", function()
@@ -238,6 +261,9 @@ t.test("spatial wrapper contains plugin callback failures", function()
   local hl = {
     plugin = {
       gendbyte_spatial = {
+        enabled = function()
+          return false
+        end,
         toggle = function()
           error("simulated plugin error")
         end,
