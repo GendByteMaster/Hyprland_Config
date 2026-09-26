@@ -172,7 +172,7 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
 
   local expected = {
     "SUPER + ALT + G",
-    "F12",
+    "SUPER + F12",
     "SUPER + ALT + LEFT",
     "SUPER + ALT + LEFT",
     "SUPER + ALT + RIGHT",
