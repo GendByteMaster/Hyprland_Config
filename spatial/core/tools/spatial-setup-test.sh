@@ -20,6 +20,7 @@ command -v hyprctl >/dev/null || die "hyprctl not found"
 command -v install >/dev/null || die "install not found"
 command -v sha256sum >/dev/null || die "sha256sum not found"
 command -v df >/dev/null || die "df not found"
+command -v python3 >/dev/null || die "python3 not found"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Run this inside the Hyprland_Config repository"
 cd "$ROOT"
@@ -202,7 +203,15 @@ sleep 0.2
 status_on="$(hyprctl gendbyte-spatial status)"
 printf '%s\n' "$status_on"
 [[ "$status_on" == *'"enabled":true'* ]] || die "Direct Lua toggle did not enable spatial mode"
-[[ "$status_on" == *'"zoom":0.74'* ]] || die "Spatial mode did not start at 74 percent zoom"
+STATUS_JSON="$status_on" python3 - <<'PY' || die "Spatial mode did not start at 74 percent zoom"
+import json
+import math
+import os
+status = json.loads(os.environ["STATUS_JSON"])
+zoom = float(status["camera"]["zoom"])
+if not math.isclose(zoom, 0.74, rel_tol=0.0, abs_tol=1e-9):
+    raise SystemExit(f"unexpected zoom: {zoom}")
+PY
 
 echo
 echo "== Direct Lua toggle OFF =="
