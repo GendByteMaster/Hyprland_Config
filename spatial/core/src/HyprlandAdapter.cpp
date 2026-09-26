@@ -8,6 +8,7 @@
 
 #include <hyprland/src/desktop/state/GlobalWindowController.hpp>
 #include <hyprland/src/desktop/state/WindowState.hpp>
+#include <hyprland/src/desktop/Workspace.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/event/EventBus.hpp>
 #include <hyprland/src/layout/space/Space.hpp>
@@ -483,8 +484,8 @@ bool HyprlandAdapter::activateWorkspaceCanvas() {
     }
 
     std::vector<PHLWORKSPACE> workspaces;
-    for (const auto& workspace : State::Workspace::state()->workspaces()) {
-        if (!workspace || workspace->type() != Workspace::eWorkspaceType::NORMAL) {
+    for (const auto& workspace : State::workspaceState()->workspaces()) {
+        if (!workspace || workspace->m_isSpecialWorkspace) {
             continue;
         }
 
@@ -506,16 +507,16 @@ bool HyprlandAdapter::activateWorkspaceCanvas() {
     }
 
     std::ranges::sort(workspaces, [](const PHLWORKSPACE& lhs, const PHLWORKSPACE& rhs) {
-        const auto lhsNumber = lhs->numberedID();
-        const auto rhsNumber = rhs->numberedID();
+        const bool lhsNumbered = lhs->m_id > 0;
+        const bool rhsNumbered = rhs->m_id > 0;
 
-        if (lhsNumber && rhsNumber && *lhsNumber != *rhsNumber) {
-            return *lhsNumber < *rhsNumber;
+        if (lhsNumbered && rhsNumbered && lhs->m_id != rhs->m_id) {
+            return lhs->m_id < rhs->m_id;
         }
-        if (lhsNumber.has_value() != rhsNumber.has_value()) {
-            return lhsNumber.has_value();
+        if (lhsNumbered != rhsNumbered) {
+            return lhsNumbered;
         }
-        return lhs->addressableName() < rhs->addressableName();
+        return lhs->m_name < rhs->m_name;
     });
 
     const auto activeIt = std::ranges::find(workspaces, monitor->m_activeWorkspace);
@@ -532,7 +533,7 @@ bool HyprlandAdapter::activateWorkspaceCanvas() {
 
         workspaceBindings_.push_back(WorkspaceBinding{
             .workspace = workspace,
-            .originalVisible = workspace->visible(),
+            .originalVisible = workspace->isVisible(),
             .originalForceRendering = workspace->m_forceRendering,
             .originalAlpha = workspace->m_alpha->value(),
             .originalRenderOffset = Point{offset.x, offset.y},
@@ -562,7 +563,7 @@ void HyprlandAdapter::restoreWorkspaceCanvas() noexcept {
             binding.originalRenderOffset.x,
             binding.originalRenderOffset.y,
         });
-        workspace->setVisible(binding.originalVisible);
+        workspace->m_visible = binding.originalVisible;
 
         if (const auto monitor = workspace->m_monitor.lock(); monitor) {
             g_pHyprRenderer->damageMonitor(monitor);
@@ -585,7 +586,7 @@ void HyprlandAdapter::reassertWorkspaceCanvas() noexcept {
             continue;
         }
 
-        workspace->setVisible(true);
+        workspace->m_visible = true;
         workspace->m_forceRendering = true;
         workspace->m_alpha->setValueAndWarp(1.0F);
         workspace->m_renderOffset->setValueAndWarp(Vector2D{});
