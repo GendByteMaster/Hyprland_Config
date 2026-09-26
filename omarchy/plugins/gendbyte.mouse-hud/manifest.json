@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "gendbyte.mouse-hud",
-  "name": "Mouse Mode HUD",
-  "version": "0.1.0",
+  "name": "Workstation Mode HUD",
+  "version": "0.2.0",
   "author": "GendByteMaster",
-  "description": "Transient NumFlow-style HUD for Hyprland keyboard mouse mode",
+  "description": "Transient HUD for Mouse Mode and Developer Spatial Desktop",
   "kinds": [
     "panel"
   ],
