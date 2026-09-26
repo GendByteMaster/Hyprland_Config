@@ -62,6 +62,18 @@ local function fake_hyprland(with_plugin)
         name = "reset",
       }
     end
+
+    function hl.plugin.gendbyte_spatial.select()
+      local selected = enabled_state
+      if selected then
+        enabled_state = false
+      end
+      calls.plugin[#calls.plugin + 1] = {
+        name = "select",
+        selected = selected,
+      }
+      return selected
+    end
   end
 
   function hl.bind(keys, callback, options)
@@ -157,8 +169,8 @@ t.test("spatial config keeps installed plugin declared when API is already avail
   t.eq(registered, true)
   t.eq(#calls.loads, 1)
   t.eq(calls.loads[1], "/tmp/gendbyte-spatial.so")
-  t.eq(#calls.unbinds, 12)
-  t.eq(#calls.binds, 20)
+  t.eq(#calls.unbinds, 14)
+  t.eq(#calls.binds, 22)
 end)
 
 t.test("spatial bindings register native and Try Omarchy chords", function()
@@ -167,12 +179,13 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
   local registered = spatial.register(hl, {}, INSTALLED_OPTIONS)
 
   t.eq(registered, true)
-  t.eq(#calls.unbinds, 12)
-  t.eq(#calls.binds, 20)
+  t.eq(#calls.unbinds, 14)
+  t.eq(#calls.binds, 22)
 
   local expected = {
     "SUPER + ALT + G",
     "SUPER + F12",
+    "SUPER + TAB",
     "SUPER + ALT + LEFT",
     "SUPER + ALT + LEFT",
     "SUPER + ALT + RIGHT",
@@ -191,6 +204,7 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
     "DOWN",
     "SUPER + ALT + 0",
     "0",
+    "mouse:272",
   }
 
   for index, keys in ipairs(expected) do
@@ -199,21 +213,25 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
 
   t.eq(calls.binds[1].options.description, "Toggle Spatial Desktop")
   t.eq(calls.binds[2].options.description, "Toggle Spatial Desktop (Try Omarchy)")
+  t.eq(calls.binds[3].options.description, "Spatial Window Overview")
+  t.eq(calls.binds[22].options.description, "Select Spatial Window")
+  t.eq(calls.binds[22].options.mouse, true)
 
-  -- Toggle bindings stay active; every camera/reset binding starts disabled
-  -- while Spatial mode is off.
+  -- Toggle bindings stay active; camera/reset/mouse-selection bindings are
+  -- enabled only while Spatial mode is active.
   t.eq(calls.binds[1].handle.enabled, true)
   t.eq(calls.binds[2].handle.enabled, true)
-  for index = 3, 20 do
+  t.eq(calls.binds[3].handle.enabled, true)
+  for index = 4, 22 do
     t.eq(calls.binds[index].handle.enabled, false)
   end
 
-  for _, index in ipairs({4, 6, 8, 10, 12, 14, 16, 18}) do
+  for _, index in ipairs({5, 7, 9, 11, 13, 15, 17, 19}) do
     t.eq(calls.binds[index].options.release, true)
   end
 end)
 
-t.test("spatial toggle synchronizes mode-scoped input bindings and HUD", function()
+t.test("spatial toggle, selection, and HUD synchronize mode-scoped input", function()
   local hl, calls = fake_hyprland(true)
   local hud_calls = {}
 
@@ -232,8 +250,8 @@ t.test("spatial toggle synchronizes mode-scoped input bindings and HUD", functio
     },
   })
 
-  t.eq(calls.binds[3].handle.enabled, false)
-  calls.binds[2].callback()
+  t.eq(calls.binds[4].handle.enabled, false)
+  calls.binds[3].callback()
 
   t.eq(calls.plugin[1].name, "toggle")
   t.eq(calls.plugin[1].enabled, true)
@@ -241,31 +259,32 @@ t.test("spatial toggle synchronizes mode-scoped input bindings and HUD", functio
   t.eq(hud_calls[1].enabled, true)
   t.eq(hud_calls[1].zoom_percent, 74)
   t.eq(hud_calls[1].action, "toggle")
-  for index = 3, 20 do
+  for index = 4, 22 do
     t.eq(calls.binds[index].handle.enabled, true)
   end
 
-  calls.binds[11].callback()
   calls.binds[12].callback()
+  calls.binds[13].callback()
   t.eq(calls.plugin[2].name, "nudge")
   t.eq(calls.plugin[2].dx, -1)
   t.eq(calls.plugin[2].dy, 0)
   t.eq(calls.plugin[3].name, "brake")
   t.eq(#hud_calls, 1)
 
-  calls.binds[20].callback()
+  calls.binds[21].callback()
   t.eq(calls.plugin[4].name, "reset")
   t.eq(#hud_calls, 2)
   t.eq(hud_calls[2].enabled, true)
   t.eq(hud_calls[2].action, "reset")
 
-  calls.binds[2].callback()
-  t.eq(calls.plugin[5].name, "toggle")
-  t.eq(calls.plugin[5].enabled, false)
+  local result = calls.binds[22].callback()
+  t.eq(result.ok, true)
+  t.eq(calls.plugin[5].name, "select")
+  t.eq(calls.plugin[5].selected, true)
   t.eq(#hud_calls, 3)
   t.eq(hud_calls[3].enabled, false)
   t.eq(hud_calls[3].action, "toggle")
-  for index = 3, 20 do
+  for index = 4, 22 do
     t.eq(calls.binds[index].handle.enabled, false)
   end
 end)
@@ -296,6 +315,7 @@ t.test("spatial wrapper contains plugin callback failures", function()
         nudge = function() end,
         brake = function() end,
         reset = function() end,
+        select = function() end,
       },
     },
   }
@@ -307,13 +327,12 @@ t.test("spatial wrapper contains plugin callback failures", function()
   t.truthy(err:find("simulated plugin error", 1, true) ~= nil)
 end)
 
-t.test("bindings entrypoint registers spatial layer before workspace overview", function()
-  local file = assert(io.open("hypr/bindings.lua", "r"))
+t.test("Spatial owns Super+Tab while legacy overview remains an explicit fallback", function()
+  local file = assert(io.open("hypr/workstation/workspace_overview.lua", "r"))
   local source = file:read("*a")
   file:close()
 
-  local spatial_index = assert(source:find('require("hypr.workstation.spatial")', 1, true))
-  local overview_index = assert(source:find('require("hypr.workstation.workspace_overview")', 1, true))
-
-  t.truthy(spatial_index < overview_index)
+  t.truthy(source:find('if not spatial.available(hl) then', 1, true) ~= nil)
+  t.truthy(source:find('"SUPER + TAB"', 1, true) ~= nil)
+  t.truthy(source:find('"Legacy Persistent Window Switcher"', 1, true) ~= nil)
 end)
