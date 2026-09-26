@@ -233,7 +233,7 @@ printf '%s\n' "$config_errors"
 
 echo
 echo "== Check direct Lua API =="
-lua_check="$(hyprctl eval 'assert(type(hl.plugin.gendbyte_spatial) == "table", "missing hl.plugin.gendbyte_spatial"); assert(type(hl.plugin.gendbyte_spatial.enabled) == "function", "missing enabled"); assert(type(hl.plugin.gendbyte_spatial.toggle) == "function", "missing toggle"); assert(type(hl.plugin.gendbyte_spatial.select) == "function", "missing select"); assert(type(hl.plugin.gendbyte_spatial.pan) == "function", "missing pan"); assert(type(hl.plugin.gendbyte_spatial.nudge) == "function", "missing nudge"); assert(type(hl.plugin.gendbyte_spatial.brake) == "function", "missing brake"); assert(type(hl.plugin.gendbyte_spatial.reset) == "function", "missing reset")')"
+lua_check="$(hyprctl eval 'assert(type(hl.plugin.gendbyte_spatial) == "table", "missing hl.plugin.gendbyte_spatial"); assert(type(hl.plugin.gendbyte_spatial.enabled) == "function", "missing enabled"); assert(type(hl.plugin.gendbyte_spatial.toggle) == "function", "missing toggle"); assert(type(hl.plugin.gendbyte_spatial.overview) == "function", "missing overview"); assert(type(hl.plugin.gendbyte_spatial.select) == "function", "missing select"); assert(type(hl.plugin.gendbyte_spatial.pan) == "function", "missing pan"); assert(type(hl.plugin.gendbyte_spatial.nudge) == "function", "missing nudge"); assert(type(hl.plugin.gendbyte_spatial.brake) == "function", "missing brake"); assert(type(hl.plugin.gendbyte_spatial.reset) == "function", "missing reset")')"
 printf '%s\n' "$lua_check"
 [[ "$lua_check" != error:* ]] || die "Lua plugin namespace validation failed"
 echo "Lua API: OK"
@@ -389,9 +389,93 @@ printf '%s\n' "$status_off"
 [[ "$status_off" == *'"enabled":false'* ]] || die "Direct Lua toggle did not disable spatial mode"
 
 echo
+echo "== Fit-all Spatial Overview =="
+overview_on="$(hyprctl eval 'hl.plugin.gendbyte_spatial.overview()')"
+printf '%s\n' "$overview_on"
+[[ "$overview_on" != error:* ]] || die "Direct Lua overview ON failed"
+sleep 0.25
+
+overview_status="$(hyprctl gendbyte-spatial status)"
+printf '%s\n' "$overview_status"
+[[ "$overview_status" == *'"enabled":true'* ]] || die "Spatial overview did not enable"
+
+overview_clients="$(hyprctl -j clients)"
+CLIENTS_JSON="$overview_clients" python3 - <<'PY' || die "Spatial overview windows overlap"
+import json
+import os
+
+clients = json.loads(os.environ["CLIENTS_JSON"])
+rects = []
+
+for window in clients:
+    if window.get("mapped") is False:
+        continue
+
+    workspace = window.get("workspace") or {}
+    name = str(workspace.get("name") or "")
+    if not name or name.startswith("special:"):
+        continue
+
+    try:
+        if int(window.get("fullscreen", 0)) != 0:
+            continue
+        if int(window.get("monitor", 0)) < 0:
+            continue
+    except (TypeError, ValueError):
+        continue
+
+    at = window.get("at") or [0, 0]
+    size = window.get("size") or [0, 0]
+    if len(at) < 2 or len(size) < 2:
+        continue
+
+    x, y = float(at[0]), float(at[1])
+    width, height = float(size[0]), float(size[1])
+    if width <= 0 or height <= 0:
+        continue
+
+    rects.append((str(window.get("address") or "?"), x, y, width, height))
+
+tolerance = 3.0
+overlaps = []
+
+for index, left in enumerate(rects):
+    _, ax, ay, aw, ah = left
+    for right in rects[index + 1:]:
+        _, bx, by, bw, bh = right
+
+        overlap_width = min(ax + aw, bx + bw) - max(ax, bx)
+        overlap_height = min(ay + ah, by + bh) - max(ay, by)
+
+        if overlap_width > tolerance and overlap_height > tolerance:
+            overlaps.append((left, right, overlap_width, overlap_height))
+
+if overlaps:
+    for left, right, ow, oh in overlaps:
+        print(
+            "overlap:",
+            left[0], f"({left[1]:.0f},{left[2]:.0f},{left[3]:.0f}x{left[4]:.0f})",
+            "<->",
+            right[0], f"({right[1]:.0f},{right[2]:.0f},{right[3]:.0f}x{right[4]:.0f})",
+            f"intersection={ow:.0f}x{oh:.0f}",
+        )
+    raise SystemExit(1)
+
+print(f"Fit-all overview: {len(rects)} windows, no overlaps")
+PY
+
+overview_off="$(hyprctl eval 'hl.plugin.gendbyte_spatial.overview()')"
+printf '%s\n' "$overview_off"
+[[ "$overview_off" != error:* ]] || die "Direct Lua overview OFF failed"
+sleep 0.2
+
+overview_status_off="$(hyprctl gendbyte-spatial status)"
+[[ "$overview_status_off" == *'"enabled":false'* ]] || die "Spatial overview did not restore normal mode"
+
+echo
 echo
 echo "Note: Windows Xbox Game Bar intercepts Win+Alt+G before Hyprland."
-echo "Use Super+Tab for Spatial Overview (Super+F12 remains the Try Omarchy fallback); click a window to restore its workspace and focus it."
+echo "Use Super+Tab for the fit-all Spatial Overview; Super+F12 keeps the free Spatial camera mode; click a window to restore its workspace and focus it."
 echo "=============================================="
 echo "Spatial plugin is versioned, installed, and config-managed."
 echo "Spatial HUD: $SPATIAL_HUD_ID"
@@ -400,8 +484,8 @@ echo "Spatial bindings: OK"
 echo
 echo "Hotkeys:"
 echo "  Super+Alt+G      Toggle Spatial Desktop (native Linux)"
-echo "  Super+Tab        Spatial Window Overview"
-echo "  Super+F12        Spatial Overview fallback (Try Omarchy)"
+echo "  Super+Tab        Fit-all Spatial Window Overview"
+echo "  Super+F12        Toggle free Spatial camera mode (Try Omarchy)"
 echo "  Super+Alt+Arrow  Camera movement (native Linux)"
 echo "  Arrow keys       Camera movement while Spatial is ON"
 echo "  Super+Alt+0      Reset camera (native Linux)"
