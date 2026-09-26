@@ -222,6 +222,64 @@ if not math.isclose(zoom, 0.74, rel_tol=0.0, abs_tol=1e-9):
 PY
 
 echo
+echo "== All-workspace capture =="
+
+monitor_count="$(hyprctl -j monitors | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')"
+if [[ "$monitor_count" -eq 1 ]]; then
+  expected_windows="$(
+    hyprctl -j clients | python3 -c '
+import json
+import sys
+
+clients = json.load(sys.stdin)
+count = 0
+for window in clients:
+    if window.get("mapped") is False:
+        continue
+
+    workspace = window.get("workspace") or {}
+    name = str(workspace.get("name") or "")
+    if not name or name.startswith("special:"):
+        continue
+
+    fullscreen = window.get("fullscreen", 0)
+    try:
+        if int(fullscreen) != 0:
+            continue
+    except (TypeError, ValueError):
+        pass
+
+    monitor = window.get("monitor", 0)
+    try:
+        if int(monitor) < 0:
+            continue
+    except (TypeError, ValueError):
+        continue
+
+    count += 1
+
+print(count)
+'
+  )"
+
+  managed_windows="$(
+    STATUS_JSON="$status_on" python3 -c '
+import json
+import os
+print(int(json.loads(os.environ["STATUS_JSON"]).get("managed_window_count", 0)))
+'
+  )"
+
+  echo "eligible normal-workspace windows: $expected_windows"
+  echo "Spatial managed windows:          $managed_windows"
+
+  [[ "$managed_windows" -eq "$expected_windows" ]]     || die "Spatial did not capture every eligible window across normal workspaces ($managed_windows/$expected_windows)"
+else
+  echo "All-workspace capture check skipped: $monitor_count monitors detected."
+  echo "Multi-monitor tiled cross-workspace projection remains fail-safe/deferred."
+fi
+
+echo
 echo "== Direct Lua toggle OFF =="
 toggle_off="$(hyprctl eval 'hl.plugin.gendbyte_spatial.toggle()')"
 printf '%s\n' "$toggle_off"
@@ -249,9 +307,11 @@ echo "  Arrow keys       Camera movement while Spatial is ON"
 echo "  Super+Alt+0      Reset camera (native Linux)"
 echo "  0                Reset camera while Spatial is ON"
 echo
-echo "Single-monitor sessions can use ordinary tiled windows directly."
+echo "Single-monitor Spatial mode captures eligible windows from every normal workspace."
+echo "Normal workspaces are projected as horizontal world lanes without moving windows out of their layout trees."
+echo "Ordinary workspace switching while Spatial is ON jumps the camera to that workspace lane."
+echo "Special workspaces and multi-monitor tiled cross-seam projection remain deferred."
 echo "No manual 'hyprctl dispatch setfloating' step is required."
-echo "On multi-monitor sessions, tiled cross-seam projection is still deferred."
 
 echo
 echo "== Prune superseded plugin builds =="
