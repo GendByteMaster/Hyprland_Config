@@ -1,4 +1,8 @@
+local hud_module = require("hypr.workstation.hud")
+
 local M = {}
+
+local SPATIAL_ZOOM_PERCENT = 74
 
 local DEFAULT_INSTALL_RELATIVE = ".local/lib/gendbyte-spatial"
 local CURRENT_PATH_FILENAME = "current-path"
@@ -202,8 +206,9 @@ local function set_handles_enabled(handles, enabled)
   end
 end
 
-function M.register(hl, _o, options)
+function M.register(hl, o, options)
   options = options or {}
+  o = o or {}
 
   assert(type(hl) == "table", "Hyprland API is required")
   assert(type(hl.bind) == "function", "Hyprland bind API is required")
@@ -217,6 +222,7 @@ function M.register(hl, _o, options)
     return false, declared and "gendbyte-spatial load scheduled" or declare_error
   end
 
+  local hud = options.hud or hud_module.new(hl, o)
   local input_handles = {}
 
   local function track(handle)
@@ -236,10 +242,25 @@ function M.register(hl, _o, options)
     set_handles_enabled(input_handles, enabled == true)
   end
 
+  local function show_spatial_hud(enabled, action)
+    if hud and type(hud.show_spatial) == "function" then
+      pcall(hud.show_spatial, enabled == true, SPATIAL_ZOOM_PERCENT, action)
+    end
+  end
+
   local function toggle_and_sync()
     local ok, enabled = M.toggle(hl)
     if ok then
       sync_input_mode(enabled == true)
+      show_spatial_hud(enabled == true, "toggle")
+    end
+    return { ok = ok }
+  end
+
+  local function reset_and_notify()
+    local ok = M.reset(hl)
+    if ok then
+      show_spatial_hud(true, "reset")
     end
     return { ok = ok }
   end
@@ -274,18 +295,14 @@ function M.register(hl, _o, options)
   track(register_binding(
     hl,
     "SUPER + ALT + 0",
-    function()
-      M.reset(hl)
-    end,
+    reset_and_notify,
     "Reset Spatial Camera"
   ))
 
   track(register_binding(
     hl,
     "0",
-    function()
-      M.reset(hl)
-    end,
+    reset_and_notify,
     "Reset Spatial Camera (Mode)"
   ))
 
