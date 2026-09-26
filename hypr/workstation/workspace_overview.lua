@@ -1,4 +1,5 @@
 local compat = require("hypr.workstation.compat")
+local spatial = require("hypr.workstation.spatial")
 
 local M = {}
 
@@ -45,7 +46,12 @@ function M.register(hl, _o, options)
     return false
   end
 
-  register_binding(hl, "SUPER + TAB", command, "Workspace Overview")
+  -- Spatial Overview owns Super+Tab once its plugin API is available.
+  -- Keep the legacy overview only as a fallback during plugin load/failure;
+  -- the explicit legacy chords below remain available during migration.
+  if not spatial.available(hl) then
+    register_binding(hl, "SUPER + TAB", command, "Workspace Overview (Legacy Fallback)")
+  end
 
   -- Windows Ctrl+Alt+Tab semantics: open a persistent task switcher that
   -- stays visible after the chord is released.
@@ -53,7 +59,7 @@ function M.register(hl, _o, options)
     hl,
     "CTRL + ALT + TAB",
     command .. " task-switcher",
-    "Persistent Window Switcher"
+    "Legacy Persistent Window Switcher"
   )
 
   -- Keep the explicit launcher chord as an additional accessibility path.
@@ -61,12 +67,12 @@ function M.register(hl, _o, options)
     hl,
     "SUPER + F10",
     command .. " task-switcher",
-    "All-Monitor Window Switcher"
+    "Legacy All-Monitor Window Switcher"
   )
 
   -- Try Omarchy may lose host-owned chords before they reach Hyprland.
   if compat.is_try_omarchy(options) then
-    register_binding(hl, "SUPER + F9", command, "Workspace Overview (Try Omarchy)")
+    register_binding(hl, "SUPER + F9", command, "Legacy Workspace Overview (Try Omarchy)")
   end
 
   return true
