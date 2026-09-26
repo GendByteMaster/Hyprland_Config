@@ -16,7 +16,6 @@
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/state/MonitorState.hpp>
 #include <hyprland/src/state/WorkspaceState.hpp>
-#include <hyprland/src/workspace/HLWorkspace.hpp>
 
 #include <algorithm>
 #include <cstdint>
