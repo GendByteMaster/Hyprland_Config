@@ -38,6 +38,7 @@ public:
     [[nodiscard]] PanResult pan(double dx, double dy);
     [[nodiscard]] PanResult setZoom(double value);
     [[nodiscard]] PanResult resetCamera();
+    [[nodiscard]] PanResult arrangeOverview();
     [[nodiscard]] bool selectAtPointer();
     [[nodiscard]] PanResult nudge(int xDirection, int yDirection);
     void releaseMotion() noexcept;
@@ -94,6 +95,7 @@ private:
     std::vector<WindowBinding> bindings_;
     std::vector<WorkspaceBinding> workspaceBindings_;
     bool workspaceCanvasActive_ = false;
+    bool overviewModeActive_ = false;
     CameraMotion motion_;
     SP<CEventLoopTimer> motionTimer_;
     std::uint64_t pendingProjectionRefresh_ = 0;
