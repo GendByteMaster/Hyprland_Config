@@ -36,6 +36,7 @@ public:
     [[nodiscard]] bool enable();
     void disable() noexcept;
     [[nodiscard]] PanResult pan(double dx, double dy);
+    [[nodiscard]] PanResult setZoom(double value);
     [[nodiscard]] PanResult nudge(int xDirection, int yDirection);
     void releaseMotion() noexcept;
     void cancelMotion() noexcept;
