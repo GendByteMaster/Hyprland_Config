@@ -836,7 +836,7 @@ void HyprlandAdapter::onWorkspaceActivated(const PHLWORKSPACE& workspace) {
     // be visible again when Spatial exits.
     for (auto& binding : workspaceBindings_) {
         const auto candidate = binding.workspace.lock();
-        if (!candidate || candidate->m_monitor != workspace->m_monitor) {
+        if (!candidate || candidate->m_monitor.lock() != workspace->m_monitor.lock()) {
             continue;
         }
 
