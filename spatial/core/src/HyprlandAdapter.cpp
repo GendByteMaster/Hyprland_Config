@@ -6,6 +6,7 @@
 #include <hyprland/src/managers/eventLoop/EventLoopManager.hpp>
 #include <hyprland/src/managers/eventLoop/EventLoopTimer.hpp>
 
+#include <hyprland/src/desktop/state/GlobalWindowController.hpp>
 #include <hyprland/src/desktop/state/WindowState.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/event/EventBus.hpp>
@@ -14,6 +15,8 @@
 #include <hyprland/src/managers/fullscreen/FullscreenController.hpp>
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/state/MonitorState.hpp>
+#include <hyprland/src/state/WorkspaceState.hpp>
+#include <hyprland/src/workspace/HLWorkspace.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -27,6 +30,7 @@ namespace spatial {
 namespace {
 
 constexpr auto kMotionTick = std::chrono::milliseconds(16);
+constexpr double kWorkspaceLaneGap = 160.0;
 
 } // namespace
 
@@ -53,11 +57,18 @@ bool HyprlandAdapter::start(SpatialState& state) {
     windowFullscreen_ = Event::bus()->m_events.window.fullscreen.listen([this](PHLWINDOW window) {
         onWindowEligibilityChanged(window);
     });
+    windowMovedWorkspace_ = Event::bus()->m_events.window.moveToWorkspace.listen([this](PHLWINDOW window, PHLWORKSPACE) {
+        onWindowMovedWorkspace(window);
+    });
+    workspaceActivated_ = Event::bus()->m_events.workspace.active.listen([this](PHLWORKSPACE workspace) {
+        onWorkspaceActivated(workspace);
+    });
     monitorLayoutChanged_ = Event::bus()->m_events.monitor.layoutChanged.listen([this] {
         onMonitorLayoutChanged();
     });
 
-    if (!windowOpened_ || !windowClosed_ || !windowFloating_ || !windowFullscreen_ || !monitorLayoutChanged_) {
+    if (!windowOpened_ || !windowClosed_ || !windowFloating_ || !windowFullscreen_
+        || !windowMovedWorkspace_ || !workspaceActivated_ || !monitorLayoutChanged_) {
         stop();
         return false;
     }
@@ -82,6 +93,8 @@ void HyprlandAdapter::stop() noexcept {
     }
 
     monitorLayoutChanged_.reset();
+    workspaceActivated_.reset();
+    windowMovedWorkspace_.reset();
     windowFullscreen_.reset();
     windowFloating_.reset();
     windowClosed_.reset();
@@ -103,6 +116,10 @@ bool HyprlandAdapter::enable() {
         return false;
     }
 
+    if (!activateWorkspaceCanvas()) {
+        return false;
+    }
+
     std::vector<ManagedWindow> windows;
     std::vector<WindowBinding> bindings;
     windows.reserve(std::min<std::size_t>(Desktop::windowState()->windows().size(), SpatialState::kMaxManagedWindows));
@@ -116,6 +133,7 @@ bool HyprlandAdapter::enable() {
         }
 
         if (windows.size() >= SpatialState::kMaxManagedWindows) {
+            restoreWorkspaceCanvas();
             return false;
         }
 
@@ -128,6 +146,7 @@ bool HyprlandAdapter::enable() {
     }
 
     if (!state_->enable(*desk, std::move(windows))) {
+        restoreWorkspaceCanvas();
         return false;
     }
 
@@ -285,6 +304,7 @@ void HyprlandAdapter::scheduleProjectionRefresh() {
             return;
         }
 
+        reassertWorkspaceCanvas();
         pruneBindings();
         if (projectionReady()) {
             applyProjection();
@@ -296,6 +316,7 @@ void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
     cancelMotion();
     if (state_ == nullptr || !state_->enabled()) {
         bindings_.clear();
+        restoreWorkspaceCanvas();
         return;
     }
 
@@ -303,6 +324,7 @@ void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
         restoreOriginalGeometry();
     }
 
+    restoreWorkspaceCanvas();
     bindings_.clear();
     state_->disable();
 }
@@ -436,6 +458,166 @@ void HyprlandAdapter::dropBinding(std::string_view id) noexcept {
     });
 }
 
+bool HyprlandAdapter::activateWorkspaceCanvas() {
+    workspaceBindings_.clear();
+    workspaceCanvasActive_ = false;
+
+    // Phase 2 all-workspace projection is deliberately limited to one physical
+    // monitor. On multi-monitor setups, changing visibility for hidden tiled
+    // workspaces would expose unmanaged tiled windows across monitor ownership
+    // boundaries, which Hyprland 0.56 does not support safely.
+    if (!tiledProjectionAllowed()) {
+        return true;
+    }
+
+    PHLMONITOR monitor;
+    for (const auto& candidate : State::monitorState()->monitors()) {
+        if (!candidate) {
+            continue;
+        }
+        monitor = candidate;
+        break;
+    }
+
+    if (!monitor || !monitor->m_activeWorkspace) {
+        return false;
+    }
+
+    std::vector<PHLWORKSPACE> workspaces;
+    for (const auto& workspace : State::Workspace::state()->workspaces()) {
+        if (!workspace || workspace->type() != Workspace::eWorkspaceType::NORMAL) {
+            continue;
+        }
+
+        if (workspace->m_monitor.lock() != monitor) {
+            continue;
+        }
+
+        // Do not snapshot a workspace in the middle of a transition. Warping
+        // those animation variables would make exact restoration ambiguous.
+        if (workspace->m_alpha->isBeingAnimated() || workspace->m_renderOffset->isBeingAnimated()) {
+            return false;
+        }
+
+        workspaces.push_back(workspace);
+    }
+
+    if (workspaces.empty() || workspaces.size() > SpatialState::kMaxManagedWindows) {
+        return false;
+    }
+
+    std::ranges::sort(workspaces, [](const PHLWORKSPACE& lhs, const PHLWORKSPACE& rhs) {
+        const auto lhsNumber = lhs->numberedID();
+        const auto rhsNumber = rhs->numberedID();
+
+        if (lhsNumber && rhsNumber && *lhsNumber != *rhsNumber) {
+            return *lhsNumber < *rhsNumber;
+        }
+        if (lhsNumber.has_value() != rhsNumber.has_value()) {
+            return lhsNumber.has_value();
+        }
+        return lhs->addressableName() < rhs->addressableName();
+    });
+
+    const auto activeIt = std::ranges::find(workspaces, monitor->m_activeWorkspace);
+    if (activeIt == workspaces.end()) {
+        return false;
+    }
+
+    const auto activeIndex = static_cast<std::ptrdiff_t>(std::distance(workspaces.begin(), activeIt));
+    workspaceBindings_.reserve(workspaces.size());
+
+    for (std::size_t index = 0; index < workspaces.size(); ++index) {
+        const auto& workspace = workspaces[index];
+        const auto offset = workspace->m_renderOffset->value();
+
+        workspaceBindings_.push_back(WorkspaceBinding{
+            .workspace = workspace,
+            .originalVisible = workspace->visible(),
+            .originalForceRendering = workspace->m_forceRendering,
+            .originalAlpha = workspace->m_alpha->value(),
+            .originalRenderOffset = Point{offset.x, offset.y},
+            .lane = static_cast<int>(static_cast<std::ptrdiff_t>(index) - activeIndex),
+        });
+    }
+
+    workspaceCanvasActive_ = true;
+    reassertWorkspaceCanvas();
+    return true;
+}
+
+void HyprlandAdapter::restoreWorkspaceCanvas() noexcept {
+    if (!workspaceCanvasActive_ && workspaceBindings_.empty()) {
+        return;
+    }
+
+    for (const auto& binding : workspaceBindings_) {
+        const auto workspace = binding.workspace.lock();
+        if (!workspace) {
+            continue;
+        }
+
+        workspace->m_forceRendering = binding.originalForceRendering;
+        workspace->m_alpha->setValueAndWarp(binding.originalAlpha);
+        workspace->m_renderOffset->setValueAndWarp(Vector2D{
+            binding.originalRenderOffset.x,
+            binding.originalRenderOffset.y,
+        });
+        workspace->setVisible(binding.originalVisible);
+
+        if (const auto monitor = workspace->m_monitor.lock(); monitor) {
+            g_pHyprRenderer->damageMonitor(monitor);
+        }
+    }
+
+    workspaceCanvasActive_ = false;
+    workspaceBindings_.clear();
+    Desktop::globalWindowController()->updateSuspendedStates();
+}
+
+void HyprlandAdapter::reassertWorkspaceCanvas() noexcept {
+    if (!workspaceCanvasActive_) {
+        return;
+    }
+
+    for (const auto& binding : workspaceBindings_) {
+        const auto workspace = binding.workspace.lock();
+        if (!workspace) {
+            continue;
+        }
+
+        workspace->setVisible(true);
+        workspace->m_forceRendering = true;
+        workspace->m_alpha->setValueAndWarp(1.0F);
+        workspace->m_renderOffset->setValueAndWarp(Vector2D{});
+
+        if (const auto monitor = workspace->m_monitor.lock(); monitor) {
+            g_pHyprRenderer->damageMonitor(monitor);
+        }
+    }
+
+    Desktop::globalWindowController()->updateSuspendedStates();
+}
+
+std::optional<int> HyprlandAdapter::workspaceLane(const PHLWORKSPACE& workspace) const noexcept {
+    if (!workspaceCanvasActive_) {
+        return 0;
+    }
+
+    if (!workspace) {
+        return std::nullopt;
+    }
+
+    const auto it = std::ranges::find_if(workspaceBindings_, [&](const WorkspaceBinding& binding) {
+        return binding.workspace.lock() == workspace;
+    });
+    if (it == workspaceBindings_.end()) {
+        return std::nullopt;
+    }
+
+    return it->lane;
+}
+
 std::optional<DeskRect> HyprlandAdapter::currentDesk() const {
     const auto& monitors = State::monitorState()->monitors();
     if (monitors.empty()) {
@@ -508,7 +690,9 @@ bool HyprlandAdapter::eligible(const PHLWINDOW& window) const {
         return false;
     }
 
-    const bool visible = window->m_workspace == monitor->m_activeWorkspace || window->m_workspace == monitor->m_activeSpecialWorkspace;
+    const bool visible = workspaceCanvasActive_
+        ? workspaceLane(window->m_workspace).has_value()
+        : (window->m_workspace == monitor->m_activeWorkspace || window->m_workspace == monitor->m_activeSpecialWorkspace);
     if (!visible) {
         return false;
     }
@@ -542,7 +726,16 @@ std::optional<ManagedWindow> HyprlandAdapter::toManagedWindow(const PHLWINDOW& w
         return std::nullopt;
     }
 
-    const auto world = captureWorldRect(*compositorRect, state_->camera(), desk);
+    auto world = captureWorldRect(*compositorRect, state_->camera(), desk);
+    const auto lane = workspaceLane(window->m_workspace);
+    if (!lane) {
+        return std::nullopt;
+    }
+
+    if (workspaceCanvasActive_) {
+        world.x += static_cast<double>(*lane) * (desk.width() + kWorkspaceLaneGap);
+    }
+
     if (!isValid(world)) {
         return std::nullopt;
     }
@@ -614,6 +807,52 @@ void HyprlandAdapter::onWindowEligibilityChanged(const PHLWINDOW& window) {
     }
 
     onWindowOpened(window);
+}
+
+void HyprlandAdapter::onWindowMovedWorkspace(const PHLWINDOW& window) {
+    if (state_ == nullptr || !state_->enabled() || !window) {
+        return;
+    }
+
+    // World coordinates remain authoritative across ordinary workspace moves.
+    // If the destination leaves the managed normal-workspace canvas (for
+    // example a special workspace), normal eligibility pruning releases it.
+    onWindowEligibilityChanged(window);
+}
+
+void HyprlandAdapter::onWorkspaceActivated(const PHLWORKSPACE& workspace) {
+    if (state_ == nullptr || !state_->enabled() || !workspaceCanvasActive_ || !workspace) {
+        return;
+    }
+
+    const auto lane = workspaceLane(workspace);
+    if (!lane) {
+        return;
+    }
+
+    // Treat the user's ordinary workspace hotkey as a camera jump while
+    // Spatial is active, then remember that workspace as the one that should
+    // be visible again when Spatial exits.
+    for (auto& binding : workspaceBindings_) {
+        const auto candidate = binding.workspace.lock();
+        if (!candidate || candidate->m_monitor != workspace->m_monitor) {
+            continue;
+        }
+
+        const bool active = candidate == workspace;
+        binding.originalVisible = active;
+        binding.originalAlpha = active ? 1.0F : 0.0F;
+        binding.originalRenderOffset = {};
+    }
+
+    reassertWorkspaceCanvas();
+
+    if (state_->resetCamera()) {
+        const double laneDelta = static_cast<double>(*lane) * (state_->desk().width() + kWorkspaceLaneGap);
+        (void)state_->pan(laneDelta, 0.0);
+    }
+
+    scheduleProjectionRefresh();
 }
 
 void HyprlandAdapter::onMonitorLayoutChanged() {
