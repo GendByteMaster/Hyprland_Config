@@ -293,7 +293,6 @@ function M.register(hl, _o, options)
   sync_input_mode(state_ok and spatial_enabled)
 
   return true
-  return true
 end
 
 return M
