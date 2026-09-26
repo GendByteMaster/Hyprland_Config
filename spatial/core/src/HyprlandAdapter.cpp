@@ -177,6 +177,25 @@ PanResult HyprlandAdapter::setZoom(double value) {
     return PanResult::Success;
 }
 
+PanResult HyprlandAdapter::resetCamera() {
+    if (state_ == nullptr || !state_->enabled()) {
+        return PanResult::Disabled;
+    }
+
+    pruneBindings();
+
+    if (!projectionReady()) {
+        return PanResult::ProjectionUnavailable;
+    }
+
+    if (!state_->resetCamera()) {
+        return PanResult::OutOfRange;
+    }
+
+    applyProjection();
+    return PanResult::Success;
+}
+
 PanResult HyprlandAdapter::nudge(int xDirection, int yDirection) {
     if (state_ == nullptr || !state_->enabled()) {
         return PanResult::Disabled;
