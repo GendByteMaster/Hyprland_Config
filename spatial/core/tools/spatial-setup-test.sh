@@ -157,7 +157,7 @@ echo "Lua API: OK"
 echo "Spatial bindings: OK"
 echo
 echo "Hotkeys:"
-echo "  Ctrl+Super+G     Toggle Spatial Desktop"
+echo "  Super+Alt+G      Toggle Spatial Desktop"
 echo "  Super+Alt+Left   Camera left"
 echo "  Super+Alt+Right  Camera right"
 echo "  Super+Alt+Up     Camera up"
