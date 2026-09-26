@@ -1,5 +1,6 @@
 #include "spatial/SpatialState.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -12,6 +13,10 @@ void require(bool condition, const char* message) {
         std::cerr << "FAIL: " << message << '\n';
         std::exit(1);
     }
+}
+
+bool near(double lhs, double rhs, double epsilon = 1e-9) {
+    return std::abs(lhs - rhs) <= epsilon;
 }
 
 } // namespace
@@ -83,6 +88,26 @@ int main() {
     require(transactional.enable(desk, initial), "transactional enable accepts a valid initial window set");
     require(transactional.epoch() == 1, "transactional enable increments epoch once");
     require(transactional.windows().size() == 2, "transactional enable commits all windows together");
+
+    const spatial::Point deskCenter{desk.width() / 2.0, desk.height() / 2.0};
+    const auto worldCenterBeforeZoom = transactional.camera().deskToWorld(deskCenter);
+    require(transactional.setZoom(0.74), "state accepts 74 percent zoom");
+    require(near(transactional.camera().zoom(), 0.74), "state stores zoom");
+    const auto worldCenterAfterZoom = transactional.camera().deskToWorld(deskCenter);
+    require(
+        near(worldCenterAfterZoom.x, worldCenterBeforeZoom.x) &&
+        near(worldCenterAfterZoom.y, worldCenterBeforeZoom.y),
+        "zoom preserves world point under desk center"
+    );
+    require(transactional.pan(120.0, -80.0), "zoomed camera can pan");
+    require(transactional.resetCamera(), "zoom-aware camera reset succeeds");
+    require(near(transactional.camera().zoom(), 0.74), "camera reset preserves zoom");
+    const auto worldCenterAfterReset = transactional.camera().deskToWorld(deskCenter);
+    require(
+        near(worldCenterAfterReset.x, deskCenter.x) &&
+        near(worldCenterAfterReset.y, deskCenter.y),
+        "camera reset returns to initial centered world point"
+    );
 
     spatial::SpatialState duplicateSet;
     require(!duplicateSet.enable(desk, {
