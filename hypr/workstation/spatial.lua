@@ -23,7 +23,8 @@ local function plugin_api(hl)
       or type(api.pan) ~= "function"
       or type(api.nudge) ~= "function"
       or type(api.brake) ~= "function"
-      or type(api.reset) ~= "function" then
+      or type(api.reset) ~= "function"
+      or type(api.select) ~= "function" then
     return nil
   end
 
@@ -168,14 +169,18 @@ function M.reset(hl)
   return invoke(hl, "reset")
 end
 
-local function register_binding(hl, keys, callback, description)
+function M.select(hl)
+  return invoke(hl, "select")
+end
+
+local function register_binding(hl, keys, callback, description, options)
   if type(hl.unbind) == "function" then
     hl.unbind(keys)
   end
 
-  return hl.bind(keys, callback, {
-    description = description,
-  })
+  local bind_options = options or {}
+  bind_options.description = description
+  return hl.bind(keys, callback, bind_options)
 end
 
 local function register_motion_binding(hl, keys, xDirection, yDirection, description)
@@ -265,6 +270,15 @@ function M.register(hl, o, options)
     return { ok = ok }
   end
 
+  local function select_and_exit()
+    local ok, selected = M.select(hl)
+    if ok and selected == true then
+      sync_input_mode(false)
+      show_spatial_hud(false, "toggle")
+    end
+    return { ok = ok and selected == true }
+  end
+
   register_binding(
     hl,
     "SUPER + ALT + G",
@@ -277,6 +291,13 @@ function M.register(hl, o, options)
     "SUPER + F12",
     toggle_and_sync,
     "Toggle Spatial Desktop (Try Omarchy)"
+  )
+
+  register_binding(
+    hl,
+    "SUPER + TAB",
+    toggle_and_sync,
+    "Spatial Window Overview"
   )
 
   -- Camera controls are real mode-scoped bindings: they only consume input
@@ -304,6 +325,14 @@ function M.register(hl, o, options)
     "0",
     reset_and_notify,
     "Reset Spatial Camera (Mode)"
+  ))
+
+  track(register_binding(
+    hl,
+    "mouse:272",
+    select_and_exit,
+    "Select Spatial Window",
+    { mouse = true }
   ))
 
   local state_ok, spatial_enabled = M.enabled(hl)
