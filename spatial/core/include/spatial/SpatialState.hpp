@@ -36,6 +36,7 @@ public:
 
     [[nodiscard]] bool addWindow(ManagedWindow window);
     [[nodiscard]] bool removeWindow(std::string_view id) noexcept;
+    [[nodiscard]] bool setWindowWorld(std::string_view id, Rect world) noexcept;
     [[nodiscard]] const ManagedWindow* findWindow(std::string_view id) const noexcept;
 
     [[nodiscard]] bool pan(double dx, double dy) noexcept;
