@@ -22,6 +22,7 @@
 #include <hyprland/src/state/WorkspaceState.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <iomanip>
 #include <limits>
@@ -34,6 +35,9 @@ namespace {
 
 constexpr auto kMotionTick = std::chrono::milliseconds(16);
 constexpr double kWorkspaceLaneGap = 160.0;
+constexpr double kOverviewMargin = 36.0;
+constexpr double kOverviewGap = 22.0;
+constexpr double kOverviewCellInset = 10.0;
 
 } // namespace
 
@@ -154,6 +158,7 @@ bool HyprlandAdapter::enable() {
     }
 
     bindings_ = std::move(bindings);
+    overviewModeActive_ = false;
     return true;
 }
 
@@ -214,6 +219,92 @@ PanResult HyprlandAdapter::resetCamera() {
         return PanResult::OutOfRange;
     }
 
+    applyProjection();
+    return PanResult::Success;
+}
+
+PanResult HyprlandAdapter::arrangeOverview() {
+    if (state_ == nullptr || !state_->enabled()) {
+        return PanResult::Disabled;
+    }
+
+    pruneBindings();
+    if (!projectionReady()) {
+        return PanResult::ProjectionUnavailable;
+    }
+
+    const std::size_t count = bindings_.size();
+    if (count == 0) {
+        overviewModeActive_ = true;
+        return PanResult::Success;
+    }
+
+    const auto& desk = state_->desk();
+    const double width = desk.width();
+    const double height = desk.height();
+    if (!isFinite(width) || !isFinite(height) || width <= 0.0 || height <= 0.0) {
+        return PanResult::ProjectionUnavailable;
+    }
+
+    // Choose a grid that matches the monitor aspect ratio. For a 16:9-ish
+    // desktop this naturally produces 4x2 for 8 windows, 3x2 for 6, etc.
+    const double aspect = width / height;
+    std::size_t columns = static_cast<std::size_t>(
+        std::ceil(std::sqrt(static_cast<double>(count) * aspect))
+    );
+    columns = std::clamp<std::size_t>(columns, 1, count);
+    const std::size_t rows = (count + columns - 1) / columns;
+
+    const double usableWidth = width - 2.0 * kOverviewMargin - kOverviewGap * static_cast<double>(columns - 1);
+    const double usableHeight = height - 2.0 * kOverviewMargin - kOverviewGap * static_cast<double>(rows - 1);
+    if (usableWidth <= 0.0 || usableHeight <= 0.0) {
+        return PanResult::ProjectionUnavailable;
+    }
+
+    const double cellWidth = usableWidth / static_cast<double>(columns);
+    const double cellHeight = usableHeight / static_cast<double>(rows);
+
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto& binding = bindings_[index];
+        const auto* managed = state_->findWindow(binding.id);
+        if (managed == nullptr) {
+            return PanResult::ProjectionUnavailable;
+        }
+
+        const double sourceWidth = std::max(1.0, binding.originalCompositorRect.width);
+        const double sourceHeight = std::max(1.0, binding.originalCompositorRect.height);
+        const double sourceAspect = sourceWidth / sourceHeight;
+
+        const double maxWidth = std::max(1.0, cellWidth - 2.0 * kOverviewCellInset);
+        const double maxHeight = std::max(1.0, cellHeight - 2.0 * kOverviewCellInset);
+
+        double previewWidth = maxWidth;
+        double previewHeight = previewWidth / sourceAspect;
+        if (previewHeight > maxHeight) {
+            previewHeight = maxHeight;
+            previewWidth = previewHeight * sourceAspect;
+        }
+
+        const std::size_t row = index / columns;
+        const std::size_t column = index % columns;
+
+        const double cellX = kOverviewMargin + static_cast<double>(column) * (cellWidth + kOverviewGap);
+        const double cellY = kOverviewMargin + static_cast<double>(row) * (cellHeight + kOverviewGap);
+
+        const Rect previewCompositor{
+            .x = desk.minX + cellX + (cellWidth - previewWidth) / 2.0,
+            .y = desk.minY + cellY + (cellHeight - previewHeight) / 2.0,
+            .width = previewWidth,
+            .height = previewHeight,
+        };
+
+        const auto world = captureWorldRect(previewCompositor, state_->camera(), desk);
+        if (!state_->setWindowWorld(binding.id, world)) {
+            return PanResult::ProjectionUnavailable;
+        }
+    }
+
+    overviewModeActive_ = true;
     applyProjection();
     return PanResult::Success;
 }
@@ -411,7 +502,13 @@ void HyprlandAdapter::scheduleProjectionRefresh() {
 
         reassertWorkspaceCanvas();
         pruneBindings();
-        if (projectionReady()) {
+        if (!projectionReady()) {
+            return;
+        }
+
+        if (overviewModeActive_) {
+            (void)arrangeOverview();
+        } else {
             applyProjection();
         }
     });
@@ -421,6 +518,7 @@ void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
     cancelMotion();
     if (state_ == nullptr || !state_->enabled()) {
         bindings_.clear();
+        overviewModeActive_ = false;
         restoreWorkspaceCanvas();
         return;
     }
@@ -431,6 +529,7 @@ void HyprlandAdapter::deactivate(bool restoreGeometry) noexcept {
 
     restoreWorkspaceCanvas();
     bindings_.clear();
+    overviewModeActive_ = false;
     state_->disable();
 }
 
@@ -927,7 +1026,7 @@ void HyprlandAdapter::onWindowMovedWorkspace(const PHLWINDOW& window) {
 }
 
 void HyprlandAdapter::onWorkspaceActivated(const PHLWORKSPACE& workspace) {
-    if (state_ == nullptr || !state_->enabled() || !workspaceCanvasActive_ || !workspace) {
+    if (state_ == nullptr || !state_->enabled() || !workspaceCanvasActive_ || !workspace || overviewModeActive_) {
         return;
     }
 
