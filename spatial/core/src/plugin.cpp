@@ -97,6 +97,30 @@ int luaToggle(lua_State* L) {
     return 1;
 }
 
+int luaOverview(lua_State* L) {
+    if (lua_gettop(L) != 0) {
+        return luaL_error(L, "gendbyte-spatial.overview: expected no arguments");
+    }
+
+    if (g_state.enabled()) {
+        g_adapter.disable();
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+
+    if (!enableSpatial()) {
+        return luaL_error(L, "gendbyte-spatial.overview: failed to initialize spatial window snapshot");
+    }
+
+    if (g_adapter.arrangeOverview() != spatial::PanResult::Success) {
+        g_adapter.disable();
+        return luaL_error(L, "gendbyte-spatial.overview: failed to arrange fit-all overview");
+    }
+
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
 int luaPan(lua_State* L) {
     if (lua_gettop(L) != 2) {
         return luaL_error(L, "gendbyte-spatial.pan: expected dx and dy");
@@ -155,9 +179,10 @@ struct LuaFunctionRegistration {
     PLUGIN_LUA_FN function;
 };
 
-constexpr std::array<LuaFunctionRegistration, 7> kLuaFunctions{{
+constexpr std::array<LuaFunctionRegistration, 8> kLuaFunctions{{
     {"enabled", luaEnabled},
     {"toggle", luaToggle},
+    {"overview", luaOverview},
     {"pan", luaPan},
     {"nudge", luaNudge},
     {"brake", luaBrake},
