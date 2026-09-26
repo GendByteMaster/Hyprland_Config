@@ -9,8 +9,8 @@ Rect captureWorldRect(const Rect& compositorRect, const Camera& camera, const De
     return {
         .x = worldPosition.x,
         .y = worldPosition.y,
-        .width = compositorRect.width,
-        .height = compositorRect.height,
+        .width = compositorRect.width / camera.zoom(),
+        .height = compositorRect.height / camera.zoom(),
     };
 }
 
@@ -21,8 +21,8 @@ Rect projectWorldRect(const Rect& worldRect, const Camera& camera, const DeskRec
     return {
         .x = compositorPosition.x,
         .y = compositorPosition.y,
-        .width = worldRect.width,
-        .height = worldRect.height,
+        .width = worldRect.width * camera.zoom(),
+        .height = worldRect.height * camera.zoom(),
     };
 }
 
