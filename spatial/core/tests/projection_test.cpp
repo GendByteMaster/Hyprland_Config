@@ -47,6 +47,13 @@ int main() {
     const auto worldAfterProjection = spatial::captureWorldRect(projected, camera, desk);
     requireRect(worldAfterProjection, world, "capture/project round-trip preserves world geometry");
 
+    require(camera.setZoom(0.74), "zoom 0.74 succeeds");
+    const auto zoomed = spatial::projectWorldRect(world, camera, desk);
+    require(near(zoomed.width, world.width * 0.74), "zoom scales projected width");
+    require(near(zoomed.height, world.height * 0.74), "zoom scales projected height");
+    const auto worldAfterZoom = spatial::captureWorldRect(zoomed, camera, desk);
+    requireRect(worldAfterZoom, world, "zoomed capture/project round-trip preserves world geometry");
+
     std::cout << "projection_test: PASS\n";
     return 0;
 }
