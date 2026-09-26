@@ -141,18 +141,28 @@ int luaReset(lua_State* L) {
     return luaPanError(L, g_adapter.resetCamera());
 }
 
+int luaSelect(lua_State* L) {
+    if (lua_gettop(L) != 0) {
+        return luaL_error(L, "gendbyte-spatial.select: expected no arguments");
+    }
+
+    lua_pushboolean(L, g_adapter.selectAtPointer() ? 1 : 0);
+    return 1;
+}
+
 struct LuaFunctionRegistration {
     const char* name;
     PLUGIN_LUA_FN function;
 };
 
-constexpr std::array<LuaFunctionRegistration, 6> kLuaFunctions{{
+constexpr std::array<LuaFunctionRegistration, 7> kLuaFunctions{{
     {"enabled", luaEnabled},
     {"toggle", luaToggle},
     {"pan", luaPan},
     {"nudge", luaNudge},
     {"brake", luaBrake},
     {"reset", luaReset},
+    {"select", luaSelect},
 }};
 
 void unregisterLuaFunctions() noexcept {
