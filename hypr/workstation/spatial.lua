@@ -209,7 +209,7 @@ function M.register(hl, _o, options)
 
   register_binding(
     hl,
-    "INSERT",
+    "CTRL + ALT + G",
     function()
       M.toggle(hl)
     end,
