@@ -215,7 +215,7 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
   t.eq(calls.binds[2].options.description, "Toggle Spatial Desktop (Try Omarchy)")
   t.eq(calls.binds[3].options.description, "Spatial Window Overview")
   t.eq(calls.binds[22].options.description, "Select Spatial Window")
-  t.eq(calls.binds[22].options.mouse, true)
+  t.eq(calls.binds[22].options.mouse, nil)
 
   -- Toggle bindings stay active; camera/reset/mouse-selection bindings are
   -- enabled only while Spatial mode is active.
