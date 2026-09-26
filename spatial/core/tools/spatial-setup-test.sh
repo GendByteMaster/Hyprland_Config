@@ -28,6 +28,13 @@ echo "== Repository =="
 echo "$ROOT"
 
 echo
+echo "== Pre-update cleanup =="
+
+# Free generated build space before switching/pulling. This path is disposable
+# and can otherwise prevent git itself from updating on small Try Omarchy disks.
+rm -rf -- "$BUILD_DIR"
+
+echo
 echo "== Branch =="
 git switch "$BRANCH"
 git pull --ff-only
@@ -48,10 +55,8 @@ if [[ -d "$INSTALL_DIR" ]]; then
   done < <(find "$INSTALL_DIR" -maxdepth 1 -type f -name 'gendbyte-spatial-*.so' -print0 2>/dev/null || true)
 fi
 
-# A clean Release build uses much less disk than accumulated RelWithDebInfo
-# objects and avoids linker failures on the small Try Omarchy filesystem.
-rm -rf -- "$BUILD_DIR"
-
+# The generated build directory was already removed before git pull so the
+# repository update itself has room to complete on small filesystems.
 df -h "$ROOT" || true
 df -ih "$ROOT" || true
 
