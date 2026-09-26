@@ -8,6 +8,8 @@ class Camera {
 public:
     static constexpr double kMinCoordinate = -1.0e9;
     static constexpr double kMaxCoordinate = 1.0e9;
+    static constexpr double kMinZoom = 0.25;
+    static constexpr double kMaxZoom = 4.0;
 
     [[nodiscard]] Point position() const noexcept;
     [[nodiscard]] double zoom() const noexcept;
