@@ -35,6 +35,15 @@ local function fake_hyprland(with_plugin)
       return enabled_state
     end
 
+    function hl.plugin.gendbyte_spatial.overview()
+      enabled_state = not enabled_state
+      calls.plugin[#calls.plugin + 1] = {
+        name = "overview",
+        enabled = enabled_state,
+      }
+      return enabled_state
+    end
+
     function hl.plugin.gendbyte_spatial.pan(dx, dy)
       calls.plugin[#calls.plugin + 1] = {
         name = "pan",
@@ -235,7 +244,7 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
   end
 end)
 
-t.test("spatial toggle, selection, and HUD synchronize mode-scoped input", function()
+t.test("spatial overview, selection, and HUD synchronize mode-scoped input", function()
   local hl, calls = fake_hyprland(true)
   local hud_calls = {}
 
@@ -257,7 +266,7 @@ t.test("spatial toggle, selection, and HUD synchronize mode-scoped input", funct
   t.eq(calls.binds[4].handle.enabled, false)
   calls.binds[3].callback()
 
-  t.eq(calls.plugin[1].name, "toggle")
+  t.eq(calls.plugin[1].name, "overview")
   t.eq(calls.plugin[1].enabled, true)
   t.eq(#hud_calls, 1)
   t.eq(hud_calls[1].enabled, true)
@@ -315,6 +324,7 @@ t.test("spatial wrapper contains plugin callback failures", function()
         toggle = function()
           error("simulated plugin error")
         end,
+        overview = function() return false end,
         pan = function() end,
         nudge = function() end,
         brake = function() end,
