@@ -20,6 +20,7 @@ local function plugin_api(hl)
 
   if type(api.enabled) ~= "function"
       or type(api.toggle) ~= "function"
+      or type(api.overview) ~= "function"
       or type(api.pan) ~= "function"
       or type(api.nudge) ~= "function"
       or type(api.brake) ~= "function"
@@ -153,6 +154,10 @@ function M.toggle(hl)
   return invoke(hl, "toggle")
 end
 
+function M.overview(hl)
+  return invoke(hl, "overview")
+end
+
 function M.pan(hl, dx, dy)
   return invoke(hl, "pan", dx, dy)
 end
@@ -280,6 +285,15 @@ function M.register(hl, o, options)
     return { ok = ok }
   end
 
+  local function overview_and_sync()
+    local ok, enabled = M.overview(hl)
+    if ok then
+      sync_input_mode(enabled == true)
+      show_spatial_hud(enabled == true, "toggle")
+    end
+    return { ok = ok }
+  end
+
   local function reset_and_notify()
     local ok = M.reset(hl)
     if ok then
@@ -314,7 +328,7 @@ function M.register(hl, o, options)
   register_binding(
     hl,
     "SUPER + TAB",
-    toggle_and_sync,
+    overview_and_sync,
     "Spatial Window Overview"
   )
 
