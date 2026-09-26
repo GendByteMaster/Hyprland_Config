@@ -331,8 +331,7 @@ function M.register(hl, o, options)
     hl,
     "mouse:272",
     select_and_exit,
-    "Select Spatial Window",
-    { mouse = true }
+    "Select Spatial Window"
   ))
 
   local state_ok, spatial_enabled = M.enabled(hl)
