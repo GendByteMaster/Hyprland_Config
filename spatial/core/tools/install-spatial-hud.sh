@@ -36,9 +36,23 @@ fi
 
 omarchy-shell shell rescanPlugins >/dev/null   || die "Omarchy Shell failed to rescan plugins for Spatial HUD"
 
+plugin_list_json() {
+  if command -v omarchy-plugin-list >/dev/null 2>&1; then
+    omarchy-plugin-list --json 2>/dev/null || true
+    return
+  fi
+
+  if command -v omarchy >/dev/null 2>&1; then
+    omarchy plugin list --json 2>/dev/null || true
+    return
+  fi
+
+  omarchy-shell shell listPlugins 2>/dev/null || true
+}
+
 plugin_discovered() {
   local plugins_json
-  plugins_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
+  plugins_json="$(plugin_list_json)"
   [[ -n "$plugins_json" ]] || return 1
 
   PLUGINS_JSON="$plugins_json" SPATIAL_HUD_ID="$SPATIAL_HUD_ID" python3 - <<'PY'
@@ -73,9 +87,25 @@ for _ in $(seq 1 "$DISCOVERY_ATTEMPTS"); do
   sleep "$DISCOVERY_SLEEP"
 done
 
-[[ "$discovered" -eq 1 ]]   || die "Omarchy Shell did not discover $SPATIAL_HUD_ID after rescan"
+if [[ "$discovered" -ne 1 ]]; then
+  echo "Omarchy plugin registry after timeout:" >&2
+  plugin_list_json >&2 || true
+  die "Omarchy Shell did not discover $SPATIAL_HUD_ID after rescan"
+fi
 
-hud_enabled="$(omarchy-shell shell setPluginEnabled "$SPATIAL_HUD_ID" true 2>/dev/null || true)"
-[[ "$hud_enabled" == "ok" ]]   || die "Omarchy Shell failed to enable $SPATIAL_HUD_ID: ${hud_enabled:-no response}"
+hud_enabled=""
+for _ in $(seq 1 10); do
+  hud_enabled="$(omarchy-shell shell setPluginEnabled "$SPATIAL_HUD_ID" true 2>/dev/null || true)"
+  if [[ "$hud_enabled" == "ok" ]]; then
+    break
+  fi
+  sleep 0.05
+done
+
+if [[ "$hud_enabled" != "ok" ]]; then
+  echo "Omarchy plugin registry before failed enable:" >&2
+  plugin_list_json >&2 || true
+  die "Omarchy Shell failed to enable $SPATIAL_HUD_ID: ${hud_enabled:-no response}"
+fi
 
 echo "Spatial HUD enabled: $SPATIAL_HUD_ID"
