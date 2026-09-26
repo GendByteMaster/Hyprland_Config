@@ -213,16 +213,34 @@ t.test("spatial bindings register native and Try Omarchy chords", function()
   end
 end)
 
-t.test("spatial toggle synchronizes mode-scoped input bindings", function()
+t.test("spatial toggle synchronizes mode-scoped input bindings and HUD", function()
   local hl, calls = fake_hyprland(true)
+  local hud_calls = {}
 
-  spatial.register(hl, {}, INSTALLED_OPTIONS)
+  spatial.register(hl, {}, {
+    plugin_path = INSTALLED_OPTIONS.plugin_path,
+    file_exists = INSTALLED_OPTIONS.file_exists,
+    hud = {
+      show_spatial = function(enabled, zoom_percent, action)
+        hud_calls[#hud_calls + 1] = {
+          enabled = enabled,
+          zoom_percent = zoom_percent,
+          action = action,
+        }
+        return true
+      end,
+    },
+  })
 
   t.eq(calls.binds[3].handle.enabled, false)
   calls.binds[2].callback()
 
   t.eq(calls.plugin[1].name, "toggle")
   t.eq(calls.plugin[1].enabled, true)
+  t.eq(#hud_calls, 1)
+  t.eq(hud_calls[1].enabled, true)
+  t.eq(hud_calls[1].zoom_percent, 74)
+  t.eq(hud_calls[1].action, "toggle")
   for index = 3, 20 do
     t.eq(calls.binds[index].handle.enabled, true)
   end
@@ -233,13 +251,20 @@ t.test("spatial toggle synchronizes mode-scoped input bindings", function()
   t.eq(calls.plugin[2].dx, -1)
   t.eq(calls.plugin[2].dy, 0)
   t.eq(calls.plugin[3].name, "brake")
+  t.eq(#hud_calls, 1)
 
   calls.binds[20].callback()
   t.eq(calls.plugin[4].name, "reset")
+  t.eq(#hud_calls, 2)
+  t.eq(hud_calls[2].enabled, true)
+  t.eq(hud_calls[2].action, "reset")
 
   calls.binds[2].callback()
   t.eq(calls.plugin[5].name, "toggle")
   t.eq(calls.plugin[5].enabled, false)
+  t.eq(#hud_calls, 3)
+  t.eq(hud_calls[3].enabled, false)
+  t.eq(hud_calls[3].action, "toggle")
   for index = 3, 20 do
     t.eq(calls.binds[index].handle.enabled, false)
   end
