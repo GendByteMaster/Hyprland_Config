@@ -46,5 +46,12 @@ jobs:
           test -f build/spatial-plugin/gendbyte-spatial.so
           file build/spatial-plugin/gendbyte-spatial.so
 
-      - name: Parse nested smoke harness
-        run: bash -n spatial/core/tests/nested/phase1-smoke.sh
+      - name: Parse Spatial shell helpers
+        run: |
+          bash -n spatial/core/tests/nested/phase1-smoke.sh
+          bash -n spatial/core/tools/spatial-setup-test.sh
+          bash -n spatial/core/tools/install-spatial-hud.sh
+          bash -n spatial/core/tests/spatial_hud_installer_test.sh
+
+      - name: Test Spatial HUD installer race handling
+        run: bash spatial/core/tests/spatial_hud_installer_test.sh
