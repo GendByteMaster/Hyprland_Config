@@ -86,6 +86,39 @@ if not all(checks):
 PY
 }
 
+assert_scaled_size() {
+  python3 - "$@" <<'PY'
+import math
+import sys
+
+label = sys.argv[1]
+before_w, before_h, after_w, after_h, scale = map(float, sys.argv[2:])
+
+checks = (
+    math.isclose(after_w, before_w * scale, abs_tol=2.0),
+    math.isclose(after_h, before_h * scale, abs_tol=2.0),
+)
+
+if not all(checks):
+    print(
+        f"FAIL: {label}: before={before_w}x{before_h} "
+        f"after={after_w}x{after_h} expected_scale={scale}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PY
+}
+
+read_camera_xy() {
+  python3 -c '
+import json
+import sys
+data = json.load(sys.stdin)
+camera = data.get("camera", data)
+print(camera.get("x"), camera.get("y"))
+'
+}
+
 if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
   echo "HYPRLAND_INSTANCE_SIGNATURE is not set; no Hyprland session detected" >&2
   exit 2
@@ -163,6 +196,15 @@ echo "== Enable =="
 enabled="$(hyprctl gendbyte-spatial enable)"
 echo "$enabled"
 assert_contains "$enabled" '"enabled":true' "spatial enable"
+assert_contains "$enabled" '"zoom":0.74' "default spatial zoom"
+
+read -r camera_base_x camera_base_y < <(printf '%s\n' "$enabled" | read_camera_xy)
+read -r zoomed_address zoomed_x zoomed_y zoomed_w zoomed_h < <(read_active_rect)
+if [[ "$zoomed_address" != "$active_address" ]]; then
+  echo "FAIL: active window changed while enabling zoom: $active_address -> $zoomed_address" >&2
+  exit 1
+fi
+assert_scaled_size "initial zoom projection" "$before_w" "$before_h" "$zoomed_w" "$zoomed_h" 0.74
 
 managed_count="$(printf '%s\n' "$enabled" | sed -n 's/.*"managed_window_count":\([0-9][0-9]*\).*/\1/p')"
 if [[ -z "$managed_count" || "$managed_count" -lt 1 ]]; then
@@ -221,8 +263,14 @@ echo
 echo "== Pan +${PAN_X},+${PAN_Y} =="
 camera="$(hyprctl gendbyte-spatial pan "$PAN_X" "$PAN_Y")"
 echo "$camera"
-assert_contains "$camera" '"x":320' "camera x after direct Lua pan"
-assert_contains "$camera" '"y":0' "camera y after direct Lua pan"
+read -r camera_after_x camera_after_y < <(printf '%s\n' "$camera" | read_camera_xy)
+python3 - "$camera_base_x" "$camera_base_y" "$camera_after_x" "$camera_after_y" "$PAN_X" "$PAN_Y" <<'PY'
+import math
+import sys
+bx, by, ax, ay, dx, dy = map(float, sys.argv[1:])
+if not (math.isclose(ax - bx, dx, abs_tol=1e-6) and math.isclose(ay - by, dy, abs_tol=1e-6)):
+    raise SystemExit(f"camera delta mismatch: before=({bx},{by}) after=({ax},{ay}) expected=({dx},{dy})")
+PY
 
 windows_after_pan="$(hyprctl gendbyte-spatial windows)"
 if [[ "$(normalize_windows "$windows_before")" != "$(normalize_windows "$windows_after_pan")" ]]; then
@@ -240,9 +288,9 @@ fi
 
 assert_rect_delta \
   "live compositor projection" \
-  "$before_x" "$before_y" "$before_w" "$before_h" \
+  "$zoomed_x" "$zoomed_y" "$zoomed_w" "$zoomed_h" \
   "$after_x" "$after_y" "$after_w" "$after_h" \
-  "-$PAN_X" "-$PAN_Y"
+  "$(python3 -c "print(-$PAN_X * 0.74)")" "$(python3 -c "print(-$PAN_Y * 0.74)")"
 
 echo
 echo "PASS: hyprctl reports the active window moved by -${PAN_X}px horizontally."
@@ -255,13 +303,19 @@ echo
 echo "== Pan back =="
 camera="$(hyprctl gendbyte-spatial pan "-$PAN_X" "-$PAN_Y")"
 echo "$camera"
-assert_contains "$camera" '"x":0' "camera x returned to zero after direct Lua reset"
-assert_contains "$camera" '"y":0' "camera y returned to zero after direct Lua reset"
+read -r camera_back_x camera_back_y < <(printf '%s\n' "$camera" | read_camera_xy)
+python3 - "$camera_base_x" "$camera_base_y" "$camera_back_x" "$camera_back_y" <<'PY'
+import math
+import sys
+bx, by, ax, ay = map(float, sys.argv[1:])
+if not (math.isclose(ax, bx, abs_tol=1e-6) and math.isclose(ay, by, abs_tol=1e-6)):
+    raise SystemExit(f"camera did not return to zoom baseline: before=({bx},{by}) after=({ax},{ay})")
+PY
 
 read -r back_address back_x back_y back_w back_h < <(read_active_rect)
 assert_rect_delta \
   "reverse pan restoration" \
-  "$before_x" "$before_y" "$before_w" "$before_h" \
+  "$zoomed_x" "$zoomed_y" "$zoomed_w" "$zoomed_h" \
   "$back_x" "$back_y" "$back_w" "$back_h" \
   0 0
 
