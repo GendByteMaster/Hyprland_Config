@@ -223,7 +223,25 @@ function M.register(hl, o, options)
   -- hl.plugin.gendbyte_spatial namespace becomes available.
   local declared, declare_error = declare_plugin(hl, options)
 
+  -- Super+Tab has exactly one owner from the very first config pass. Reserve
+  -- it even while the plugin API is still loading so the legacy overview can
+  -- never race Spatial and create two overlapping overview surfaces.
+  if type(hl.unbind) == "function" then
+    hl.unbind("SUPER + TAB")
+  end
+
   if not M.available(hl) then
+    if declared then
+      hl.bind("SUPER + TAB", function()
+        -- During the tiny plugin-load window this is intentionally a no-op.
+        -- The next config evaluation replaces this reservation with the live
+        -- Spatial toggle. A no-op is safer than launching a second overview.
+        return { ok = false }
+      end, {
+        description = "Spatial Window Overview (Loading)",
+      })
+    end
+
     return false, declared and "gendbyte-spatial load scheduled" or declare_error
   end
 
