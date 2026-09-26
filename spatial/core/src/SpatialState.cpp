@@ -116,6 +116,25 @@ bool SpatialState::removeWindow(std::string_view id) noexcept {
     return true;
 }
 
+bool SpatialState::setWindowWorld(std::string_view id, Rect world) noexcept {
+    if (!enabled_ || id.empty() || !isValid(world)) {
+        return false;
+    }
+
+    const auto it = std::find_if(windows_.begin(), windows_.end(), [&](const ManagedWindow& window) {
+        return window.id == id;
+    });
+    if (it == windows_.end()) {
+        return false;
+    }
+
+    if (it->world != world) {
+        it->world = world;
+        ++epoch_;
+    }
+    return true;
+}
+
 const ManagedWindow* SpatialState::findWindow(std::string_view id) const noexcept {
     const auto it = std::find_if(windows_.begin(), windows_.end(), [&](const ManagedWindow& window) {
         return window.id == id;
