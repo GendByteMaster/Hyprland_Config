@@ -139,6 +139,37 @@ bool SpatialState::pan(double dx, double dy) noexcept {
     return true;
 }
 
+bool SpatialState::setZoom(double value) noexcept {
+    if (!enabled_) {
+        return false;
+    }
+
+    const auto beforeZoom = camera_.zoom();
+    const auto beforePosition = camera_.position();
+    const Point deskCenter{desk_.width() / 2.0, desk_.height() / 2.0};
+    const auto worldCenter = camera_.deskToWorld(deskCenter);
+
+    if (!camera_.setZoom(value)) {
+        return false;
+    }
+
+    const Point nextPosition{
+        worldCenter.x - deskCenter.x / value,
+        worldCenter.y - deskCenter.y / value,
+    };
+
+    if (!camera_.setPosition(nextPosition)) {
+        (void)camera_.setZoom(beforeZoom);
+        (void)camera_.setPosition(beforePosition);
+        return false;
+    }
+
+    if (camera_.zoom() != beforeZoom || camera_.position() != beforePosition) {
+        ++epoch_;
+    }
+    return true;
+}
+
 std::span<const ManagedWindow> SpatialState::windows() const noexcept {
     return windows_;
 }
