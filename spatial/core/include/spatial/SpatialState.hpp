@@ -39,6 +39,7 @@ public:
     [[nodiscard]] const ManagedWindow* findWindow(std::string_view id) const noexcept;
 
     [[nodiscard]] bool pan(double dx, double dy) noexcept;
+    [[nodiscard]] bool setZoom(double value) noexcept;
 
     [[nodiscard]] std::span<const ManagedWindow> windows() const noexcept;
 
