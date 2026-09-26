@@ -49,10 +49,15 @@ int main() {
     require(!camera.pan(1.0, 0.0), "pan beyond max bound is rejected");
     require(!camera.pan(0.0, -1.0), "pan beyond min bound is rejected");
 
-    require(camera.setZoom(1.0), "phase 1 accepts zoom 1");
-    require(!camera.setZoom(0.5), "phase 1 rejects zoom below 1");
-    require(!camera.setZoom(2.0), "phase 1 rejects zoom above 1");
-    require(!camera.setZoom(std::numeric_limits<double>::quiet_NaN()), "phase 1 rejects NaN zoom");
+    require(camera.setZoom(0.74), "camera accepts 74 percent zoom");
+    require(near(camera.zoom(), 0.74), "camera stores requested zoom");
+    const spatial::Point zoomDesk{333.0, 222.0};
+    const auto zoomWorld = camera.deskToWorld(zoomDesk);
+    const auto zoomRoundTrip = camera.worldToDesk(zoomWorld);
+    require(near(zoomRoundTrip.x, zoomDesk.x) && near(zoomRoundTrip.y, zoomDesk.y), "zoomed desk/world mapping round-trips");
+    require(!camera.setZoom(0.1), "zoom below minimum is rejected");
+    require(!camera.setZoom(5.0), "zoom above maximum is rejected");
+    require(!camera.setZoom(std::numeric_limits<double>::quiet_NaN()), "NaN zoom is rejected");
 
     std::cout << "camera_test: PASS\n";
     return 0;
