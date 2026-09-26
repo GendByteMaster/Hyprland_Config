@@ -49,12 +49,26 @@ private:
         Rect originalCompositorRect;
     };
 
+    struct WorkspaceBinding {
+        PHLWORKSPACEREF workspace;
+        bool originalVisible = false;
+        bool originalForceRendering = false;
+        float originalAlpha = 0.0F;
+        Point originalRenderOffset{};
+        int lane = 0;
+    };
+
     [[nodiscard]] std::optional<DeskRect> currentDesk() const;
     [[nodiscard]] std::optional<Rect> currentCompositorRect(const PHLWINDOW& window) const;
     [[nodiscard]] std::optional<ManagedWindow> toManagedWindow(const PHLWINDOW& window, const DeskRect& desk) const;
     [[nodiscard]] bool eligible(const PHLWINDOW& window) const;
     [[nodiscard]] bool tiledProjectionAllowed() const;
     [[nodiscard]] static std::string sessionWindowId(const PHLWINDOW& window);
+
+    [[nodiscard]] bool activateWorkspaceCanvas();
+    void restoreWorkspaceCanvas() noexcept;
+    void reassertWorkspaceCanvas() noexcept;
+    [[nodiscard]] std::optional<int> workspaceLane(const PHLWORKSPACE& workspace) const noexcept;
 
     void deactivate(bool restoreGeometry) noexcept;
     void restoreOriginalGeometry() noexcept;
@@ -71,10 +85,14 @@ private:
     void onWindowOpened(const PHLWINDOW& window);
     void onWindowClosed(const PHLWINDOW& window);
     void onWindowEligibilityChanged(const PHLWINDOW& window);
+    void onWindowMovedWorkspace(const PHLWINDOW& window);
+    void onWorkspaceActivated(const PHLWORKSPACE& workspace);
     void onMonitorLayoutChanged();
 
     SpatialState* state_ = nullptr;
     std::vector<WindowBinding> bindings_;
+    std::vector<WorkspaceBinding> workspaceBindings_;
+    bool workspaceCanvasActive_ = false;
     CameraMotion motion_;
     SP<CEventLoopTimer> motionTimer_;
     std::uint64_t pendingProjectionRefresh_ = 0;
@@ -82,6 +100,8 @@ private:
     CHyprSignalListener windowClosed_;
     CHyprSignalListener windowFloating_;
     CHyprSignalListener windowFullscreen_;
+    CHyprSignalListener windowMovedWorkspace_;
+    CHyprSignalListener workspaceActivated_;
     CHyprSignalListener monitorLayoutChanged_;
 };
 
