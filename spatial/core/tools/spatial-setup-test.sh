@@ -241,17 +241,58 @@ echo "Lua API: OK"
 echo
 echo "== Spatial keybindings =="
 binds="$(hyprctl -j binds)"
-if command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "$binds" | jq -r '
-    .[]
-    | select((.description // "") | ascii_downcase | contains("spatial"))
-    | "\(.modmask)  \(.key)  \(.description // "")"
-  '
-  count="$(printf '%s\n' "$binds" | jq '[.[] | select((.description // "") | ascii_downcase | contains("spatial"))] | length')"
-  [[ "$count" -eq 12 ]] || die "Expected 12 Spatial bindings, found $count"
-else
-  printf '%s\n' "$binds" | grep -i spatial || true
-fi
+
+BINDS_JSON="$binds" python3 - <<'PY' || die "Spatial binding contract validation failed"
+import json
+import os
+
+binds = json.loads(os.environ["BINDS_JSON"])
+
+expected = {
+    "Toggle Spatial Desktop",
+    "Toggle Spatial Desktop (Try Omarchy)",
+    "Spatial Window Overview",
+    "Spatial Camera Left",
+    "Spatial Camera Right",
+    "Spatial Camera Up",
+    "Spatial Camera Down",
+    "Spatial Camera Left (Mode)",
+    "Spatial Camera Right (Mode)",
+    "Spatial Camera Up (Mode)",
+    "Spatial Camera Down (Mode)",
+    "Reset Spatial Camera",
+    "Reset Spatial Camera (Mode)",
+    "Select Spatial Window",
+}
+
+spatial = [
+    item for item in binds
+    if isinstance(item, dict)
+    and "spatial" in str(item.get("description") or "").lower()
+]
+
+for item in spatial:
+    print(f"{item.get('modmask')}  {item.get('key')}  {item.get('description') or ''}")
+
+descriptions = [str(item.get("description") or "") for item in spatial]
+actual = set(descriptions)
+
+missing = sorted(expected - actual)
+unexpected = sorted(actual - expected)
+duplicates = sorted({name for name in descriptions if descriptions.count(name) > 1})
+
+if missing or unexpected or duplicates or len(spatial) != len(expected):
+    if missing:
+        print("missing:", ", ".join(missing))
+    if unexpected:
+        print("unexpected:", ", ".join(unexpected))
+    if duplicates:
+        print("duplicates:", ", ".join(duplicates))
+    print(f"expected {len(expected)} Spatial bindings, found {len(spatial)}")
+    raise SystemExit(1)
+
+print(f"Spatial bindings: {len(spatial)}/{len(expected)} OK")
+PY
 
 echo
 echo "== Normalize Spatial state =="
