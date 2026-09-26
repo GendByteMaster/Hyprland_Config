@@ -1,4 +1,4 @@
-local hud_module = require("hypr.workstation.hud")
+local spatial_hud_module = require("hypr.workstation.spatial_hud")
 
 local M = {}
 
@@ -222,7 +222,7 @@ function M.register(hl, o, options)
     return false, declared and "gendbyte-spatial load scheduled" or declare_error
   end
 
-  local hud = options.hud or hud_module.new(hl, o)
+  local hud = options.hud or spatial_hud_module.new(hl, o)
   local input_handles = {}
 
   local function track(handle)
@@ -243,8 +243,8 @@ function M.register(hl, o, options)
   end
 
   local function show_spatial_hud(enabled, action)
-    if hud and type(hud.show_spatial) == "function" then
-      pcall(hud.show_spatial, enabled == true, SPATIAL_ZOOM_PERCENT, action)
+    if hud and type(hud.show) == "function" then
+      pcall(hud.show, enabled == true, SPATIAL_ZOOM_PERCENT, action)
     end
   end
 
