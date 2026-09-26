@@ -22,6 +22,7 @@ spatial::HyprlandAdapter g_adapter;
 SP<SHyprCtlCommand> g_hyprCtlCommand;
 
 constexpr std::string_view kLuaNamespace = "gendbyte_spatial";
+constexpr double kDefaultEnableZoom = 0.74;
 
 void notifyFailure(const std::string& message) {
     if (g_pluginHandle == nullptr) {
@@ -51,6 +52,23 @@ int luaPanError(lua_State* L, spatial::PanResult result) {
     return luaL_error(L, "gendbyte-spatial: unreachable pan result");
 }
 
+bool enableSpatial() {
+    if (g_state.enabled()) {
+        return true;
+    }
+
+    if (!g_adapter.enable()) {
+        return false;
+    }
+
+    if (g_adapter.setZoom(kDefaultEnableZoom) != spatial::PanResult::Success) {
+        g_adapter.disable();
+        return false;
+    }
+
+    return true;
+}
+
 int luaEnabled(lua_State* L) {
     if (lua_gettop(L) != 0) {
         return luaL_error(L, "gendbyte-spatial.enabled: expected no arguments");
@@ -71,8 +89,8 @@ int luaToggle(lua_State* L) {
         return 1;
     }
 
-    if (!g_adapter.enable()) {
-        return luaL_error(L, "gendbyte-spatial.toggle: failed to initialize spatial desk/window snapshot");
+    if (!enableSpatial()) {
+        return luaL_error(L, "gendbyte-spatial.toggle: failed to initialize zoomed spatial desk/window snapshot");
     }
 
     lua_pushboolean(L, 1);
@@ -119,9 +137,8 @@ int luaReset(lua_State* L) {
         return luaL_error(L, "gendbyte-spatial.reset: spatial mode is not enabled");
     }
 
-    const auto camera = g_state.camera().position();
     g_adapter.cancelMotion();
-    return luaPanError(L, g_adapter.pan(-camera.x, -camera.y));
+    return luaPanError(L, g_adapter.resetCamera());
 }
 
 struct LuaFunctionRegistration {
@@ -192,10 +209,10 @@ std::string handleHyprCtl(eHyprCtlOutputFormat, std::string request) {
     case spatial::command::Kind::Camera:
         return spatial::protocol::cameraJson(g_state);
     case spatial::command::Kind::Enable:
-        if (!g_adapter.enable()) {
+        if (!enableSpatial()) {
             return spatial::protocol::errorJson(
                 spatial::protocol::ErrorCode::InternalError,
-                "failed to initialize spatial desk/window snapshot"
+                "failed to initialize zoomed spatial desk/window snapshot"
             );
         }
         return spatial::protocol::statusJson(g_state);
