@@ -207,6 +207,15 @@ function M.register(hl, _o, options)
     "Toggle Spatial Desktop"
   )
 
+  register_binding(
+    hl,
+    "CTRL + SUPER + G",
+    function()
+      M.toggle(hl)
+    end,
+    "Toggle Spatial Desktop (Windows fallback)"
+  )
+
   register_motion_binding(hl, "SUPER + ALT + LEFT", -1, 0, "Spatial Camera Left")
   register_motion_binding(hl, "SUPER + ALT + RIGHT", 1, 0, "Spatial Camera Right")
   register_motion_binding(hl, "SUPER + ALT + UP", 0, -1, "Spatial Camera Up")

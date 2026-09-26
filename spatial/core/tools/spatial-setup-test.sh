@@ -125,10 +125,17 @@ if command -v jq >/dev/null 2>&1; then
     | "\(.modmask)  \(.key)  \(.description // "")"
   '
   count="$(printf '%s\n' "$binds" | jq '[.[] | select((.description // "") | ascii_downcase | contains("spatial"))] | length')"
-  [[ "$count" -eq 6 ]] || die "Expected 6 Spatial bindings, found $count"
+  [[ "$count" -eq 7 ]] || die "Expected 7 Spatial bindings, found $count"
 else
   printf '%s\n' "$binds" | grep -i spatial || true
 fi
+
+echo
+echo "== Normalize Spatial state =="
+hyprctl gendbyte-spatial disable >/dev/null 2>&1 || true
+baseline_status="$(hyprctl gendbyte-spatial status)"
+printf '%s\n' "$baseline_status"
+[[ "$baseline_status" == *'"enabled":false'* ]] || die "Could not normalize Spatial state to disabled"
 
 echo
 echo "== Direct Lua toggle ON =="
@@ -151,13 +158,17 @@ printf '%s\n' "$status_off"
 [[ "$status_off" == *'"enabled":false'* ]] || die "Direct Lua toggle did not disable spatial mode"
 
 echo
+echo
+echo "Note: Windows Xbox Game Bar intercepts Win+Alt+G before Hyprland."
+echo "On Try Omarchy, use Ctrl+Super+G unless Game Bar is disabled in Windows."
 echo "=============================================="
 echo "Spatial plugin is versioned, installed, and config-managed."
 echo "Lua API: OK"
 echo "Spatial bindings: OK"
 echo
 echo "Hotkeys:"
-echo "  Super+Alt+G      Toggle Spatial Desktop"
+echo "  Super+Alt+G      Toggle Spatial Desktop (native Linux)"
+echo "  Ctrl+Super+G     Toggle Spatial Desktop (Try Omarchy / Windows fallback)"
 echo "  Super+Alt+Left   Camera left"
 echo "  Super+Alt+Right  Camera right"
 echo "  Super+Alt+Up     Camera up"
