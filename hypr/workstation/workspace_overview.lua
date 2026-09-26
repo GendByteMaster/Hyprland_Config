@@ -1,5 +1,4 @@
 local compat = require("hypr.workstation.compat")
-local spatial = require("hypr.workstation.spatial")
 
 local M = {}
 
@@ -46,13 +45,9 @@ function M.register(hl, _o, options)
     return false
   end
 
-  -- Spatial Overview owns Super+Tab once its plugin API is available.
-  -- Keep the legacy overview only as a fallback during plugin load/failure;
-  -- the explicit legacy chords below remain available during migration.
-  if not spatial.available(hl) then
-    register_binding(hl, "SUPER + TAB", command, "Workspace Overview (Legacy Fallback)")
-  end
-
+  -- Super+Tab is exclusively owned by Spatial Overview. The legacy UI keeps
+  -- only explicit migration/fallback chords so two overview implementations
+  -- can never be opened by one key press.
   -- Windows Ctrl+Alt+Tab semantics: open a persistent task switcher that
   -- stays visible after the chord is released.
   register_binding(
