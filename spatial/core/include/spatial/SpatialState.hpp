@@ -40,6 +40,7 @@ public:
 
     [[nodiscard]] bool pan(double dx, double dy) noexcept;
     [[nodiscard]] bool setZoom(double value) noexcept;
+    [[nodiscard]] bool resetCamera() noexcept;
 
     [[nodiscard]] std::span<const ManagedWindow> windows() const noexcept;
 
