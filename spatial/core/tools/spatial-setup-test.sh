@@ -202,6 +202,7 @@ sleep 0.2
 status_on="$(hyprctl gendbyte-spatial status)"
 printf '%s\n' "$status_on"
 [[ "$status_on" == *'"enabled":true'* ]] || die "Direct Lua toggle did not enable spatial mode"
+[[ "$status_on" == *'"zoom":0.74'* ]] || die "Spatial mode did not start at 74 percent zoom"
 
 echo
 echo "== Direct Lua toggle OFF =="
