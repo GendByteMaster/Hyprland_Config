@@ -40,7 +40,7 @@ bool Camera::setPosition(Point value) noexcept {
 }
 
 bool Camera::setZoom(double value) noexcept {
-    if (!std::isfinite(value) || value != 1.0) {
+    if (!std::isfinite(value) || value < kMinZoom || value > kMaxZoom) {
         return false;
     }
 
