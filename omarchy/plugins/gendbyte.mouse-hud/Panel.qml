@@ -11,27 +11,16 @@ Item {
   property bool cardShown: false
   property string mode: "numpad"
   property string button: "LMB"
-  property bool spatialEnabled: false
-  property int zoomPercent: 74
-  property string spatialAction: "toggle"
 
   function open(payloadJson) {
     var payload = {}
     try { payload = JSON.parse(payloadJson || "{}") || {} } catch (e) {}
 
-    if (payload.mode === "spatial") {
-      root.mode = "spatial"
-      root.spatialEnabled = payload.enabled === true
-      var parsedZoom = Number(payload.zoomPercent)
-      root.zoomPercent = isFinite(parsedZoom) && parsedZoom > 0 ? Math.round(parsedZoom) : 74
-      root.spatialAction = payload.action === "reset" ? "reset" : "toggle"
-    } else {
-      root.mode = payload.mode === "mouse" ? "mouse" : "numpad"
-      if (payload.button === "RMB" || payload.button === "MMB")
-        root.button = payload.button
-      else
-        root.button = "LMB"
-    }
+    root.mode = payload.mode === "mouse" ? "mouse" : "numpad"
+    if (payload.button === "RMB" || payload.button === "MMB")
+      root.button = payload.button
+    else
+      root.button = "LMB"
 
     root.opened = true
     root.cardShown = false
@@ -127,16 +116,12 @@ Item {
           height: 8
           radius: 4
           anchors.verticalCenter: parent.verticalCenter
-          color: root.mode === "spatial"
-            ? (root.spatialEnabled ? "#67e8f9" : "#9aa0a6")
-            : (root.mode === "mouse" ? "#8bd450" : "#9aa0a6")
+          color: root.mode === "mouse" ? "#8bd450" : "#9aa0a6"
         }
 
         Text {
           anchors.verticalCenter: parent.verticalCenter
-          text: root.mode === "spatial"
-            ? (root.spatialAction === "reset" ? "Camera Reset" : "Spatial Desktop")
-            : (root.mode === "mouse" ? "Mouse Mode" : "NumPad")
+          text: root.mode === "mouse" ? "Mouse Mode" : "NumPad"
           color: "#f5f5f7"
           font.pixelSize: 15
           font.weight: Font.DemiBold
@@ -144,7 +129,7 @@ Item {
         }
 
         Rectangle {
-          visible: root.mode === "mouse" || root.mode === "spatial"
+          visible: root.mode === "mouse"
           anchors.verticalCenter: parent.verticalCenter
           width: buttonText.implicitWidth + 16
           height: 28
@@ -156,9 +141,7 @@ Item {
           Text {
             id: buttonText
             anchors.centerIn: parent
-            text: root.mode === "spatial"
-              ? (root.spatialEnabled ? ("ON · " + root.zoomPercent + "%") : "OFF")
-              : root.button
+            text: root.button
             color: "#ffffff"
             font.pixelSize: 12
             font.weight: Font.Bold
