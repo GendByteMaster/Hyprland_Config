@@ -209,7 +209,7 @@ function M.register(hl, _o, options)
 
   register_binding(
     hl,
-    "CTRL + ALT + G",
+    "F12",
     function()
       M.toggle(hl)
     end,
