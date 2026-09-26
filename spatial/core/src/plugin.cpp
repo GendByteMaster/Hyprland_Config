@@ -51,6 +51,15 @@ int luaPanError(lua_State* L, spatial::PanResult result) {
     return luaL_error(L, "gendbyte-spatial: unreachable pan result");
 }
 
+int luaEnabled(lua_State* L) {
+    if (lua_gettop(L) != 0) {
+        return luaL_error(L, "gendbyte-spatial.enabled: expected no arguments");
+    }
+
+    lua_pushboolean(L, g_state.enabled() ? 1 : 0);
+    return 1;
+}
+
 int luaToggle(lua_State* L) {
     if (lua_gettop(L) != 0) {
         return luaL_error(L, "gendbyte-spatial.toggle: expected no arguments");
@@ -58,14 +67,16 @@ int luaToggle(lua_State* L) {
 
     if (g_state.enabled()) {
         g_adapter.disable();
-        return 0;
+        lua_pushboolean(L, 0);
+        return 1;
     }
 
     if (!g_adapter.enable()) {
         return luaL_error(L, "gendbyte-spatial.toggle: failed to initialize spatial desk/window snapshot");
     }
 
-    return 0;
+    lua_pushboolean(L, 1);
+    return 1;
 }
 
 int luaPan(lua_State* L) {
@@ -118,7 +129,8 @@ struct LuaFunctionRegistration {
     PLUGIN_LUA_FN function;
 };
 
-constexpr std::array<LuaFunctionRegistration, 5> kLuaFunctions{{
+constexpr std::array<LuaFunctionRegistration, 6> kLuaFunctions{{
+    {"enabled", luaEnabled},
     {"toggle", luaToggle},
     {"pan", luaPan},
     {"nudge", luaNudge},
