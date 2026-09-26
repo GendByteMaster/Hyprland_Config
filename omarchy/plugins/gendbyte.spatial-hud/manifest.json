@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "gendbyte.spatial-hud",
+  "name": "Spatial Desktop HUD",
+  "version": "0.1.0",
+  "author": "GendByteMaster",
+  "description": "Transient HUD for Developer Spatial Desktop state and camera reset",
+  "kinds": [
+    "panel"
+  ],
+  "entryPoints": {
+    "panel": "Panel.qml"
+  },
+  "keepLoaded": true
+}
