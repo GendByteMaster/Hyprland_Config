@@ -216,7 +216,7 @@ printf '%s\n' "$status_off"
 echo
 echo
 echo "Note: Windows Xbox Game Bar intercepts Win+Alt+G before Hyprland."
-echo "On Try Omarchy, use F12 to toggle Spatial Desktop; while enabled, use plain Arrow keys to move the camera."
+echo "On Try Omarchy, use Super+F12 to toggle Spatial Desktop; while enabled, use plain Arrow keys to move the camera."
 echo "=============================================="
 echo "Spatial plugin is versioned, installed, and config-managed."
 echo "Lua API: OK"
@@ -224,7 +224,7 @@ echo "Spatial bindings: OK"
 echo
 echo "Hotkeys:"
 echo "  Super+Alt+G      Toggle Spatial Desktop (native Linux)"
-echo "  F12              Toggle Spatial Desktop (Try Omarchy)"
+echo "  Super+F12        Toggle Spatial Desktop (Try Omarchy)"
 echo "  Super+Alt+Arrow  Camera movement (native Linux)"
 echo "  Arrow keys       Camera movement while Spatial is ON"
 echo "  Super+Alt+0      Reset camera (native Linux)"
