@@ -276,11 +276,47 @@ bool HyprlandAdapter::selectAtPointer() {
     }
 
     if (monitor->m_activeWorkspace != workspace) {
+        // Use Hyprland's normal workspace transition so IPC/bar state and
+        // workspace bookkeeping remain canonical. Suppress automatic focus
+        // and pointer simulation because Spatial owns the selected target.
         monitor->changeWorkspace(workspace, false, true, true);
     }
 
-    Desktop::focusState()->fullWindowFocus(selected, Desktop::FOCUS_REASON_CLICK);
+    // changeWorkspace recalculates the monitor, but explicitly recalculate the
+    // selected tiled space once more after Spatial's live box overrides have
+    // been removed. This guarantees the canonical layout tree wins.
+    if (const auto target = selected->layoutTarget(); target) {
+        if (const auto space = target->space(); space) {
+            space->recalculate();
+        }
+    }
+
+    Desktop::globalWindowController()->updateSuspendedStates();
     g_pHyprRenderer->damageMonitor(monitor);
+
+    const auto focusSelected = [selected, workspace, monitor] {
+        if (!Desktop::View::validMapped(selected)
+            || !selected->m_workspace
+            || selected->m_workspace != workspace
+            || monitor->m_activeWorkspace != workspace) {
+            return;
+        }
+
+        // Final focus happens after the mouse bind dispatch returns. This keeps
+        // the click release / follow-mouse path from stealing focus back to a
+        // window that happened to occupy the same screen coordinates after
+        // normal layout restoration.
+        Desktop::focusState()->fullWindowFocus(selected, Desktop::FOCUS_REASON_CLICK);
+        g_pHyprRenderer->damageWindow(selected);
+        g_pHyprRenderer->damageMonitor(monitor);
+    };
+
+    if (g_pEventLoopManager) {
+        (void)g_pEventLoopManager->doLater(focusSelected);
+    } else {
+        focusSelected();
+    }
+
     return true;
 }
 
