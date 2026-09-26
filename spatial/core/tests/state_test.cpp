@@ -88,6 +88,19 @@ int main() {
     require(transactional.enable(desk, initial), "transactional enable accepts a valid initial window set");
     require(transactional.epoch() == 1, "transactional enable increments epoch once");
     require(transactional.windows().size() == 2, "transactional enable commits all windows together");
+    const auto overviewEpoch = transactional.epoch();
+    require(
+        transactional.setWindowWorld("a", {300.0, 240.0, 420.0, 260.0}),
+        "overview layout can replace a managed world rectangle"
+    );
+    require(
+        transactional.findWindow("a") != nullptr
+        && transactional.findWindow("a")->world == spatial::Rect{300.0, 240.0, 420.0, 260.0},
+        "updated overview world rectangle is stored"
+    );
+    require(transactional.epoch() == overviewEpoch + 1, "world rectangle update increments epoch");
+    require(!transactional.setWindowWorld("missing", {0.0, 0.0, 1.0, 1.0}), "missing overview window is rejected");
+    require(!transactional.setWindowWorld("a", {0.0, 0.0, -1.0, 1.0}), "invalid overview rectangle is rejected");
 
     const spatial::Point deskCenter{desk.width() / 2.0, desk.height() / 2.0};
     const auto worldCenterBeforeZoom = transactional.camera().deskToWorld(deskCenter);
